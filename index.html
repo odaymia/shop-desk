@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Shop Desk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#12161c" />
+<style>
+  html, body { margin:0; padding:0; background:#12161c; }
+  #root { min-height:100vh; }
+  #boot {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:14px; background:#12161c; color:#8b98a8; z-index:999;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  #boot .ring {
+    width:34px; height:34px; border-radius:50%;
+    border:2px solid #2e3743; border-top-color:#f2a310; animation:spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg) } }
+  #boot .err { color:#e2593f; max-width:34ch; text-align:center; line-height:1.5; font-size:14px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="boot"><div class="ring"></div><div id="bootmsg">Opening the front desk…</div></div>
+<script>
+window.addEventListener("error", function (e) {
+  var b = document.getElementById("bootmsg");
+  if (b) {
+    b.className = "err";
+    b.textContent = "Couldn't start: " + (e.message || "unknown error") + ". Try reloading the page.";
+    var r = document.querySelector("#boot .ring");
+    if (r) r.style.display = "none";
+  }
+});
+</script>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+import { useState, useMemo } from "react";
+import { Money, fmtDate } from "./ui.jsx";
+import { customerName, vehicleName, searchText } from "./useShop.js";
+import { orderTotals, statusLabel } from "../lib/invoice.js";
+import { workSummary } from "./Customers.jsx";
+
+const FILTERS = [
+  ["estimate", "Estimates"],
+  ["open", "Repair orders"],
+  ["invoiced", "Invoices"],
+  ["due", "Balance due"],
+  ["all", "All"],
+];
+
+export function Orders({ shop, cfg, nav, onNew }) {
+  const [filter, setFilter] = useState("open");
+  const [q, setQ] = useState("");
+
+  const rows = useMemo(() => {
+    const all = Object.values(shop.orders).map((o) => {
+      const c = shop.customers[o.customerId];
+      const v = shop.vehicles[o.vehicleId];
+      return { o, c, v, t: orderTotals(o, cfg, c) };
+    });
+    const numbers = {};
+    for (const r of all) numbers[r.o.number] = (numbers[r.o.number] || 0) + 1;
+    return all
+      .filter(({ o, t }) => {
+        if (filter === "all") return true;
+        if (filter === "due") return o.status === "invoiced" && t.balance > 0.001;
+        return o.status === filter;
+      })
+      .filter(({ o, c, v }) =>
+        searchText(q, `#${o.number}`, String(o.number), customerName(c), c && c.phone, vehicleName(v), v && v.plate, o.concern)
+      )
+      .map((r) => ({ ...r, dup: numbers[r.o.number] > 1 }))
+      .sort((a, b) => (b.o.invoicedAt || b.o.createdAt) - (a.o.invoicedAt || a.o.createdAt));
+  }, [shop.orders, shop.customers, shop.vehicles, cfg, filter, q]);
+
+  const counts = useMemo(() => {
+    const n = { estimate: 0, open: 0, invoiced: 0, due: 0 };
+    for (const o of Object.values(shop.orders)) {
+      if (n[o.status] != null) n[o.status]++;
+      if (o.status === "invoiced" && orderTotals(o, cfg, shop.customers[o.customerId]).balance > 0.001) n.due++;
+    }
+    return n;
+  }, [shop.orders, shop.customers, cfg]);
+
+  return (
+    <>
+      <header className="deskHead">
+        <h1>Tickets</h1>
+        <div className="seg">
+          {FILTERS.map(([k, label]) => (
+            <button key={k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>
+              {label}
+              {counts[k] ? ` (${counts[k]})` : ""}
+            </button>
+          ))}
+        </div>
+        <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ticket #, name, plate, vehicle" />
+        <div className="grow" />
+        <button className="btn primary" onClick={() => onNew()}>
+          New ticket
+        </button>
+      </header>
+      <div className="deskBody">
+        <div className="tableCard scroll">
+          <table className="dk">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Vehicle</th>
+                <th>Work</th>
+                <th className="r">Total</th>
+                <th className="r">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="emptyNote">
+                    {q ? "Nothing matches." : filter === "open" ? "No open repair orders. Start a new ticket, or check Estimates." : "Nothing here yet."}
+                  </td>
+                </tr>
+              )}
+              {rows.map(({ o, c, v, t, dup }) => (
+                <tr key={o.id} className="row" onClick={() => nav.openOrder(o.id)}>
+                  <td>
+                    <strong>#{o.number}</strong> <span className={`st ${o.status}`}>{statusLabel(o.status)}</span>
+                    {dup && <span className="sub" style={{ color: "var(--warn)" }}>Duplicate number — two devices made tickets offline</span>}
+                  </td>
+                  <td className="muted">{fmtDate(o.invoicedAt || o.createdAt)}</td>
+                  <td>{customerName(c)}</td>
+                  <td className="muted">
+                    {vehicleName(v)}
+                    {v && v.plate ? <span className="sub">{v.plate}</span> : null}
+                  </td>
+                  <td className="muted">{workSummary(o)}</td>
+                  <td className="r num">
+                    <Money v={t.total} />
+                  </td>
+                  <td className="r num">
+                    {o.status === "void" ? (
+                      "—"
+                    ) : t.balance > 0.001 ? (
+                      <span className="st due">
+                        <Money v={t.balance} />
+                      </span>
+                    ) : o.status === "invoiced" ? (
+                      <span className="st paid">Paid</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
