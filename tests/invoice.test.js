@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney } from "../src/lib/invoice.js";
+import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText } from "../src/lib/invoice.js";
 
 const cfg = {
   laborRate: 150,
@@ -130,11 +130,44 @@ test("money formatting", () => {
 
 test("starter brake jobs sell for $219.99 before supplies and tax", async () => {
   const { STARTER_JOBS } = await import("../src/lib/starterJobs.js");
-  for (const job of STARTER_JOBS) {
+  const pads = STARTER_JOBS.filter((j) => /pads/.test(j.starterKey));
+  assert.equal(pads.length, 2);
+  for (const job of pads) {
     const lines = jobLines(job, { laborRate: 150 }, {}, () => "x");
     const t = orderTotals({ lines, noSupplies: true }, { ...cfg, taxRate: 0 });
     assert.equal(t.parts, 49.99, job.name);
     assert.equal(t.labor, 170, job.name);
     assert.equal(t.total, 219.99, job.name);
   }
+});
+
+test("tire job: 4 tires multiplies the tire, the $25 labor, and the $1.75 fee", async () => {
+  const { STARTER_JOBS } = await import("../src/lib/starterJobs.js");
+  const tires = STARTER_JOBS.find((j) => j.starterKey === "tires");
+  const lines = jobLines(tires, { laborRate: 150 }, {}, () => "x", 4);
+  const tire = lines.find((l) => l.kind === "part");
+  const labor = lines.find((l) => l.kind === "labor");
+  const fee = lines.find((l) => l.kind === "fee");
+  assert.equal(tire.qty, 4);
+  assert.equal(labor.hours, 4);
+  assert.equal(labor.rate, 25);
+  assert.equal(labor.unit, "tire");
+  assert.equal(laborQtyText(labor), "4 tires");
+  assert.equal(fee.qty, 4);
+  assert.equal(fee.price, 1.75);
+  tire.price = 120; // typed on the ticket
+  const t = orderTotals({ lines, noSupplies: true }, { ...cfg, taxRate: 7.75 });
+  assert.equal(t.parts, 480);
+  assert.equal(t.labor, 100);
+  assert.equal(t.fees, 7);
+  assert.equal(t.taxable, 480); // fee and labor are not taxed
+  assert.equal(t.tax, 37.2);
+  assert.equal(t.total, 624.2);
+  assert.equal(laborHours({ lines }), 0); // per-tire labor isn't clock hours
+  assert.equal(laborQtyText({ hours: 1.5 }), "1.5 hr");
+});
+
+test("a job with no unit ignores the count", () => {
+  const job = { name: "Fixed", lines: [{ kind: "labor", hours: 1, rate: 100 }] };
+  assert.equal(jobLines(job, cfg, {}, () => "x", 4)[0].hours, 1);
 });

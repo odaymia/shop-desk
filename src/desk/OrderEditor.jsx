@@ -564,8 +564,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           shop={shop}
           cfg={cfg}
           onClose={() => setPick(null)}
-          onPick={(j) => {
-            addLines(jobLines(j, cfg, shop.parts, uid).map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
+          onPick={(j, count) => {
+            addLines(jobLines(j, cfg, shop.parts, uid, count).map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
             setPick(null);
           }}
         />
@@ -623,6 +623,7 @@ function LineRow({ l, prev, rules, techs, locked, set, remove }) {
       <tr>
         <td>
           <span className="kindTag">{tag}</span>
+          {l.unit ? <span className="kindTag"> / {l.unit}</span> : null}
         </td>
         {l.kind === "note" ? (
           <td colSpan={6}>
@@ -649,7 +650,15 @@ function LineRow({ l, prev, rules, techs, locked, set, remove }) {
             </td>
             <td>
               {l.kind === "labor" ? (
-                <input className="r" inputMode="decimal" value={l.hours} onChange={(e) => set({ hours: e.target.value })} onBlur={(e) => set({ hours: toNum(e.target.value) })} readOnly={locked} />
+                <input
+                  className="r"
+                  inputMode="decimal"
+                  value={l.hours}
+                  onChange={(e) => set({ hours: e.target.value })}
+                  onBlur={(e) => set({ hours: toNum(e.target.value) })}
+                  readOnly={locked}
+                  title={l.unit ? `Number of ${l.unit}s` : "Hours"}
+                />
               ) : (
                 <input className="r" inputMode="decimal" value={l.qty} onChange={(e) => set({ qty: e.target.value })} onBlur={(e) => set({ qty: toNum(e.target.value) })} readOnly={locked} />
               )}

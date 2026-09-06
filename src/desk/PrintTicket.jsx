@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { fmtMoney, lineAmount, orderTotals, statusLabel } from "../lib/invoice.js";
+import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -197,7 +197,7 @@ function GroupRows({ g }) {
         <tr key={l.id}>
           <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>
           <td>{l.description}</td>
-          <td className="r">{l.kind === "labor" ? `${l.hours} hr` : l.kind === "note" ? "" : l.qty}</td>
+          <td className="r">{l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : l.qty}</td>
           <td className="r">{l.kind === "labor" ? fmtMoney(l.rate) : l.kind === "note" ? "" : fmtMoney(l.price)}</td>
           <td className="r">{l.kind === "note" ? "" : l.kind === "discount" ? `-${fmtMoney(lineAmount(l))}` : fmtMoney(lineAmount(l))}</td>
         </tr>

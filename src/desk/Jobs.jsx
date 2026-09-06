@@ -8,11 +8,21 @@ import { uid } from "../lib/ids.js";
 /* Canned jobs: a bundle of parts and labor that drops onto a ticket in one
    tap. "Full synthetic oil change" = 5 qt oil + filter + 0.4 hr labor. */
 
-const blank = () => ({ name: "", category: "", lines: [], active: true });
+const blank = () => ({ name: "", category: "", unit: "", lines: [], active: true });
 const blankLine = (kind) =>
   kind === "labor"
     ? { kind, description: "", hours: 0.5, rate: null }
+    : kind === "fee"
+    ? { kind, description: "", qty: 1, price: 0 }
     : { kind, description: "", number: "", partId: null, qty: 1, price: null, cost: null };
+const lineText = (l, parts, unit) =>
+  l.kind === "labor"
+    ? unit && l.perUnit
+      ? `${l.description || "labor"} $${Number(l.rate || 0).toFixed(2)}/${unit}`
+      : `${l.hours} hr ${l.description || "labor"}`
+    : `${l.qty}× ${l.description || l.number || (parts && parts[l.partId] && parts[l.partId].description) || l.kind}${
+        l.kind === "fee" ? ` $${Number(l.price || 0).toFixed(2)}` : ""
+      }`;
 
 export function Jobs({ shop, cfg, flash }) {
   const [edit, setEdit] = useState(null);
@@ -54,12 +64,12 @@ export function Jobs({ shop, cfg, flash }) {
                   </td>
                   <td className="muted">{j.category}</td>
                   <td className="muted">
-                    {j.lines
-                      .map((l) => (l.kind === "labor" ? `${l.hours} hr ${l.description || "labor"}` : `${l.qty}× ${l.description || l.number || "part"}`))
-                      .join(", ")}
+                    {j.unit ? `Per ${j.unit}: ` : ""}
+                    {j.lines.map((l) => lineText(l, shop.parts, j.unit)).join(", ")}
                   </td>
                   <td className="r num">
                     <Money v={priceOf(j)} />
+                    {j.unit ? <span className="sub">per {j.unit}</span> : null}
                   </td>
                 </tr>
               ))}
@@ -107,14 +117,24 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
           <Field label="Category">
             <Text value={d.category} onChange={(v) => setD({ ...d, category: v })} placeholder="Oil, Brakes, Tires…" />
           </Field>
+          <Field label="Priced per (leave blank for a fixed job)">
+            <Text value={d.unit || ""} onChange={(v) => setD({ ...d, unit: v.trim().toLowerCase() })} placeholder="tire, wheel, quart" />
+          </Field>
         </div>
+        {d.unit && (
+          <p className="noteBox">
+            When this job goes on a ticket you'll be asked how many {d.unit}s. Lines with “× count” checked multiply by
+            that number; the rest are added once.
+          </p>
+        )}
         <div className="subhead">Lines</div>
         <div className="miniLines">
           {d.lines.map((l, i) => (
-            <div className="miniLine" key={i}>
+            <div className={`miniLine ${d.unit ? "unit" : ""}`} key={i}>
               <select value={l.kind} onChange={(e) => setLine(i, blankLine(e.target.value))}>
                 <option value="part">Part</option>
                 <option value="labor">Labor</option>
+                <option value="fee">Fee</option>
               </select>
               {l.kind === "part" ? (
                 <div style={{ display: "flex", gap: 6 }}>
@@ -129,14 +149,20 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                   </button>
                 </div>
               ) : (
-                <input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} placeholder="Lube, oil, filter" />
+                <input
+                  value={l.description}
+                  onChange={(e) => setLine(i, { description: e.target.value })}
+                  placeholder={l.kind === "fee" ? "CA tire recycling fee" : "Lube, oil, filter"}
+                />
               )}
-              {l.kind === "part" ? (
-                <input inputMode="decimal" value={l.qty} onChange={(e) => setLine(i, { qty: toNum(e.target.value) })} title="Quantity" />
+              {l.kind === "labor" ? (
+                <input inputMode="decimal" value={l.hours} onChange={(e) => setLine(i, { hours: toNum(e.target.value) })} title={d.unit && l.perUnit ? `Per ${d.unit}` : "Hours"} />
               ) : (
-                <input inputMode="decimal" value={l.hours} onChange={(e) => setLine(i, { hours: toNum(e.target.value) })} title="Hours" />
+                <input inputMode="decimal" value={l.qty} onChange={(e) => setLine(i, { qty: toNum(e.target.value) })} title="Quantity" />
               )}
-              {l.kind === "part" ? (
+              {l.kind === "fee" ? (
+                <input inputMode="decimal" value={l.price == null ? "" : l.price} onChange={(e) => setLine(i, { price: toNum(e.target.value) })} placeholder="amount" title="Fee amount" />
+              ) : l.kind === "part" ? (
                 <input
                   inputMode="decimal"
                   value={l.price == null ? "" : l.price}
@@ -149,9 +175,15 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                   inputMode="decimal"
                   value={l.rate == null ? "" : l.rate}
                   onChange={(e) => setLine(i, { rate: numOrNull(e.target.value) })}
-                  placeholder={`$${toNum(cfg.laborRate)}/hr`}
-                  title="Rate — blank uses the shop rate"
+                  placeholder={d.unit && l.perUnit ? `$ per ${d.unit}` : `$${toNum(cfg.laborRate)}/hr`}
+                  title={d.unit && l.perUnit ? `Flat amount per ${d.unit}` : "Rate — blank uses the shop rate"}
                 />
+              )}
+              {d.unit && (
+                <label className="perUnit" title={`Multiply by the number of ${d.unit}s`}>
+                  <input type="checkbox" checked={!!l.perUnit} onChange={(e) => setLine(i, { perUnit: e.target.checked })} />
+                  <span>× count</span>
+                </label>
               )}
               <button className="lineX" onClick={() => remove(i)} aria-label="Remove">
                 ✕
@@ -165,6 +197,9 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
           </button>
           <button className="btn tiny" onClick={() => add("labor")}>
             + Labor
+          </button>
+          <button className="btn tiny" onClick={() => add("fee")}>
+            + Fee
           </button>
         </div>
         {d.id && (

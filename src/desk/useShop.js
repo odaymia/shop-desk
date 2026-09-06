@@ -115,10 +115,10 @@ export function useShop(cfg) {
     [commit]
   );
 
-  /* A shop with no canned jobs at all gets the starter set, once. If this
-     computer is signed in, wait for the first pull so jobs another
-     computer already made aren't doubled up. Jobs are never deleted, so
-     "none at all" can only mean a brand-new shop. */
+  /* Starter jobs the shop doesn't have yet are added once the data is in.
+     If this computer is signed in, wait for the first pull so jobs another
+     computer already made aren't doubled up. Jobs are never deleted (only
+     retired), so a missing one can only mean it was never added. */
   useEffect(() => {
     if (!data.loaded) return;
     let done = false;
@@ -127,8 +127,11 @@ export function useShop(cfg) {
       const s = cloud.getState();
       if (s.linked && !s.lastSync) return;
       done = true;
-      if (Object.keys(ref.current.jobs).length) return;
-      for (const j of STARTER_JOBS) await put("jobs", jobKey, { ...j, active: true });
+      const have = Object.values(ref.current.jobs);
+      for (const j of STARTER_JOBS) {
+        if (have.some((x) => x.starterKey === j.starterKey || x.name === j.name)) continue;
+        await put("jobs", jobKey, { ...j, active: true });
+      }
     };
     trySeed();
     return cloud.subscribe((e) => (e.type === "state" || e.type === "data") && trySeed());

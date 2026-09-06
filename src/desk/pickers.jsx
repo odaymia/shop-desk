@@ -63,9 +63,12 @@ export function PartPicker({ shop, onPick, onTyped, onClose }) {
   );
 }
 
-/* Pick a canned job. Shows what it would cost at today's prices. */
+/* Pick a canned job. Shows what it would cost at today's prices. A job
+   priced per unit asks how many first. */
 export function JobPicker({ shop, cfg, onPick, onClose }) {
   const [q, setQ] = useState("");
+  const [asking, setAsking] = useState(null); // job waiting for a count
+  const [count, setCount] = useState(4);
   const rows = useMemo(
     () =>
       activeList(shop.jobs)
@@ -73,6 +76,58 @@ export function JobPicker({ shop, cfg, onPick, onClose }) {
         .sort((a, b) => (a.category || "").localeCompare(b.category || "") || a.name.localeCompare(b.name)),
     [shop.jobs, q]
   );
+  const lineText = (l, unit) =>
+    l.kind === "labor"
+      ? unit && l.perUnit
+        ? `${l.description || "labor"} $${toNum(l.rate).toFixed(2)}/${unit}`
+        : `${l.hours} hr labor`
+      : `${l.qty}× ${l.description || l.number || shop.parts[l.partId]?.description || l.kind}${
+          l.kind === "fee" ? ` $${toNum(l.price).toFixed(2)}` : ""
+        }`;
+
+  if (asking) {
+    const unit = asking.unit;
+    const price = orderTotals({ lines: jobLines(asking, cfg, shop.parts, uid, count), noSupplies: true }, cfg).subtotal;
+    return (
+      <Modal title={asking.name} onClose={() => setAsking(null)}>
+        <p className="muted" style={{ marginTop: 0 }}>
+          How many {unit}s?
+        </p>
+        <div className="countRow">
+          {[1, 2, 4].map((n) => (
+            <button key={n} className={`btn ${count === n ? "primary" : ""}`} onClick={() => setCount(n)}>
+              {n}
+            </button>
+          ))}
+          <input
+            className="search"
+            style={{ minWidth: 0, width: 90 }}
+            inputMode="numeric"
+            value={count}
+            onChange={(e) => setCount(Math.max(1, toNum(e.target.value) || 1))}
+          />
+        </div>
+        <p className="muted">
+          {asking.lines
+            .map((l) =>
+              l.perUnit
+                ? l.kind === "labor"
+                  ? `${count} × ${l.description || "labor"} at $${toNum(l.rate).toFixed(2)}`
+                  : `${toNum(l.qty) * count}× ${l.description || l.number || shop.parts[l.partId]?.description || l.kind}${
+                      l.kind === "fee" ? ` at $${toNum(l.price).toFixed(2)}` : ""
+                    }`
+                : lineText(l, unit)
+            )
+            .join(", ")}
+        </p>
+        <button className="btn primary lg full" onClick={() => onPick(asking, count)}>
+          Add {count} {unit}
+          {count === 1 ? "" : "s"} · <Money v={price} /> plus tire price
+        </button>
+      </Modal>
+    );
+  }
+
   return (
     <Modal title="Add a job" onClose={onClose} size="wide">
       <input className="search" style={{ width: "100%" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Job name" autoFocus />
@@ -81,20 +136,19 @@ export function JobPicker({ shop, cfg, onPick, onClose }) {
         {rows.map((j) => {
           const price = orderTotals({ lines: jobLines(j, cfg, shop.parts, uid), noSupplies: true }, cfg).subtotal;
           return (
-            <li key={j.id} onClick={() => onPick(j)}>
+            <li key={j.id} onClick={() => (j.unit ? (setAsking(j), setCount(4)) : onPick(j, 1))}>
               <div className="main">
                 <strong>{j.name}</strong>
                 <span>
-                  {j.lines
-                    .map((l) => (l.kind === "labor" ? `${l.hours} hr labor` : `${l.qty}× ${l.description || l.number || shop.parts[l.partId]?.description || "part"}`))
-                    .join(", ")}
+                  {j.unit ? `Per ${j.unit}: ` : ""}
+                  {j.lines.map((l) => lineText(l, j.unit)).join(", ")}
                 </span>
               </div>
               <div className="side">
                 <strong>
                   <Money v={price} />
                 </strong>
-                {j.category}
+                {j.unit ? `per ${j.unit}` : j.category}
               </div>
             </li>
           );

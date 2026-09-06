@@ -123,9 +123,12 @@ export function orderTotals(order, cfg, customer) {
   };
 }
 
-/* Labor hours on the ticket, for productivity reports. */
+/* Labor hours on the ticket, for productivity reports. Per-unit labor
+   (so much a tire) isn't clock time and is left out. */
 export function laborHours(order) {
-  return round2(((order && order.lines) || []).filter((l) => l.kind === "labor").reduce((a, l) => a + num(l.hours), 0));
+  return round2(
+    ((order && order.lines) || []).filter((l) => l.kind === "labor" && !l.unit).reduce((a, l) => a + num(l.hours), 0)
+  );
 }
 
 /* ---------- status ---------- */
@@ -151,12 +154,20 @@ export function stockMoves(order) {
 
 /* Expand a canned job into fresh lines priced at today's rates. A job
    line may carry its own price; otherwise the inventory part's price is
-   used when there is one, and labor falls back to the shop rate. */
-export function jobLines(job, cfg, parts, mkId) {
+   used when there is one, and labor falls back to the shop rate.
+
+   A job can be priced per unit (`job.unit`, e.g. "tire"): lines marked
+   `perUnit` have their qty or hours multiplied by `count`. Labor on such
+   a line is a flat amount per unit, so `hours` holds the count and the
+   line carries `unit` so screens say "4 tires", not "4 hr". */
+export function jobLines(job, cfg, parts, mkId, count = 1) {
+  const n = Math.max(1, num(count) || 1);
   const out = [];
   for (const t of (job && job.lines) || []) {
     const part = t.partId && parts ? parts[t.partId] : null;
-    const line = makeLine(t.kind, cfg, {
+    const scaled = job.unit && t.perUnit;
+    const mult = scaled ? n : 1;
+    const extra = {
       ...t,
       id: mkId(),
       job: job.name,
@@ -165,10 +176,24 @@ export function jobLines(job, cfg, parts, mkId) {
       price: t.price != null ? t.price : part ? num(part.price) : 0,
       cost: t.cost != null ? t.cost : part ? num(part.cost) : 0,
       rate: t.rate != null ? t.rate : num(cfg.laborRate),
-    });
-    out.push(line);
+    };
+    delete extra.perUnit;
+    if (t.kind === "labor") {
+      extra.hours = round2((t.hours == null ? 1 : num(t.hours)) * mult);
+      if (scaled) extra.unit = job.unit;
+    } else if (t.kind !== "note") {
+      extra.qty = round2((t.qty == null ? 1 : num(t.qty)) * mult);
+    }
+    out.push(makeLine(t.kind, cfg, extra));
   }
   return out;
+}
+
+/* "4 tires" for per-unit labor, "1.5 hr" otherwise. */
+export function laborQtyText(line) {
+  const h = num(line.hours);
+  if (line.unit) return `${h} ${line.unit}${h === 1 ? "" : "s"}`;
+  return `${h} hr`;
 }
 
 /* ---------- money ---------- */
