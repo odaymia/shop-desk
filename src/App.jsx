@@ -3,8 +3,10 @@ import { Desk } from "./desk/Desk.jsx";
 import { Setup } from "./components/Setup.jsx";
 import { Toast } from "./components/Toast.jsx";
 import { DEFAULT_CFG } from "./lib/config.js";
-import { CFG_KEY, ROSTER_KEY } from "./lib/keys.js";
-import { cloud, sGet, sSet, storageReady } from "./storage/index.js";
+import { CFG_KEY, JOB_PREFIX, ROSTER_KEY, jobKey } from "./lib/keys.js";
+import { STARTER_JOBS } from "./lib/starterJobs.js";
+import { uid } from "./lib/ids.js";
+import { cloud, sGet, sGetAll, sSet, storageReady } from "./storage/index.js";
 
 /* Root: loads settings and the shared staff list, then shows the desk.
    No PIN — this runs on the counter PC signed in with the shop account.
@@ -56,6 +58,22 @@ export default function App() {
     await sSet(ROSTER_KEY, next);
   }, []);
 
+  /* first run: name the shop, and give it a few canned jobs to start from
+     unless some already came across from another computer */
+  const finishSetup = useCallback(
+    async (next) => {
+      if ((await sGetAll(JOB_PREFIX)).length === 0) {
+        const now = Date.now();
+        for (const j of STARTER_JOBS) {
+          const id = uid();
+          await sSet(jobKey(id), { ...j, id, active: true, createdAt: now, updatedAt: now });
+        }
+      }
+      await saveCfg(next);
+    },
+    [saveCfg]
+  );
+
   if (!ready)
     return (
       <div className="root">
@@ -69,7 +87,7 @@ export default function App() {
   if (!cfg.shopName)
     return (
       <div className="root">
-        <Setup cfg={cfg} onDone={saveCfg} />
+        <Setup cfg={cfg} onDone={finishSetup} />
       </div>
     );
 

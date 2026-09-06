@@ -127,3 +127,14 @@ test("money formatting", () => {
   assert.equal(fmtMoney(1234.5), "$1,234.50");
   assert.equal(fmtMoney(-3), "-$3.00");
 });
+
+test("starter brake jobs sell for $219.99 before supplies and tax", async () => {
+  const { STARTER_JOBS } = await import("../src/lib/starterJobs.js");
+  for (const job of STARTER_JOBS) {
+    const lines = jobLines(job, { laborRate: 150 }, {}, () => "x");
+    const t = orderTotals({ lines, noSupplies: true }, { ...cfg, taxRate: 0 });
+    assert.equal(t.parts, 49.99, job.name);
+    assert.equal(t.labor, 170, job.name);
+    assert.equal(t.total, 219.99, job.name);
+  }
+});
