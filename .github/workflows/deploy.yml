@@ -1,6 +1,6 @@
 # Builds the app and publishes dist/ to GitHub Pages on every push to main.
-# Same pipeline as the time clock. configure-pages turns Pages on for the
-# repo the first time so there is no manual step in the GitHub settings.
+# Same pipeline as the time clock. One-time setup in the repo: Settings →
+# Pages → Source: GitHub Actions.
 name: Deploy to GitHub Pages
 
 on:
@@ -26,9 +26,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - run: npm ci
       - run: npm run lint
       - run: npm test
