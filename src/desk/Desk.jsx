@@ -11,6 +11,7 @@ import { Staff } from "./Staff.jsx";
 import { Reports } from "./Reports.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
 import { PrintTicket } from "./PrintTicket.jsx";
+import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
 
@@ -72,6 +73,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       <div className="desk">
         <nav className="deskNav">
           <div className="deskBrand">
+            <img className="brandLogo" src={cfg.logo || defaultLogo} alt="" />
             <strong>{cfg.shopName}</strong>
             <span>Front desk</span>
           </div>

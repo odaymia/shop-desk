@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { fmtMoney, lineAmount, orderTotals, statusLabel } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
+import defaultLogo from "../assets/genie-logo.png";
 
 /* The paper copy. Black on white, one page for most tickets. */
 export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
@@ -38,6 +39,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
         <div className="sheet">
           <div className="shHead">
             <div>
+              <img className="shLogo" src={cfg.logo || defaultLogo} alt="" />
               <h1>{cfg.shopName}</h1>
               <div>{cfg.shopAddress}</div>
               <div>{[fmtPhone(cfg.shopPhone), cfg.shopEmail].filter(Boolean).join(" · ")}</div>

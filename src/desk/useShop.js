@@ -16,6 +16,7 @@ import {
   orderKey,
 } from "../lib/keys.js";
 import { STATUS, canTransition, snapshotRules, stockMoves, round2 } from "../lib/invoice.js";
+import { STARTER_JOBS } from "../lib/starterJobs.js";
 import { cloud, sGet, sGetAll, sSet } from "../storage/index.js";
 
 /* Front desk data: customers, vehicles, parts, vendors, canned jobs, and
@@ -113,6 +114,25 @@ export function useShop(cfg) {
     },
     [commit]
   );
+
+  /* A shop with no canned jobs at all gets the starter set, once. If this
+     computer is signed in, wait for the first pull so jobs another
+     computer already made aren't doubled up. Jobs are never deleted, so
+     "none at all" can only mean a brand-new shop. */
+  useEffect(() => {
+    if (!data.loaded) return;
+    let done = false;
+    const trySeed = async () => {
+      if (done || !ref.current.loaded) return;
+      const s = cloud.getState();
+      if (s.linked && !s.lastSync) return;
+      done = true;
+      if (Object.keys(ref.current.jobs).length) return;
+      for (const j of STARTER_JOBS) await put("jobs", jobKey, { ...j, active: true });
+    };
+    trySeed();
+    return cloud.subscribe((e) => (e.type === "state" || e.type === "data") && trySeed());
+  }, [data.loaded, put]);
 
   const saveCustomer = useCallback((c) => put("customers", customerKey, c), [put]);
   const saveVehicle = useCallback((v) => put("vehicles", vehicleKey, v), [put]);

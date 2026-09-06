@@ -1,6 +1,27 @@
 import { useState, useEffect } from "react";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
+import defaultLogo from "../assets/genie-logo.png";
+
+/* Shrink an uploaded image to something that fits in a settings record
+   and prints crisply: at most 900px wide, PNG so transparency survives. */
+function readLogo(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 900 / img.width);
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL("image/png"));
+    };
+    img.onerror = () => rej(new Error("That file isn't an image the browser can read."));
+    img.src = url;
+  });
+}
 
 /* Shop info, pricing rules, what prints on the invoice, and the cloud
    account. */
@@ -33,6 +54,36 @@ export function DeskSettings({ cfg, saveCfg, flash }) {
       <div className="deskBody">
         <div className="settingsGrid">
           <h3 className="subhead">On the invoice header</h3>
+          <div className="fld">
+            <span>Logo (shown in the menu and printed on tickets)</span>
+            <div className="logoPreview">
+              <img src={d.logo || defaultLogo} alt="" />
+              <div className="rowBtns">
+                <label className="btn tiny">
+                  Upload
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (!f) return;
+                      try {
+                        set("logo")(await readLogo(f));
+                      } catch (err) {
+                        flash(err.message, "out");
+                      }
+                    }}
+                  />
+                </label>
+                {d.logo && (
+                  <button className="btn tiny" onClick={() => set("logo")("")}>
+                    Use the default
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
           <Field label="Shop name">
             <Text value={d.shopName} onChange={set("shopName")} />
           </Field>

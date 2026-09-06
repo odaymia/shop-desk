@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CloudSync } from "./CloudSync.jsx";
 import { useCloud } from "../hooks/useCloud.js";
+import defaultLogo from "../assets/genie-logo.png";
 
 /* First run. Name the shop, or sign in and let the settings come across. */
 export function Setup({ cfg, onDone }) {
@@ -15,6 +16,7 @@ export function Setup({ cfg, onDone }) {
   return (
     <div className="setupWrap">
       <div className="setupCard">
+        <img className="setupLogo" src={defaultLogo} alt="" />
         <h1 className="setupTitle">Set up the front desk</h1>
         <p className="setupLead">
           Tickets, customers, inventory, and invoices for the shop. Runs in the browser on the counter PC, keeps

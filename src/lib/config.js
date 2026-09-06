@@ -5,6 +5,7 @@ export const DEFAULT_CFG = {
   shopPhone: "",
   shopAddress: "", // free text, printed on the invoice header
   shopEmail: "",
+  logo: "", // data URL of the shop logo; blank shows the bundled Genie logo
   weekStart: 1, // 0=Sun ... 6=Sat; used by the "This week" report range
   laborRate: 150, // default $/hour for labor lines
   taxRate: 7.75, // percent; San Diego city rate

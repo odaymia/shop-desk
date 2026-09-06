@@ -1,16 +1,21 @@
-/* Palette and base rules shared with the time clock: asphalt background,
-   amber accent, green for money in, blue for info, red for problems. */
+/* Palette: white pages, grey menu, Genie red for buttons and accents.
+   Green means paid, blue means estimate, amber means work in progress,
+   red means a problem. Variable names are kept from the dark theme so
+   the desk stylesheet reads the same. */
 :root {
-  --asphalt:#12161c;
-  --panel:#1a2029;
-  --panel2:#212934;
-  --line:#2e3743;
-  --ink:#e9eef4;
-  --muted:#8b98a8;
-  --signal:#f2a310;
-  --live:#3fb56a;
-  --brk:#5aa7e0;
-  --warn:#e2593f;
+  --asphalt:#ffffff;   /* page and input background */
+  --panel:#f5f6f8;     /* cards */
+  --panel2:#e9ecf0;    /* pressed / hover */
+  --menu:#e4e7eb;      /* the sidebar */
+  --line:#d6dbe2;
+  --ink:#1b1f24;
+  --muted:#5f6b78;
+  --signal:#9a2c2c;    /* Genie red */
+  --signalInk:#ffffff;
+  --live:#2e8b57;
+  --brk:#1e7bb8;
+  --amber:#c47a00;
+  --warn:#c62828;
 }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 .root {
@@ -32,11 +37,12 @@ input, select, textarea { font-family:inherit; font-size:16px; }
   padding:11px 18px; font-size:15px;
 }
 .btn:active { background:var(--panel2); }
-.btn.primary { background:var(--signal); border-color:var(--signal); color:#1a1300; font-weight:600; }
+.btn.primary { background:var(--signal); border-color:var(--signal); color:var(--signalInk); font-weight:600; }
+.btn.primary:active { background:#7f2222; }
 .btn.ghost { background:transparent; color:var(--muted); }
 .btn.tiny { padding:7px 12px; font-size:13px; }
-.btn.tiny.primary { color:#1a1300; }
-.btn.danger { color:var(--warn); border-color:rgba(226,89,63,.35); }
+.btn.tiny.primary { color:var(--signalInk); }
+.btn.danger { color:var(--warn); border-color:rgba(198,40,40,.35); }
 .btn.lg { padding:16px 26px; font-size:18px; }
 .btn.full { width:100%; margin-top:8px; }
 .btn:disabled { opacity:.35; }
@@ -49,13 +55,13 @@ input, select, textarea { font-family:inherit; font-size:16px; }
 
 /* overlay + cards */
 .overlay {
-  position:fixed; inset:0; background:rgba(8,11,15,.86);
+  position:fixed; inset:0; background:rgba(20,24,30,.55);
   display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;
   backdrop-filter:blur(3px);
 }
 .editCard {
   position:relative;
-  background:var(--panel); border:1px solid var(--line); border-radius:18px;
+  background:#fff; box-shadow:0 20px 60px rgba(0,0,0,.25); border:1px solid var(--line); border-radius:18px;
   padding:30px; width:100%; max-width:520px;
 }
 .closeX {
@@ -82,22 +88,22 @@ input, select, textarea { font-family:inherit; font-size:16px; }
   padding:14px 16px; margin:0 0 16px; border-radius:10px; font-size:13.5px; line-height:1.55;
   background:var(--asphalt); border:1px solid var(--line); color:var(--muted);
 }
-.legalNote { margin-top:22px; color:#5c6774; font-size:13px; line-height:1.6; max-width:78ch; }
+.legalNote { margin-top:22px; color:#6b7580; font-size:13px; line-height:1.6; max-width:78ch; }
 
 /* toast */
 .toast {
   position:fixed; left:50%; bottom:36px; transform:translateX(-50%);
-  background:var(--live); color:#04180c; padding:16px 28px; border-radius:12px;
+  background:var(--live); color:#fff; padding:16px 28px; border-radius:12px;
   font-size:18px; font-weight:600; z-index:80; box-shadow:0 10px 40px rgba(0,0,0,.5);
 }
-.toast.out { background:var(--signal); color:#1a1300; }
+.toast.out { background:var(--signal); color:#fff; }
 
 /* setup + boot */
 .setupWrap { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
-.setupCard { width:100%; max-width:460px; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:32px; }
+.setupCard { width:100%; max-width:460px; background:#fff; box-shadow:0 12px 40px rgba(0,0,0,.12); border:1px solid var(--line); border-radius:18px; padding:32px; }
 .setupTitle { margin:0 0 8px; font-size:27px; font-weight:600; letter-spacing:-0.02em; }
 .setupLead { margin:0 0 22px; color:var(--muted); line-height:1.5; font-size:15px; }
-.setupNote { margin:14px 0 0; color:#5c6774; font-size:13px; line-height:1.5; }
+.setupNote { margin:14px 0 0; color:#6b7580; font-size:13px; line-height:1.5; }
 .setupCloud { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
 .cloudBox { display:flex; flex-direction:column; gap:10px; }
 .cloudBox p { margin:0; line-height:1.5; }
@@ -105,6 +111,7 @@ input, select, textarea { font-family:inherit; font-size:16px; }
 .bootPulse { width:36px; height:36px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--signal); animation:spin 1s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 .bootTxt { color:var(--muted); }
+.setupLogo { display:block; width:240px; max-width:100%; margin:0 auto 18px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation:none !important; transition:none !important; }

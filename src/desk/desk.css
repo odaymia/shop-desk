@@ -1,23 +1,24 @@
-/* Front desk: the office side of the shop. Same palette as the clock,
-   denser layout because it's a monitor with a mouse, not a wall iPad. */
+/* Front desk: the office side of the shop. Light theme, grey menu, Genie
+   red accents. Denser than a kiosk because it's a monitor with a mouse. */
 
 .desk { flex:1; display:flex; min-height:100vh; min-height:100dvh; }
 .deskNav {
   width:210px; flex-shrink:0; display:flex; flex-direction:column;
-  border-right:1px solid var(--line); background:#151a21; padding:18px 12px;
+  border-right:1px solid var(--line); background:var(--menu); padding:18px 12px;
   position:sticky; top:0; height:100vh; height:100dvh;
 }
-.deskBrand { padding:4px 10px 18px; }
-.deskBrand strong { display:block; font-size:17px; letter-spacing:-0.01em; }
+.deskBrand { padding:4px 6px 18px; text-align:center; }
+.brandLogo { display:block; width:100%; max-width:180px; margin:0 auto 8px; }
+.deskBrand strong { display:block; font-size:15px; letter-spacing:-0.01em; }
 .deskBrand span { font-size:12px; color:var(--muted); }
 .deskNavBtn {
   display:flex; align-items:center; gap:10px; width:100%; text-align:left;
   background:transparent; border:1px solid transparent; color:var(--muted);
   padding:11px 12px; border-radius:9px; font-size:15px; margin-bottom:2px;
 }
-.deskNavBtn.on { color:var(--ink); background:var(--panel); border-color:var(--line); }
+.deskNavBtn.on { color:var(--signal); background:#fff; border-color:var(--line); font-weight:600; }
 .deskNavBtn:hover { color:var(--ink); }
-.deskNavBtn .k { margin-left:auto; font-size:12px; color:#5c6774; }
+.deskNavBtn .k { margin-left:auto; font-size:12px; color:var(--muted); }
 .deskNavFoot { margin-top:auto; display:flex; flex-direction:column; gap:6px; }
 .deskMain { flex:1; min-width:0; display:flex; flex-direction:column; }
 .deskHead {
@@ -51,24 +52,24 @@ table.dk th { color:var(--muted); font-weight:500; font-size:12px; text-transfor
 table.dk td.r, table.dk th.r { text-align:right; }
 table.dk td.num { font-variant-numeric:tabular-nums; }
 table.dk tr.row { cursor:pointer; }
-table.dk tr.row:hover td { background:rgba(255,255,255,.025); }
+table.dk tr.row:hover td { background:rgba(154,44,44,.04); }
 table.dk tr.off td { opacity:.45; }
 table.dk td.muted { color:var(--muted); }
 table.dk td .sub { display:block; font-size:12px; color:var(--muted); margin-top:2px; }
-.tableCard { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#161b22; }
+.tableCard { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; }
 .tableCard.scroll { overflow-x:auto; }
 
 /* status pills */
 .st { display:inline-block; font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
-.st.estimate { color:var(--brk); border-color:rgba(90,167,224,.4); }
-.st.open { color:var(--signal); border-color:rgba(242,163,16,.45); }
-.st.invoiced { color:var(--live); border-color:rgba(63,181,106,.4); }
-.st.void { color:var(--warn); border-color:rgba(226,89,63,.4); }
-.st.due { color:var(--warn); border-color:rgba(226,89,63,.4); }
-.st.paid { color:var(--live); border-color:rgba(63,181,106,.4); }
+.st.estimate { color:var(--brk); border-color:rgba(30,123,184,.4); background:rgba(30,123,184,.06); }
+.st.open { color:var(--amber); border-color:rgba(196,122,0,.45); background:rgba(196,122,0,.07); }
+.st.invoiced { color:var(--live); border-color:rgba(46,139,87,.4); background:rgba(46,139,87,.07); }
+.st.void { color:var(--warn); border-color:rgba(198,40,40,.4); }
+.st.due { color:var(--warn); border-color:rgba(198,40,40,.4); background:rgba(198,40,40,.06); }
+.st.paid { color:var(--live); border-color:rgba(46,139,87,.4); background:rgba(46,139,87,.07); }
 
 /* cards */
-.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
 .card + .card { margin-top:14px; }
 .cardHead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
 .cardHead h3 { margin:0; font-size:15px; font-weight:600; }
@@ -80,7 +81,7 @@ table.dk td .sub { display:block; font-size:12px; color:var(--muted); margin-top
 .big { font-size:26px; font-weight:600; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
 .emptyNote { color:var(--muted); padding:28px; text-align:center; line-height:1.5; }
 .linkish { background:none; border:none; color:var(--signal); padding:0; font-size:inherit; text-decoration:underline; cursor:pointer; }
-.warnBox { border:1px solid rgba(226,89,63,.4); background:rgba(226,89,63,.08); color:var(--ink); border-radius:10px; padding:12px 14px; font-size:14px; line-height:1.5; }
+.warnBox { border:1px solid rgba(198,40,40,.4); background:rgba(198,40,40,.06); color:var(--ink); border-radius:10px; padding:12px 14px; font-size:14px; line-height:1.5; }
 
 /* ticket editor */
 .tk { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:18px; align-items:start; }
@@ -99,7 +100,7 @@ table.lines td { padding:6px 8px; border-bottom:1px solid var(--line); vertical-
 table.lines td.r, table.lines th.r { text-align:right; }
 table.lines tr.jobHead td { color:var(--signal); font-size:12px; text-transform:uppercase; letter-spacing:.05em; padding-top:12px; border-bottom:none; }
 table.lines input, table.lines select {
-  width:100%; background:var(--asphalt); border:1px solid transparent; color:var(--ink);
+  width:100%; background:#fff; border:1px solid var(--line); color:var(--ink);
   border-radius:7px; padding:8px 9px; font-size:14px; min-height:36px;
 }
 table.lines input:hover { border-color:var(--line); }
@@ -107,7 +108,7 @@ table.lines input:focus, table.lines select:focus { outline:none; border-color:v
 table.lines input.r { text-align:right; font-variant-numeric:tabular-nums; }
 table.lines .kindTag { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
 table.lines .lineAmt { font-variant-numeric:tabular-nums; white-space:nowrap; }
-table.lines .lineX { background:none; border:none; color:#5c6774; font-size:16px; padding:6px 8px; }
+table.lines .lineX { background:none; border:none; color:var(--muted); font-size:16px; padding:6px 8px; }
 table.lines .lineX:hover { color:var(--warn); }
 table.lines td.chk { text-align:center; }
 table.lines td.chk input { width:18px; height:18px; min-height:0; }
@@ -158,23 +159,24 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 
 /* reports */
 .statRow { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:18px; }
-.stat { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+.stat { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
 .stat span { display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
 .stat strong { display:block; font-size:22px; margin-top:6px; font-variant-numeric:tabular-nums; }
 .dateRow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.dateRow input[type=date] { background:var(--asphalt); border:1px solid var(--line); color:var(--ink); border-radius:9px; padding:9px 12px; font-size:14px; color-scheme:dark; }
+.dateRow input[type=date] { background:#fff; border:1px solid var(--line); color:var(--ink); border-radius:9px; padding:9px 12px; font-size:14px; }
 
 /* ---------- print ---------- */
 .printSheet { display:none; }
-.printBar { position:fixed; top:0; left:0; right:0; z-index:60; display:flex; gap:10px; justify-content:flex-end; padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--line); }
-.printWrap { position:fixed; inset:0; z-index:55; overflow:auto; background:#3a3f47; padding:70px 20px 40px; }
+.printBar { position:fixed; top:0; left:0; right:0; z-index:60; display:flex; gap:10px; justify-content:flex-end; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); }
+.printWrap { position:fixed; inset:0; z-index:55; overflow:auto; background:#cfd4da; padding:70px 20px 40px; }
 .sheet {
   background:#fff; color:#111; width:8.5in; min-height:11in; margin:0 auto; padding:.55in .6in;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:1.4;
-  font-variant-numeric:tabular-nums; box-shadow:0 10px 40px rgba(0,0,0,.5);
+  font-variant-numeric:tabular-nums; box-shadow:0 10px 40px rgba(0,0,0,.25);
 }
 .sheet h1 { margin:0; font-size:20px; }
 .sheet .shHead { display:flex; justify-content:space-between; gap:20px; border-bottom:2px solid #111; padding-bottom:10px; margin-bottom:14px; }
+.sheet .shLogo { display:block; height:62px; margin-bottom:6px; }
 .sheet .shHead .r { text-align:right; }
 .sheet .shHead .title { font-size:22px; font-weight:700; }
 .sheet .shWho { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
@@ -201,3 +203,7 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
   .sheet { box-shadow:none; width:auto; min-height:0; margin:0; }
 }
 .printSheet.show { display:block; }
+
+/* logo upload in settings */
+.logoPreview { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+.logoPreview img { max-width:220px; max-height:90px; border:1px solid var(--line); border-radius:8px; padding:6px; background:#fff; }

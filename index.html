@@ -4,21 +4,21 @@
 <meta charset="utf-8" />
 <title>Shop Desk</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="theme-color" content="#12161c" />
+<meta name="theme-color" content="#ffffff" />
 <style>
-  html, body { margin:0; padding:0; background:#12161c; }
+  html, body { margin:0; padding:0; background:#ffffff; }
   #root { min-height:100vh; }
   #boot {
     position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    flex-direction:column; gap:14px; background:#12161c; color:#8b98a8; z-index:999;
+    flex-direction:column; gap:14px; background:#ffffff; color:#5f6b78; z-index:999;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   #boot .ring {
     width:34px; height:34px; border-radius:50%;
-    border:2px solid #2e3743; border-top-color:#f2a310; animation:spin 1s linear infinite;
+    border:2px solid #d6dbe2; border-top-color:#9a2c2c; animation:spin 1s linear infinite;
   }
   @keyframes spin { to { transform:rotate(360deg) } }
-  #boot .err { color:#e2593f; max-width:34ch; text-align:center; line-height:1.5; font-size:14px; }
+  #boot .err { color:#c62828; max-width:34ch; text-align:center; line-height:1.5; font-size:14px; }
 </style>
 </head>
 <body>
