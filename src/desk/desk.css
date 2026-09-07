@@ -182,7 +182,7 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .sheet h1 { margin:0; font-size:15px; line-height:1.2; }
 .sheet .shHead { display:flex; justify-content:space-between; align-items:center; gap:16px; border-bottom:2px solid #111; padding-bottom:6px; margin-bottom:8px; }
 .sheet .shBrand { display:flex; align-items:center; gap:10px; min-width:0; }
-.sheet .shLogo { display:block; height:36px; flex-shrink:0; }
+.sheet .shLogo { display:block; height:56px; flex-shrink:0; }
 .sheet .shMeta { font-size:10px; color:#444; margin-top:1px; }
 .sheet .shHead .r { text-align:right; flex-shrink:0; }
 .sheet .shHead .title { font-size:17px; font-weight:700; line-height:1.2; }
