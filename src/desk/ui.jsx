@@ -64,3 +64,20 @@ export function Num({ value, onChange, ...rest }) {
   );
 }
 export const toNum = (v) => (Number.isFinite(Number(v)) && v !== "" ? Number(v) : 0);
+
+/* "Are you sure?" with a red button. */
+export function ConfirmModal({ title, children, confirmText, onConfirm, onClose }) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <div className="muted" style={{ marginTop: 0, lineHeight: 1.5 }}>{children}</div>
+      <div className="rowBtns" style={{ marginTop: 14 }}>
+        <button className="btn danger lg" onClick={onConfirm}>
+          {confirmText || "Yes, delete it"}
+        </button>
+        <button className="btn lg" onClick={onClose}>
+          Keep it
+        </button>
+      </div>
+    </Modal>
+  );
+}

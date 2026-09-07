@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Field, Text } from "./ui.jsx";
+import { Modal, Field, Text, ConfirmModal } from "./ui.jsx";
 import { uid } from "../lib/ids.js";
 
 /* The staff list is shared with the time clock (same storage key), so a
@@ -8,6 +8,7 @@ import { uid } from "../lib/ids.js";
    carried through untouched. */
 export function Staff({ roster, saveRoster, flash }) {
   const [edit, setEdit] = useState(null);
+  const [toDelete, setToDelete] = useState(null);
   const rows = [...roster].sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name));
   return (
     <>
@@ -55,6 +56,9 @@ export function Staff({ roster, saveRoster, flash }) {
                       >
                         {e.active === false ? "Bring back" : "Set inactive"}
                       </button>
+                      <button className="btn tiny danger" onClick={() => setToDelete(e)}>
+                        Delete
+                      </button>
                     </span>
                   </td>
                 </tr>
@@ -67,6 +71,23 @@ export function Staff({ roster, saveRoster, flash }) {
           live there too and are never shown here.
         </p>
       </div>
+      {toDelete && (
+        <ConfirmModal
+          title={`Delete ${toDelete.name}?`}
+          onClose={() => setToDelete(null)}
+          onConfirm={async () => {
+            await saveRoster(roster.filter((x) => x.id !== toDelete.id));
+            setToDelete(null);
+            flash(`${toDelete.name} deleted`, "out");
+          }}
+        >
+          <p style={{ marginTop: 0 }}>Are you sure you want to delete this? This cannot be reversed.</p>
+          <p>
+            This removes them from the staff list here and on the time clock. Old tickets and timecards stay, but will no
+            longer show their name. If they might come back, use Set inactive instead.
+          </p>
+        </ConfirmModal>
+      )}
       {edit && (
         <Modal title={edit.id ? "Edit person" : "Add someone"} onClose={() => setEdit(null)}>
           <Field label="Name">

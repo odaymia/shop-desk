@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Modal, Field, Text, Money, toNum } from "./ui.jsx";
+import { Modal, Field, Text, Money, toNum, ConfirmModal } from "./ui.jsx";
 import { PartPicker } from "./pickers.jsx";
-import { activeList } from "./useShop.js";
+
 import { jobLines, orderTotals, PART_CONDITIONS } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 
@@ -26,13 +26,27 @@ const lineText = (l, parts, unit) =>
 
 export function Jobs({ shop, cfg, flash }) {
   const [edit, setEdit] = useState(null);
-  const rows = activeList(shop.jobs).sort((a, b) => (a.category || "").localeCompare(b.category || "") || a.name.localeCompare(b.name));
+  const [toDelete, setToDelete] = useState(null);
+  const [showRetired, setShowRetired] = useState(false);
+  /* deleted jobs are gone for good; retired ones can come back */
+  const rows = Object.values(shop.jobs)
+    .filter((j) => !j.deleted && (showRetired ? j.active === false : j.active !== false))
+    .sort((a, b) => (a.category || "").localeCompare(b.category || "") || a.name.localeCompare(b.name));
+  const retiredCount = Object.values(shop.jobs).filter((j) => !j.deleted && j.active === false).length;
   const priceOf = (job) => orderTotals({ lines: jobLines(job, cfg, shop.parts, uid), noSupplies: true }, cfg).subtotal;
 
   return (
     <>
       <header className="deskHead">
         <h1>Canned jobs</h1>
+        <div className="seg">
+          <button className={!showRetired ? "on" : ""} onClick={() => setShowRetired(false)}>
+            In use
+          </button>
+          <button className={showRetired ? "on" : ""} onClick={() => setShowRetired(true)}>
+            Retired{retiredCount ? ` (${retiredCount})` : ""}
+          </button>
+        </div>
         <div className="grow" />
         <button className="btn primary" onClick={() => setEdit(blank())}>
           Add job
@@ -47,13 +61,14 @@ export function Jobs({ shop, cfg, flash }) {
                 <th>Category</th>
                 <th>What's in it</th>
                 <th className="r">Price today</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="emptyNote">
-                    No canned jobs yet. Build one for each service you sell every day so a ticket is two taps, not ten.
+                  <td colSpan={5} className="emptyNote">
+                    {showRetired ? "No retired jobs." : "No canned jobs yet. Build one for each service you sell every day so a ticket is two taps, not ten."}
                   </td>
                 </tr>
               )}
@@ -70,6 +85,31 @@ export function Jobs({ shop, cfg, flash }) {
                   <td className="r num">
                     <Money v={priceOf(j)} />
                     {j.unit ? <span className="sub">per {j.unit}</span> : null}
+                  </td>
+                  <td className="r">
+                    <span className="rowActs">
+                      {showRetired && (
+                        <button
+                          className="btn tiny"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await shop.saveJob({ ...j, active: true });
+                            flash(`${j.name} is back in use`);
+                          }}
+                        >
+                          Bring back
+                        </button>
+                      )}
+                      <button
+                        className="btn tiny danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setToDelete(j);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -88,6 +128,20 @@ export function Jobs({ shop, cfg, flash }) {
           isn't new.
         </p>
       </div>
+      {toDelete && (
+        <ConfirmModal
+          title={`Delete ${toDelete.name}?`}
+          onClose={() => setToDelete(null)}
+          onConfirm={async () => {
+            await shop.saveJob({ ...toDelete, active: false, deleted: true });
+            setToDelete(null);
+            flash(`${toDelete.name} deleted`, "out");
+          }}
+        >
+          <p style={{ marginTop: 0 }}>Are you sure you want to delete this? This cannot be reversed.</p>
+          <p>Tickets that already used this job keep their lines. To hide it but keep the option to bring it back, retire it instead.</p>
+        </ConfirmModal>
+      )}
       {edit && (
         <JobForm
           job={edit}
