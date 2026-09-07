@@ -312,6 +312,43 @@ def main(path, out):
         cjobs.append({"id": "m1j%d" % cj["CannedJobId"], "name": name, "category": category.get(cj["CategoryId"], ""), "unit": "", "lines": ls,
                       "active": True, "createdAt": ts(cj["LastChangeDate"]), "m1": {"code": s(cj["Name"])}})
 
+    # ---------- special packages (Manager SE's menu-priced Good/Better/Best,
+    # oil change menu, tire packages) → canned jobs ----------
+    spType = {x["SpecialPackageTypeId"]: s(x["SpecialPackageType"]) for x in R("SpecialPackageType")}
+    spCat = by(R("SpecialPackageCategory"), "SpecialPackageCategoryId")
+    spSeq = group(R("SpecialPackageLineItemSequence"), "SpecialPackageId")
+    TYPE_CAT = {"Tire": "Tires", "Brake": "Brakes", "LOF": "Oil"}
+    for sp in R("SpecialPackage"):
+        desc = s(sp["Description"])
+        rows = spSeq.get(sp["SpecialPackageId"], [])
+        if not desc or desc.upper() == "DO NOT USE" or not rows: continue
+        cat = spCat.get(sp["SpecialPackageCategoryId"], {})
+        typ = spType.get(cat.get("SpecialPackageTypeId"), "")
+        perTire = typ == "Tire"
+        ls = []
+        for sq in sorted(rows, key=lambda x: x["Sequence"] or 0):
+            li = lineitems.get(sq["LineItemId"])
+            if not li: continue
+            l = make_line(li, "")
+            per = perTire and bool(sq.get("UsePackageQuantity"))
+            if l["kind"] == "labor":
+                if per: ls.append({"kind": "labor", "description": l["description"], "hours": 1, "rate": round(money(li["Sale"]), 2), "perUnit": True})
+                else: ls.append({"kind": "labor", "description": l["description"], "hours": l["hours"], "rate": l["rate"] or None})
+            elif l["kind"] == "part":
+                if not l["qty"]: continue
+                ls.append({"kind": "part", "description": l["description"], "number": "" if l.get("number") == "XXXX" else l.get("number", ""),
+                           "partId": l.get("partId"), "qty": l["qty"], "price": l["price"], "cost": l.get("cost") or None, "condition": "new", "perUnit": per})
+            elif l["kind"] == "fee":
+                ls.append({"kind": "fee", "description": l["description"], "qty": l["qty"], "price": l["price"], "perUnit": per})
+            elif l["kind"] == "note" and l["description"]:
+                ls.append({"kind": "note", "description": l["description"][:200]})
+        if not any(x["kind"] in ("labor", "part", "fee") for x in ls): continue
+        name = f"{s(cat.get('CategoryDescription'))}: {desc}" if s(cat.get("CategoryDescription")) else desc
+        name = " ".join(w if not w.isupper() or len(w) <= 3 else w.title() for w in name.split())
+        cjobs.append({"id": "m1sp%d" % sp["SpecialPackageId"], "name": name, "category": TYPE_CAT.get(typ, typ),
+                      "unit": "tire" if perTire else "", "lines": ls, "active": True, "createdAt": ts(sp.get("LastChangeDate")),
+                      "m1": {"specialPackageId": sp["SpecialPackageId"], "type": typ}})
+
     numbers = [o["number"] for o in orders if o["number"] < 900000]
     bundle = {
         "format": "shop-desk-import", "version": 1, "source": "Mitchell1 Manager SE", "exportedAt": ts(datetime.datetime.now()),
