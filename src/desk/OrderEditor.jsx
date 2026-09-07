@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Modal, Field, Text, Num, Money, fmtDateTime, fmtPhone, toNum } from "./ui.jsx";
 import { CustomerForm, CustomerPicker, VehicleForm } from "./forms.jsx";
 import { PartPicker, JobPicker } from "./pickers.jsx";
+import { ConfirmDelete } from "./Orders.jsx";
 import { customerName, vehicleName, vehiclesOf } from "./useShop.js";
 import {
   STATUS,
@@ -83,7 +84,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const vehicles = o.customerId ? vehiclesOf(shop.vehicles, o.customerId) : [];
   const t = orderTotals(o, cfg, customer);
   const rules = rulesFor(o, cfg, customer);
-  const locked = o.status === STATUS.invoiced || o.status === STATUS.void;
+  const locked = o.status === STATUS.invoiced || o.status === STATUS.void || o.status === STATUS.deleted;
   const techs = employees.filter((e) => e.active !== false);
 
   /* ---------- lines ---------- */
@@ -192,6 +193,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               Void
             </button>
           )}
+          {(o.status === STATUS.estimate || o.status === STATUS.open) && (
+            <button className="btn danger" onClick={() => setPick("confirmDelete")}>
+              Delete
+            </button>
+          )}
         </div>
       </header>
 
@@ -199,7 +205,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <div>
           {locked && (
             <div className="warnBox" style={{ marginBottom: 14 }}>
-              {o.status === STATUS.void
+              {o.status === STATUS.deleted
+                ? `This ticket was deleted ${fmtDateTime(o.deletedAt)}.`
+                : o.status === STATUS.void
                 ? `This invoice was voided ${fmtDateTime(o.voidedAt)}. It stays on file; nothing on it can change.`
                 : `Posted ${fmtDateTime(o.invoicedAt)}. Lines and totals are locked. To fix a mistake, void it and write a new ticket — the customer's paperwork has this number on it.`}
             </div>
@@ -589,6 +597,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             </button>
           </div>
         </Modal>
+      )}
+      {pick === "confirmDelete" && (
+        <ConfirmDelete
+          order={o}
+          onClose={() => setPick(null)}
+          onConfirm={async () => {
+            const latest = await flushNow();
+            await shop.setStatus(latest, STATUS.deleted, customer);
+            flash(`Ticket #${o.number} deleted`, "out");
+            nav.go("orders");
+          }}
+        />
       )}
       {pick === "confirmVoid" && (
         <Modal title={`Void invoice #${o.number}?`} onClose={() => setPick(null)}>

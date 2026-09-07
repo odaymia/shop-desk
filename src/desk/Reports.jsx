@@ -43,7 +43,7 @@ export function Reports({ shop, cfg, employees, nav }) {
     const byMethod = {};
     let collected = 0;
     for (const o of Object.values(shop.orders)) {
-      if (o.status === "void") continue;
+      if (o.status === "void" || o.status === "deleted") continue;
       for (const pay of o.payments || []) {
         if (pay.at >= fromTs && pay.at <= toTs) {
           byMethod[pay.method] = round2((byMethod[pay.method] || 0) + Number(pay.amount || 0));

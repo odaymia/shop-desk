@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { Money, fmtDate } from "./ui.jsx";
-import { customerName, vehicleName, searchText } from "./useShop.js";
+import { Modal, Money, fmtDate } from "./ui.jsx";
+import { customerName, vehicleName, searchText, isLive } from "./useShop.js";
 import { orderTotals, statusLabel } from "../lib/invoice.js";
 import { workSummary } from "./Customers.jsx";
 
@@ -12,12 +12,13 @@ const FILTERS = [
   ["all", "All"],
 ];
 
-export function Orders({ shop, cfg, nav, onNew }) {
+export function Orders({ shop, cfg, nav, onNew, flash }) {
   const [filter, setFilter] = useState("open");
   const [q, setQ] = useState("");
+  const [toDelete, setToDelete] = useState(null);
 
   const rows = useMemo(() => {
-    const all = Object.values(shop.orders).map((o) => {
+    const all = Object.values(shop.orders).filter(isLive).map((o) => {
       const c = shop.customers[o.customerId];
       const v = shop.vehicles[o.vehicleId];
       return { o, c, v, t: orderTotals(o, cfg, c) };
@@ -40,6 +41,7 @@ export function Orders({ shop, cfg, nav, onNew }) {
   const counts = useMemo(() => {
     const n = { estimate: 0, open: 0, invoiced: 0, due: 0 };
     for (const o of Object.values(shop.orders)) {
+      if (!isLive(o)) continue;
       if (n[o.status] != null) n[o.status]++;
       if (o.status === "invoiced" && orderTotals(o, cfg, shop.customers[o.customerId]).balance > 0.001) n.due++;
     }
@@ -76,12 +78,13 @@ export function Orders({ shop, cfg, nav, onNew }) {
                 <th>Work</th>
                 <th className="r">Total</th>
                 <th className="r">Balance</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="emptyNote">
+                  <td colSpan={8} className="emptyNote">
                     {q ? "Nothing matches." : filter === "open" ? "No open repair orders. Start a new ticket, or check Estimates." : "Nothing here yet."}
                   </td>
                 </tr>
@@ -115,12 +118,54 @@ export function Orders({ shop, cfg, nav, onNew }) {
                       "—"
                     )}
                   </td>
+                  <td className="r">
+                    {(o.status === "estimate" || o.status === "open") && (
+                      <button
+                        className="btn tiny danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setToDelete(o);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+      {toDelete && (
+        <ConfirmDelete
+          order={toDelete}
+          onClose={() => setToDelete(null)}
+          onConfirm={async () => {
+            await shop.setStatus(toDelete, "deleted", shop.customers[toDelete.customerId]);
+            setToDelete(null);
+            if (flash) flash(`Ticket #${toDelete.number} deleted`, "out");
+          }}
+        />
+      )}
     </>
+  );
+}
+
+export function ConfirmDelete({ order, onClose, onConfirm }) {
+  return (
+    <Modal title={`Delete ${statusLabel(order.status).toLowerCase()} #${order.number}?`} onClose={onClose}>
+      <p className="muted" style={{ marginTop: 0, lineHeight: 1.5 }}>
+        Are you sure you want to delete this? This cannot be reversed.
+      </p>
+      <div className="rowBtns" style={{ marginTop: 10 }}>
+        <button className="btn danger lg" onClick={onConfirm}>
+          Yes, delete it
+        </button>
+        <button className="btn lg" onClick={onClose}>
+          Keep it
+        </button>
+      </div>
+    </Modal>
   );
 }

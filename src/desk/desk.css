@@ -215,3 +215,4 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 
 /* start-a-ticket plate box */
 .stateFld { flex:0 0 110px; }
+.st.deleted { color:var(--muted); }

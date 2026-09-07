@@ -102,7 +102,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
             (orderId ? (
               <OrderEditor key={orderId} orderId={orderId} shop={shop} cfg={cfg} employees={employees} nav={nav} flash={flash} />
             ) : (
-              <Orders shop={shop} cfg={cfg} nav={nav} onNew={newTicket} />
+              <Orders shop={shop} cfg={cfg} nav={nav} onNew={newTicket} flash={flash} />
             ))}
           {page === "customers" && (
             <Customers shop={shop} cfg={cfg} nav={nav} flash={flash} customerId={customerId} onNew={newTicket} />

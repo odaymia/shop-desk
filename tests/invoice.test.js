@@ -97,6 +97,10 @@ test("status transitions", () => {
   assert.equal(canTransition("invoiced", "open"), false);
   assert.equal(canTransition("invoiced", "void"), true);
   assert.equal(canTransition("void", "invoiced"), false);
+  assert.equal(canTransition("estimate", "deleted"), true);
+  assert.equal(canTransition("open", "deleted"), true);
+  assert.equal(canTransition("invoiced", "deleted"), false);
+  assert.equal(canTransition("deleted", "open"), false);
 });
 
 test("canned job expands with inventory prices and the shop labor rate", () => {

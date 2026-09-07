@@ -219,6 +219,7 @@ export function useShop(cfg) {
         const miles = Number(next.mileageOut || next.mileageIn);
         if (veh && miles && miles > (Number(veh.mileage) || 0)) await saveVehicle({ ...veh, mileage: miles });
       }
+      if (to === STATUS.deleted) next.deletedAt = now;
       if (to === STATUS.void) {
         next.voidedAt = now;
         if (order.stockApplied) {
@@ -256,8 +257,12 @@ export const activeList = (map) =>
   Object.values(map || {}).filter((r) => r.active !== false);
 export const vehiclesOf = (vehicles, customerId) =>
   activeList(vehicles).filter((v) => v.customerId === customerId);
+/* deleted tickets are gone from every screen; the record stays behind
+   only so other computers learn about the deletion */
+export const isLive = (o) => o && o.status !== "deleted";
 export const ordersOf = (orders, { customerId, vehicleId }) =>
   Object.values(orders || {})
+    .filter(isLive)
     .filter((o) => (vehicleId ? o.vehicleId === vehicleId : o.customerId === customerId))
     .sort((a, b) => b.createdAt - a.createdAt);
 

@@ -7,6 +7,7 @@ export const STATUS = {
   open: "open", // authorized repair order, work in progress
   invoiced: "invoiced", // posted; stock pulled, number final, totals frozen
   void: "void", // cancelled after posting; kept for the audit trail
+  deleted: "deleted", // an estimate or repair order thrown away before posting; hidden everywhere
 };
 
 export const LINE_KINDS = ["part", "labor", "sublet", "fee", "discount", "note"];
@@ -16,10 +17,10 @@ export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
 export function statusLabel(status) {
-  return { estimate: "Estimate", open: "Repair order", invoiced: "Invoice", void: "Void" }[status] || status;
+  return { estimate: "Estimate", open: "Repair order", invoiced: "Invoice", void: "Void", deleted: "Deleted" }[status] || status;
 }
 export function orderTitle(order) {
-  const short = { estimate: "Estimate", open: "RO", invoiced: "Invoice", void: "Void" }[order.status] || "";
+  const short = { estimate: "Estimate", open: "RO", invoiced: "Invoice", void: "Void", deleted: "Deleted" }[order.status] || "";
   return `${short} #${order.number}`;
 }
 
@@ -139,6 +140,7 @@ export function canTransition(from, to) {
     (from === "estimate" && to === "open") ||
     (from === "open" && to === "estimate") ||
     ((from === "estimate" || from === "open") && to === "invoiced") ||
+    ((from === "estimate" || from === "open") && to === "deleted") ||
     (from === "invoiced" && to === "void")
   );
 }
