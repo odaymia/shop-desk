@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
+import { PLATE_PROVIDER } from "../lib/plate.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -98,6 +99,21 @@ export function DeskSettings({ cfg, saveCfg, flash }) {
               <Text value={d.shopEmail} onChange={set("shopEmail")} type="email" />
             </Field>
           </div>
+
+          <h3 className="subhead">Plate lookup</h3>
+          <Field label={`${PLATE_PROVIDER.name} API key`}>
+            <Text value={d.plateApiKey || ""} onChange={set("plateApiKey")} type="password" placeholder="sk_live_…" autoComplete="off" />
+          </Field>
+          <p className="legalNote" style={{ marginTop: -6, marginBottom: 18 }}>
+            Typing a plate and tapping “Look up plate” on a vehicle finds the VIN and fills in year, make, model, and
+            engine. DMV records aren't public, so this goes through {PLATE_PROVIDER.name} at about{" "}
+            {PLATE_PROVIDER.costText}, billed to a prepaid balance on your own account. Sign up at{" "}
+            <a href={PLATE_PROVIDER.signup} target="_blank" rel="noreferrer">
+              {PLATE_PROVIDER.signup.replace("https://", "")}
+            </a>
+            , add a few dollars, and paste the key here. The key is kept with your shop settings and only computers
+            signed in to this shop can see it.
+          </p>
 
           <h3 className="subhead">Pricing</h3>
           <div className="fldRow">

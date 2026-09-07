@@ -273,6 +273,7 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
       )}
       {vehEdit && (
         <VehicleForm
+          cfg={cfg}
           initial={vehEdit.id ? vehEdit : null}
           customerId={c.id}
           onClose={() => setVehEdit(null)}

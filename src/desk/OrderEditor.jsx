@@ -528,6 +528,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       )}
       {vehEdit && (
         <VehicleForm
+          cfg={cfg}
           initial={vehEdit.id ? vehEdit : null}
           customerId={o.customerId}
           onClose={() => setVehEdit(null)}

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
+import { lookupPlate } from "../lib/plate.js";
 import { customerName, vehicleName, activeList, vehiclesOf, searchText } from "./useShop.js";
 
 /* Customer and vehicle forms, plus the customer picker a ticket uses.
@@ -107,27 +108,55 @@ export const blankVehicle = (customerId) => ({
   active: true,
 });
 
-export function VehicleForm({ initial, customerId, onSave, onClose }) {
+export function VehicleForm({ initial, customerId, onSave, onClose, cfg }) {
   const [d, setD] = useState(() => ({ ...blankVehicle(customerId), ...(initial || {}) }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
+  const plateKey = cfg && cfg.plateApiKey;
+  const applyDecode = (r) =>
+    setD((x) => ({
+      ...x,
+      vin: r.vin || x.vin,
+      year: r.year || x.year,
+      make: r.make || x.make,
+      model: r.model || x.model,
+      submodel: r.submodel || x.submodel,
+      engine: r.engine || x.engine,
+      color: x.color || r.color || "",
+    }));
+  /* plate → VIN through the paid provider, then the free NHTSA decode
+     fills in whatever the provider left blank */
+  const fromPlate = async () => {
+    setErr("");
+    setNote("");
+    setBusy(true);
+    try {
+      const r = await lookupPlate(d.plate, d.plateState, plateKey);
+      applyDecode(r);
+      setNote(`Found VIN ${r.vin}`);
+      if (!r.make || !r.model || !r.engine) {
+        try {
+          const n = await decodeVin(r.vin);
+          if (n) applyDecode(n);
+        } catch {
+          /* the plate result is enough */
+        }
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const decode = async () => {
     setErr("");
     setBusy(true);
     try {
       const r = await decodeVin(d.vin);
       if (!r) setErr("Couldn't read that VIN. Check it and try again, or fill the fields in by hand.");
-      else
-        setD((x) => ({
-          ...x,
-          vin: r.vin,
-          year: r.year || x.year,
-          make: r.make || x.make,
-          model: r.model || x.model,
-          submodel: r.submodel || x.submodel,
-          engine: r.engine || x.engine,
-        }));
+      else applyDecode(r);
     } catch {
       setErr("No connection to the VIN service right now. Fill the fields in by hand.");
     } finally {
@@ -147,8 +176,45 @@ export function VehicleForm({ initial, customerId, onSave, onClose }) {
   return (
     <Modal title={d.id ? "Edit vehicle" : "New vehicle"} onClose={onClose} size="wide">
       <div className="fldRow">
+        <Field label="Plate">
+          <Text
+            value={d.plate}
+            onChange={(v) => set("plate")(v.toUpperCase())}
+            placeholder="8ABC123"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && plateKey && !busy) fromPlate();
+            }}
+          />
+        </Field>
+        <Field label="State">
+          <select value={d.plateState} onChange={(e) => set("plateState")(e.target.value)}>
+            {US_STATES.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </Field>
+        <div className="fld">
+          <span>&nbsp;</span>
+          <button
+            className="btn primary"
+            onClick={fromPlate}
+            disabled={busy || !d.plate.trim()}
+            style={{ minHeight: 52 }}
+            title={plateKey ? "Look up the VIN and vehicle from the plate" : "Add a plate lookup key under Settings to turn this on"}
+          >
+            {busy ? "Looking up…" : "Look up plate"}
+          </button>
+        </div>
+      </div>
+      {!plateKey && (
+        <p className="setupNote" style={{ margin: "-6px 0 14px" }}>
+          Plate lookup needs a key under Settings → Plate lookup. Until then, enter the VIN below.
+        </p>
+      )}
+      <div className="fldRow">
         <Field label="VIN">
-          <Text value={d.vin} onChange={(v) => set("vin")(v.toUpperCase())} placeholder="17 characters" autoFocus />
+          <Text value={d.vin} onChange={(v) => set("vin")(v.toUpperCase())} placeholder="17 characters" />
         </Field>
         <div className="fld">
           <span>&nbsp;</span>
@@ -157,6 +223,7 @@ export function VehicleForm({ initial, customerId, onSave, onClose }) {
           </button>
         </div>
       </div>
+      {note && <p className="muted" style={{ margin: "-6px 0 14px", color: "var(--live)" }}>{note}</p>}
       <div className="fldRow">
         <Field label="Year">
           <Num value={d.year} onChange={set("year")} placeholder="2019" />
@@ -175,20 +242,10 @@ export function VehicleForm({ initial, customerId, onSave, onClose }) {
         <Field label="Engine">
           <Text value={d.engine} onChange={set("engine")} placeholder="2.5L 4-cyl" />
         </Field>
-        <Field label="Color">
-          <Text value={d.color} onChange={set("color")} />
-        </Field>
       </div>
       <div className="fldRow">
-        <Field label="Plate">
-          <Text value={d.plate} onChange={(v) => set("plate")(v.toUpperCase())} />
-        </Field>
-        <Field label="Plate state">
-          <select value={d.plateState} onChange={(e) => set("plateState")(e.target.value)}>
-            {US_STATES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+        <Field label="Color">
+          <Text value={d.color} onChange={set("color")} />
         </Field>
         <Field label="Mileage">
           <Num value={d.mileage} onChange={set("mileage")} />
