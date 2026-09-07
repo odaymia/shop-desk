@@ -367,9 +367,12 @@ def main(path, out, keep_canned=False):
         if not any(x["kind"] in ("labor", "part", "fee") for x in ls): continue
         name = f"{s(cat.get('CategoryDescription'))}: {desc}" if s(cat.get("CategoryDescription")) else desc
         name = " ".join(w if not w.isupper() or len(w) <= 3 else w.title() for w in name.split())
+        # the oil change menu (LOF) is left out at the shop's request; it goes
+        # in as deleted so a re-import clears any that came over earlier
+        skip = typ == "LOF"
         cjobs.append({"id": "m1sp%d" % sp["SpecialPackageId"], "name": name, "category": TYPE_CAT.get(typ, typ),
-                      "unit": "tire" if perTire else "", "lines": ls, "active": True, "createdAt": ts(sp.get("LastChangeDate")),
-                      "m1": {"specialPackageId": sp["SpecialPackageId"], "type": typ}})
+                      "unit": "tire" if perTire else "", "lines": ls, "active": not skip, "deleted": skip,
+                      "createdAt": ts(sp.get("LastChangeDate")), "m1": {"specialPackageId": sp["SpecialPackageId"], "type": typ}})
 
     numbers = [o["number"] for o in orders if o["number"] < 900000]
     bundle = {
