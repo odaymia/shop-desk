@@ -9,6 +9,10 @@ python3 export_m1.py /path/to/ShopMgt.bak shop.import.json
 
 Then in the desk: Settings → Import from Mitchell1 → choose the file.
 
+Manager SE's special packages (Good/Better/Best menus, oil change menu,
+tire packages) come over as canned jobs. Its generic canned-job list is
+left out unless you pass `--keep-canned-jobs`.
+
 `bak.py` finds the 8 KB database pages inside the backup, decodes the
 system catalog to learn table names and column layouts, and walks each
 table's data pages. Backups from SQL Server Express are uncompressed,

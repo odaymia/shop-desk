@@ -26,7 +26,7 @@ def phone(p):
     d = re.sub(r"\D", "", s(p))
     return d if len(d) >= 7 and not d.startswith("000") else ""
 
-def main(path, out):
+def main(path, out, keep_canned=False):
     b = B.Bak(path)
     t = B.user_tables(b)
     R = lambda n: list(B.rows(b, t[n])) if n in t else []
@@ -309,8 +309,11 @@ def main(path, out):
             elif l["kind"] == "fee": ls.append({"kind": "fee", "description": l["description"], "qty": l["qty"], "price": l["price"]})
         if not ls: continue
         name = s(cj["Description"]) or s(cj["Name"])
+        # Manager SE's stock canned-job list is mostly generic labor-guide
+        # entries. Unless asked to keep them, they go in as deleted so a
+        # re-import removes any that came over earlier.
         cjobs.append({"id": "m1j%d" % cj["CannedJobId"], "name": name, "category": category.get(cj["CategoryId"], ""), "unit": "", "lines": ls,
-                      "active": True, "createdAt": ts(cj["LastChangeDate"]), "m1": {"code": s(cj["Name"])}})
+                      "active": keep_canned, "deleted": not keep_canned, "createdAt": ts(cj["LastChangeDate"]), "m1": {"code": s(cj["Name"])}})
 
     # ---------- special packages (Manager SE's menu-priced Good/Better/Best,
     # oil change menu, tire packages) → canned jobs ----------
@@ -353,7 +356,7 @@ def main(path, out):
     bundle = {
         "format": "shop-desk-import", "version": 1, "source": "Mitchell1 Manager SE", "exportedAt": ts(datetime.datetime.now()),
         "counts": {"customers": len(customers), "vehicles": len(vehicles), "parts": len(parts), "vendors": len(vendors),
-                   "orders": len(orders), "jobs": len(cjobs), "staff": len(staff)},
+                   "orders": len(orders), "jobs": sum(1 for j in cjobs if not j.get("deleted")), "staff": len(staff)},
         "nextOrderNumber": (max(numbers) + 1) if numbers else None,
         "staff": staff, "vendors": vendors, "customers": customers, "vehicles": vehicles, "parts": parts, "jobs": cjobs, "orders": orders,
     }
@@ -370,4 +373,4 @@ def main(path, out):
     return bundle
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], keep_canned="--keep-canned-jobs" in sys.argv)
