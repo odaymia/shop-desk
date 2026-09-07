@@ -4,6 +4,7 @@ import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { PLATE_PROVIDER } from "../lib/plate.js";
 import { ImportPanel } from "./Import.jsx";
+import { NAME_MODES } from "../lib/names.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -158,6 +159,16 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster }) {
               {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((n, i) => (
                 <option key={n} value={i}>
                   {n}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Staff names on printed tickets (writer and technician)">
+            <select value={d.printStaffNames || "full"} onChange={(e) => set("printStaffNames")(e.target.value)}>
+              {NAME_MODES.map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
                 </option>
               ))}
             </select>

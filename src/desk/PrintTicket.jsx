@@ -3,6 +3,7 @@ import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, condition
 import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
+import { staffLabel } from "../lib/names.js";
 
 /* The paper copy. Black on white, one page for most tickets. */
 export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
@@ -55,7 +56,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               </div>
               <div className="shMeta">
                 {fmtDate(o.invoicedAt || o.createdAt)}
-                {o.writerId ? ` · ${techName(o.writerId)}` : ""}
+                {staffLine(o, cfg, techName)}
                 {o.status === "void" ? " · VOID" : ""}
               </div>
             </div>
@@ -196,6 +197,18 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
       </div>
     </div>
   );
+}
+
+/* " · Writer: Sam G. · Tech: M.S." per the shop's setting */
+function staffLine(o, cfg, techName) {
+  const mode = cfg.printStaffNames || "full";
+  if (mode === "off") return "";
+  const bits = [];
+  const w = o.writerId ? staffLabel(techName(o.writerId), mode) : "";
+  const t = o.techId ? staffLabel(techName(o.techId), mode) : "";
+  if (w) bits.push(`Writer: ${w}`);
+  if (t) bits.push(`Tech: ${t}`);
+  return bits.length ? ` · ${bits.join(" · ")}` : "";
 }
 
 function GroupRows({ g }) {

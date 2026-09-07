@@ -7,6 +7,7 @@ export const DEFAULT_CFG = {
   shopEmail: "",
   ardNumber: "", // California BAR registration (ARD) number, printed on every estimate and invoice
   logo: "", // data URL of the shop logo; blank shows the bundled Genie logo
+  printStaffNames: "full", // off | full | first-initial | initials — writer and tech on printed tickets
   plateApiKey: "", // PlateToVIN key for plate → VIN lookups; blank hides the button
   weekStart: 1, // 0=Sun ... 6=Sat; used by the "This week" report range
   laborRate: 150, // default $/hour for labor lines
