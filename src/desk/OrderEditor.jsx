@@ -18,6 +18,7 @@ import {
   PART_CONDITIONS,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
+import { tireName } from "../lib/tires.js";
 
 /* One ticket: estimate → repair order → invoice. Edits save themselves a
    moment after you stop typing. Once posted, the lines lock; only
@@ -87,6 +88,19 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const rules = rulesFor(o, cfg, customer);
   const locked = o.status === STATUS.invoiced || o.status === STATUS.void || o.status === STATUS.deleted;
   const techs = employees.filter((e) => e.active !== false);
+  /* the tire size this car was last sold, so the rack opens on it */
+  const lastTireSize = (() => {
+    if (!o.vehicleId) return "";
+    const prior = Object.values(shop.orders)
+      .filter((x) => x.vehicleId === o.vehicleId && x.id !== o.id && x.status !== "deleted")
+      .sort((a, b) => (b.invoicedAt || b.createdAt) - (a.invoicedAt || a.createdAt));
+    for (const x of prior)
+      for (const l of x.lines || []) {
+        const part = l.partId && shop.parts[l.partId];
+        if (part && part.tire && part.size) return part.size;
+      }
+    return "";
+  })();
 
   /* ---------- lines ---------- */
   const addLine = (kind, extra) => update((d) => ({ ...d, lines: [...d.lines, makeLine(kind, cfg, { id: uid(), ...extra })] }));
@@ -590,9 +604,30 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <JobPicker
           shop={shop}
           cfg={cfg}
+          lastTireSize={lastTireSize}
           onClose={() => setPick(null)}
-          onPick={(j, count) => {
-            addLines(jobLines(j, cfg, shop.parts, uid, count).map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
+          onPick={(j, count, tire) => {
+            let lines = jobLines(j, cfg, shop.parts, uid, count).map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l));
+            if (tire) {
+              /* the chosen tire becomes the job's tire line: replaces a
+                 placeholder "Tire" part with no inventory link, else is added */
+              const tireLine = makeLine("part", cfg, {
+                id: uid(),
+                job: j.name,
+                partId: tire.id,
+                number: tire.number || "",
+                description: `${tireName(tire)} ${tire.size}`.trim(),
+                qty: count,
+                price: toNum(tire.price),
+                cost: toNum(tire.cost),
+                condition: /used/i.test(j.name) ? "used" : "new",
+                taxable: tire.taxable === false ? false : null,
+              });
+              const i = lines.findIndex((l) => l.kind === "part" && !l.partId && /tire/i.test(l.description || ""));
+              if (i >= 0) lines[i] = tireLine;
+              else lines = [tireLine, ...lines];
+            }
+            addLines(lines);
             setPick(null);
           }}
         />
