@@ -38,20 +38,26 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
       <div className="printWrap">
         <div className="sheet">
           <div className="shHead">
-            <div>
+            <div className="shBrand">
               <img className="shLogo" src={cfg.logo || defaultLogo} alt="" />
-              <h1>{cfg.shopName}</h1>
-              <div>{cfg.shopAddress}</div>
-              <div>{[fmtPhone(cfg.shopPhone), cfg.shopEmail].filter(Boolean).join(" · ")}</div>
-              {cfg.ardNumber && <div>Automotive Repair Dealer Reg. No. {cfg.ardNumber}</div>}
+              <div>
+                <h1>{cfg.shopName}</h1>
+                <div className="shMeta">
+                  {[cfg.shopAddress, fmtPhone(cfg.shopPhone), cfg.shopEmail, cfg.ardNumber ? `BAR ARD #${cfg.ardNumber}` : ""]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
             </div>
             <div className="r">
               <div className="title">
                 {statusLabel(o.status)} #{o.number}
               </div>
-              <div>{fmtDate(o.invoicedAt || o.createdAt)}</div>
-              {o.status === "void" && <div style={{ color: "#b00", fontWeight: 700 }}>VOID</div>}
-              {o.writerId && <div>Written by {techName(o.writerId)}</div>}
+              <div className="shMeta">
+                {fmtDate(o.invoicedAt || o.createdAt)}
+                {o.writerId ? ` · ${techName(o.writerId)}` : ""}
+                {o.status === "void" ? " · VOID" : ""}
+              </div>
             </div>
           </div>
 

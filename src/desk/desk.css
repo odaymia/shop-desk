@@ -175,20 +175,22 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .printBar { position:fixed; top:0; left:0; right:0; z-index:60; display:flex; gap:10px; justify-content:flex-end; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); }
 .printWrap { position:fixed; inset:0; z-index:55; overflow:auto; background:#cfd4da; padding:70px 20px 40px; }
 .sheet {
-  background:#fff; color:#111; width:8.5in; min-height:11in; margin:0 auto; padding:.55in .6in;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:1.4;
+  background:#fff; color:#111; width:8.5in; min-height:11in; margin:0 auto; padding:.4in .5in;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:11px; line-height:1.35;
   font-variant-numeric:tabular-nums; box-shadow:0 10px 40px rgba(0,0,0,.25);
 }
-.sheet h1 { margin:0; font-size:20px; }
-.sheet .shHead { display:flex; justify-content:space-between; gap:20px; border-bottom:2px solid #111; padding-bottom:10px; margin-bottom:14px; }
-.sheet .shLogo { display:block; height:62px; margin-bottom:6px; }
-.sheet .shHead .r { text-align:right; }
-.sheet .shHead .title { font-size:22px; font-weight:700; }
-.sheet .shWho { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
-.sheet .shWho h4 { margin:0 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#555; }
-.sheet table { width:100%; border-collapse:collapse; margin:8px 0; }
-.sheet th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#555; border-bottom:1px solid #111; padding:5px 6px; }
-.sheet td { padding:5px 6px; border-bottom:1px solid #ddd; vertical-align:top; }
+.sheet h1 { margin:0; font-size:15px; line-height:1.2; }
+.sheet .shHead { display:flex; justify-content:space-between; align-items:center; gap:16px; border-bottom:2px solid #111; padding-bottom:6px; margin-bottom:8px; }
+.sheet .shBrand { display:flex; align-items:center; gap:10px; min-width:0; }
+.sheet .shLogo { display:block; height:36px; flex-shrink:0; }
+.sheet .shMeta { font-size:10px; color:#444; margin-top:1px; }
+.sheet .shHead .r { text-align:right; flex-shrink:0; }
+.sheet .shHead .title { font-size:17px; font-weight:700; line-height:1.2; }
+.sheet .shWho { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px; }
+.sheet .shWho h4 { margin:0 0 2px; font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; color:#555; }
+.sheet table { width:100%; border-collapse:collapse; margin:4px 0; }
+.sheet th { text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:#555; border-bottom:1px solid #111; padding:4px 5px; }
+.sheet td { padding:3px 5px; border-bottom:1px solid #ddd; vertical-align:top; }
 .sheet td.r, .sheet th.r { text-align:right; white-space:nowrap; }
 .sheet tr.job td { font-weight:700; border-bottom:none; padding-top:9px; }
 .sheet .shTotals { margin-left:auto; width:280px; margin-top:8px; }
@@ -197,7 +199,9 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .sheet .shNote { margin-top:16px; font-size:11px; color:#333; }
 .sheet .shSign { margin-top:34px; display:flex; gap:30px; }
 .sheet .shSign div { flex:1; border-top:1px solid #111; padding-top:4px; font-size:10px; color:#555; }
-.sheet .shConcern { margin:0 0 12px; padding:8px 10px; background:#f4f4f4; border-radius:4px; }
+.sheet .shConcern { margin:0 0 8px; padding:5px 8px; background:#f4f4f4; border-radius:4px; }
+.sheet .shNote { margin-top:10px; font-size:9.5px; line-height:1.35; }
+.sheet .shSign { margin-top:22px; }
 @media print {
   @page { margin:0; }
   html, body { background:#fff !important; }
