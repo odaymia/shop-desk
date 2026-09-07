@@ -100,6 +100,15 @@ def main(path, out):
             "createdAt": ts(c["FirstVisited"]) or ts(c["LastChangeDate"]), "updatedAt": ts(c["LastChangeDate"]),
             "m1": {"custId": c["CustId"], "balanceDue": money(c["BalanceDue"]), "lastVisited": ts(c["LastVisited"])},
         })
+    # placeholder customers ("-", "+", blank) with no tickets go in as inactive
+    ticketCust = collections.Counter("m1c%d" % ro["CustId"] for ro in R("RepairOrder") if ro["CustId"])
+    placeholders = 0
+    for c in customers:
+        hasName = bool(re.search(r"[A-Za-z0-9]", c["first"] + c["last"] + c["company"]))
+        if not hasName and not ticketCust.get(c["id"]):
+            c["active"] = False
+            placeholders += 1
+    report["placeholderCustomers"] = placeholders
     custIds = {c["id"] for c in customers}
 
     # ---------- vehicles ----------
@@ -315,6 +324,7 @@ def main(path, out):
     st = collections.Counter(o["status"] for o in orders)
     print("wrote", out)
     print("counts", bundle["counts"], "statuses", dict(st), "next number", bundle["nextOrderNumber"])
+    print("placeholder customers set inactive:", report["placeholderCustomers"])
     print("vehicles recovered from tickets", report["vehiclesRecovered"], "dropped (no customer anywhere)", report["vehiclesDroppedNoCustomer"])
     vids = {v["id"] for v in vehicles}
     print("tickets whose vehicle is missing:", sum(1 for o in orders if o["vehicleId"] and o["vehicleId"] not in vids))
