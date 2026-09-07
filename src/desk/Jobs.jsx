@@ -11,7 +11,7 @@ import { uid } from "../lib/ids.js";
 const blank = () => ({ name: "", category: "", unit: "", lines: [], active: true });
 const blankLine = (kind) =>
   kind === "labor"
-    ? { kind, description: "", hours: 0.5, rate: null }
+    ? { kind, description: "", details: "", hours: 0.5, rate: null }
     : kind === "fee"
     ? { kind, description: "", qty: 1, price: 0 }
     : { kind, description: "", number: "", partId: null, qty: 1, price: null, cost: null, condition: "new" };
@@ -216,11 +216,20 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                     ))}
                   </select>
                 </div>
+              ) : l.kind === "labor" ? (
+                <div className="laborCell">
+                  <input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} placeholder="Replace front brake pads" />
+                  <input
+                    value={l.details || ""}
+                    onChange={(e) => setLine(i, { details: e.target.value })}
+                    placeholder="Details that print under it: what's included, warranty, notes"
+                  />
+                </div>
               ) : (
                 <input
                   value={l.description}
                   onChange={(e) => setLine(i, { description: e.target.value })}
-                  placeholder={l.kind === "fee" ? "CA tire recycling fee" : "Lube, oil, filter"}
+                  placeholder="CA tire recycling fee"
                 />
               )}
               {l.kind === "labor" ? (

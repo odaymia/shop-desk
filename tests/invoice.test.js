@@ -191,3 +191,10 @@ test("parts are new unless marked otherwise (California BAR)", () => {
   const job = { name: "J", lines: [{ kind: "part", description: "Alternator", qty: 1, price: 150, condition: "rebuilt" }] };
   assert.equal(jobLines(job, cfg, {}, () => "x")[0].condition, "rebuilt");
 });
+
+test("labor details ride along from a canned job", () => {
+  const job = { name: "TPMS", lines: [{ kind: "labor", description: "Replace TPMS sensor", details: "Includes programming and balancing", hours: 0.4 }] };
+  const l = jobLines(job, cfg, {}, () => "x")[0];
+  assert.equal(l.details, "Includes programming and balancing");
+  assert.equal(makeLine("labor", cfg).details, "");
+});

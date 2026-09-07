@@ -42,7 +42,7 @@ export function makeLine(kind, cfg, extra = {}) {
   if (kind === "part")
     return { ...base, number: "", partId: null, qty: 1, price: 0, cost: 0, condition: "new", ...extra };
   if (kind === "labor")
-    return { ...base, hours: 1, rate: num(cfg?.laborRate), techId: null, ...extra };
+    return { ...base, details: "", hours: 1, rate: num(cfg?.laborRate), techId: null, ...extra };
   if (kind === "sublet") return { ...base, qty: 1, price: 0, cost: 0, vendorId: null, ...extra };
   if (kind === "fee") return { ...base, qty: 1, price: 0, ...extra };
   if (kind === "discount") return { ...base, qty: 1, price: 0, ...extra };

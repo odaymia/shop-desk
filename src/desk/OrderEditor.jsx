@@ -694,7 +694,20 @@ function LineRow({ l, prev, rules, techs, locked, set, remove }) {
               ) : null}
             </td>
             <td>
-              <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder={l.kind === "labor" ? "What was done" : "Description"} readOnly={locked} />
+              {l.kind === "labor" ? (
+                <div className="laborCell">
+                  <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="What was done" readOnly={locked} />
+                  <input
+                    value={l.details || ""}
+                    onChange={(e) => set({ details: e.target.value })}
+                    placeholder="Details (print under the line)"
+                    readOnly={locked}
+                    className="details"
+                  />
+                </div>
+              ) : (
+                <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="Description" readOnly={locked} />
+              )}
             </td>
             <td>
               {l.kind === "labor" ? (

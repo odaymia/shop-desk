@@ -221,8 +221,10 @@ def main(path, out, keep_canned=False):
             sale = money(li["Sale"])
             rate = round(sale / hours, 4) if hours else sale
             tech = next((x["EmployeeId"] for x in lineTechs.get(lid, []) if x["EmployeeId"]), None)
-            line = {**base, "kind": "labor", "hours": hours if hours else 1, "rate": rate if hours else sale,
-                    "techId": staffKey.get(tech), "taxable": True if (not li["TaxExempt"] and money(li.get("LaborSale")) and False) else None}
+            wp = l.get("WorkPerformed")
+            details = s(wp).replace("\r\n", "\n").strip() if isinstance(wp, str) else ""
+            line = {**base, "kind": "labor", "details": details, "hours": hours if hours else 1, "rate": rate if hours else sale,
+                    "techId": staffKey.get(tech), "taxable": None}
             if not hours:
                 line["hours"], line["rate"] = 1, sale
             return line
@@ -304,7 +306,7 @@ def main(path, out, keep_canned=False):
             li = lineitems.get(sq["LineItem"])
             if not li: continue
             l = make_line(li, "")
-            if l["kind"] == "labor": ls.append({"kind": "labor", "description": l["description"], "hours": l["hours"], "rate": l["rate"] or None})
+            if l["kind"] == "labor": ls.append({"kind": "labor", "description": l["description"], "details": l.get("details", ""), "hours": l["hours"], "rate": l["rate"] or None})
             elif l["kind"] == "part": ls.append({"kind": "part", "description": l["description"], "number": l.get("number", ""), "partId": l.get("partId"), "qty": l["qty"], "price": l["price"] or None, "cost": l.get("cost") or None})
             elif l["kind"] == "fee": ls.append({"kind": "fee", "description": l["description"], "qty": l["qty"], "price": l["price"]})
         if not ls: continue
@@ -335,8 +337,8 @@ def main(path, out, keep_canned=False):
             l = make_line(li, "")
             per = perTire and bool(sq.get("UsePackageQuantity"))
             if l["kind"] == "labor":
-                if per: ls.append({"kind": "labor", "description": l["description"], "hours": 1, "rate": round(money(li["Sale"]), 2), "perUnit": True})
-                else: ls.append({"kind": "labor", "description": l["description"], "hours": l["hours"], "rate": l["rate"] or None})
+                if per: ls.append({"kind": "labor", "description": l["description"], "details": l.get("details", ""), "hours": 1, "rate": round(money(li["Sale"]), 2), "perUnit": True})
+                else: ls.append({"kind": "labor", "description": l["description"], "details": l.get("details", ""), "hours": l["hours"], "rate": l["rate"] or None})
             elif l["kind"] == "part":
                 if not l["qty"]: continue
                 ls.append({"kind": "part", "description": l["description"], "number": "" if l.get("number") == "XXXX" else l.get("number", ""),
