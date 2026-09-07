@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
@@ -108,7 +108,7 @@ export const blankVehicle = (customerId) => ({
   active: true,
 });
 
-export function VehicleForm({ initial, customerId, onSave, onClose, cfg }) {
+export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLookup }) {
   const [d, setD] = useState(() => ({ ...blankVehicle(customerId), ...(initial || {}) }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -163,6 +163,13 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg }) {
       setBusy(false);
     }
   };
+  const ran = useRef(false);
+  useEffect(() => {
+    if (autoLookup && plateKey && d.plate && !ran.current) {
+      ran.current = true;
+      fromPlate();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const save = () => {
     if (!d.make.trim() && !d.model.trim()) return setErr("At least a make and model.");
     onSave({

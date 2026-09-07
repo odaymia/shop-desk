@@ -11,6 +11,7 @@ import { Staff } from "./Staff.jsx";
 import { Reports } from "./Reports.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
 import { PrintTicket } from "./PrintTicket.jsx";
+import { StartTicket } from "./StartTicket.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
@@ -32,6 +33,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const [orderId, setOrderId] = useState(null);
   const [customerId, setCustomerId] = useState(null);
   const [printId, setPrintId] = useState(null);
+  const [starting, setStarting] = useState(false);
   const employees = roster.filter((e) => e.active !== false);
 
   const nav = {
@@ -52,8 +54,15 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
     print: (id) => setPrintId(id),
   };
 
+  /* from a customer or vehicle page the car is known; from anywhere else
+     the ticket starts with the plate */
   const newTicket = async (opts) => {
-    const o = await shop.createOrder(opts || {});
+    if (!opts || (!opts.customerId && !opts.vehicleId && !opts.walkIn)) {
+      setStarting(true);
+      return;
+    }
+    setStarting(false);
+    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null });
     nav.openOrder(o.id);
   };
 
@@ -106,6 +115,14 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "settings" && <DeskSettings cfg={cfg} saveCfg={saveCfg} flash={flash} roster={roster} saveRoster={saveRoster} />}
         </div>
       </div>
+      {starting && (
+        <StartTicket
+          shop={shop}
+          cfg={cfg}
+          onClose={() => setStarting(false)}
+          onStart={(opts) => newTicket({ ...opts, walkIn: !opts.customerId && !opts.vehicleId })}
+        />
+      )}
       {printOrder && <PrintTicket order={printOrder} shop={shop} cfg={cfg} employees={roster} onClose={() => setPrintId(null)} />}
     </>
   );

@@ -212,3 +212,6 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 /* logo upload in settings */
 .logoPreview { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
 .logoPreview img { max-width:220px; max-height:90px; border:1px solid var(--line); border-radius:8px; padding:6px; background:#fff; }
+
+/* start-a-ticket plate box */
+.stateFld { flex:0 0 110px; }
