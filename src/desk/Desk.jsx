@@ -103,7 +103,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}
-          {page === "settings" && <DeskSettings cfg={cfg} saveCfg={saveCfg} flash={flash} />}
+          {page === "settings" && <DeskSettings cfg={cfg} saveCfg={saveCfg} flash={flash} roster={roster} saveRoster={saveRoster} />}
         </div>
       </div>
       {printOrder && <PrintTicket order={printOrder} shop={shop} cfg={cfg} employees={roster} onClose={() => setPrintId(null)} />}

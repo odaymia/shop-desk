@@ -171,3 +171,11 @@ test("a job with no unit ignores the count", () => {
   const job = { name: "Fixed", lines: [{ kind: "labor", hours: 1, rate: 100 }] };
   assert.equal(jobLines(job, cfg, {}, () => "x", 4)[0].hours, 1);
 });
+
+test("an imported invoice keeps the tax the old system charged", () => {
+  const o = { lines: [{ kind: "part", qty: 1, price: 100 }], taxOverride: 8.13, rules: { ...cfg, taxRate: 7.75, suppliesPct: 0 } };
+  const t = orderTotals(o, cfg);
+  assert.equal(t.tax, 8.13);
+  assert.equal(t.total, 108.13);
+  assert.equal(orderTotals({ ...o, taxOverride: null }, cfg).tax, 7.75);
+});

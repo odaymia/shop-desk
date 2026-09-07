@@ -1,3 +1,7 @@
 node_modules
 dist
 .DS_Store
+# never commit a shop's exported data
+*.import.json
+tools/m1import/*.json
+public/_test-*

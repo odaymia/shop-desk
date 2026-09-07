@@ -3,6 +3,7 @@ import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { PLATE_PROVIDER } from "../lib/plate.js";
+import { ImportPanel } from "./Import.jsx";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -26,7 +27,7 @@ function readLogo(file) {
 
 /* Shop info, pricing rules, what prints on the invoice, and the cloud
    account. */
-export function DeskSettings({ cfg, saveCfg, flash }) {
+export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster }) {
   const [d, setD] = useState(cfg);
   useEffect(() => setD(cfg), [cfg]);
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
@@ -164,6 +165,7 @@ export function DeskSettings({ cfg, saveCfg, flash }) {
             Cloud account
           </h3>
           <CloudSync />
+          <ImportPanel roster={roster} saveRoster={saveRoster} flash={flash} />
           <p className="legalNote">
             Posting an invoice freezes the tax rate and supplies rule on that ticket. Changing them here affects new
             tickets and open estimates only.

@@ -100,7 +100,9 @@ export function orderTotals(order, cfg, customer) {
   }
   taxable = Math.max(0, round2(taxable));
   const taxRate = rules.taxExempt ? 0 : rules.taxRate;
-  const tax = round2((taxable * taxRate) / 100);
+  /* an invoice imported from another system keeps the tax it actually
+     charged, so old paperwork and our screen never disagree */
+  const tax = order && order.taxOverride != null ? round2(order.taxOverride) : round2((taxable * taxRate) / 100);
   const subtotal = round2(sums.part + sums.labor + sums.sublet + sums.fee - sums.discount + supplies);
   const total = round2(subtotal + tax);
   const paid = round2(((order && order.payments) || []).reduce((a, p) => a + num(p.amount), 0));

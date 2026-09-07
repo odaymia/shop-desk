@@ -138,6 +138,17 @@ async function push(item) {
   }
 }
 
+/* Consecutive kv writes go up in one request. An import can queue ten
+   thousand of them; one at a time would take most of an hour. */
+const BATCH = 200;
+async function pushBatch(items) {
+  const shop_id = state.shopId;
+  const rows = new Map();
+  for (const it of items) rows.set(it.key, { shop_id, key: it.key, value: it.value });
+  const { error } = await supabase.from("kv").upsert([...rows.values()]);
+  if (error) throw error;
+}
+
 let flushing = false;
 let retryTimer = null;
 async function flush() {
@@ -147,8 +158,13 @@ async function flush() {
   try {
     while (outbox.length) {
       const item = outbox[0];
+      let n = 1;
+      if (item.kind === "kv" && item.op === "put") {
+        while (n < outbox.length && n < BATCH && outbox[n].kind === "kv" && outbox[n].op === "put") n++;
+      }
       try {
-        await push(item);
+        if (n > 1) await pushBatch(outbox.slice(0, n));
+        else await push(item);
       } catch (e) {
         if (isNetworkError(e)) {
           setState({ error: "Offline — changes will upload when the connection is back" });
@@ -161,7 +177,7 @@ async function flush() {
         setState({ error: `Cloud rejected a change: ${e.message || e}` });
       }
       await withOutbox(async () => {
-        outbox.shift();
+        outbox.splice(0, n);
         await lset(OUTBOX_KEY, outbox);
         setState({ pending: outbox.length });
       });
