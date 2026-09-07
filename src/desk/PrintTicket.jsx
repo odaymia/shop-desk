@@ -170,10 +170,16 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
           </div>
 
           {isInvoice ? (
-            cfg.invoiceFooter && <p className="shNote">{cfg.invoiceFooter}</p>
+            <>
+              {cfg.invoiceFooter && <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>{cfg.invoiceFooter}</p>}
+              <div className="shSign">
+                <div>Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty</div>
+                <div>Date</div>
+              </div>
+            </>
           ) : (
             <>
-              {cfg.authorizationText && <p className="shNote">{cfg.authorizationText}</p>}
+              {cfg.authorizationText && <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>{cfg.authorizationText}</p>}
               <div className="shSign">
                 <div>Customer signature</div>
                 <div>Date</div>
