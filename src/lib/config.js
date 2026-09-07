@@ -5,6 +5,7 @@ export const DEFAULT_CFG = {
   shopPhone: "",
   shopAddress: "", // free text, printed on the invoice header
   shopEmail: "",
+  ardNumber: "", // California BAR registration (ARD) number, printed on every estimate and invoice
   logo: "", // data URL of the shop logo; blank shows the bundled Genie logo
   plateApiKey: "", // PlateToVIN key for plate → VIN lookups; blank hides the button
   weekStart: 1, // 0=Sun ... 6=Sat; used by the "This week" report range
@@ -13,8 +14,8 @@ export const DEFAULT_CFG = {
   partsTaxable: true,
   laborTaxable: false, // California doesn't tax repair labor
   subletTaxable: false,
-  suppliesPct: 5, // shop supplies charge as a percent of labor
-  suppliesCap: 25, // never more than this per ticket; 0 = no cap
+  suppliesPct: 0, // a generic "shop supplies" charge is prohibited on California invoices (16 CCR 3356); other states may set a percent of labor
+  suppliesCap: 0, // never more than this per ticket; 0 = no cap
   suppliesTaxable: true,
   nextOrderNumber: 1001, // first estimate/RO/invoice number; the live counter is in sd:counters
   invoiceFooter:

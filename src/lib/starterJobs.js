@@ -18,7 +18,7 @@ export const STARTER_JOBS = [
     category: "Tires",
     unit: "tire",
     lines: [
-      { kind: "part", description: "Tire", number: "", partId: null, qty: 1, price: null, cost: null, perUnit: true },
+      { kind: "part", description: "Tire", number: "", partId: null, qty: 1, price: null, cost: null, condition: "new", perUnit: true },
       { kind: "labor", description: "Mount, balance, and tire disposal", hours: 1, rate: 25, perUnit: true },
       { kind: "fee", description: "CA tire recycling fee", qty: 1, price: 1.75, perUnit: true },
     ],
@@ -28,7 +28,7 @@ export const STARTER_JOBS = [
     name: "Front brake pads replacement",
     category: "Brakes",
     lines: [
-      { kind: "part", description: "Front brake pads", number: "", partId: null, qty: 1, price: 49.99, cost: null },
+      { kind: "part", description: "Front brake pads", number: "", partId: null, qty: 1, price: 49.99, cost: null, condition: "new" },
       { kind: "labor", description: "Replace front brake pads", hours: 1, rate: 170 },
     ],
   },
@@ -37,7 +37,7 @@ export const STARTER_JOBS = [
     name: "Rear brake pads replacement",
     category: "Brakes",
     lines: [
-      { kind: "part", description: "Rear brake pads", number: "", partId: null, qty: 1, price: 49.99, cost: null },
+      { kind: "part", description: "Rear brake pads", number: "", partId: null, qty: 1, price: 49.99, cost: null, condition: "new" },
       { kind: "labor", description: "Replace rear brake pads", hours: 1, rate: 170 },
     ],
   },

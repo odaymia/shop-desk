@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Modal, Field, Text, Money, toNum } from "./ui.jsx";
 import { PartPicker } from "./pickers.jsx";
 import { activeList } from "./useShop.js";
-import { jobLines, orderTotals } from "../lib/invoice.js";
+import { jobLines, orderTotals, PART_CONDITIONS } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 
 /* Canned jobs: a bundle of parts and labor that drops onto a ticket in one
@@ -14,7 +14,7 @@ const blankLine = (kind) =>
     ? { kind, description: "", hours: 0.5, rate: null }
     : kind === "fee"
     ? { kind, description: "", qty: 1, price: 0 }
-    : { kind, description: "", number: "", partId: null, qty: 1, price: null, cost: null };
+    : { kind, description: "", number: "", partId: null, qty: 1, price: null, cost: null, condition: "new" };
 const lineText = (l, parts, unit) =>
   l.kind === "labor"
     ? unit && l.perUnit
@@ -79,6 +79,13 @@ export function Jobs({ shop, cfg, flash }) {
         <p className="legalNote">
           A job line with no price uses the inventory part's current price, or the shop labor rate, at the moment it's added
           to a ticket. Set a price on the line to lock it.
+        </p>
+        <p className="legalNote">
+          California Bureau of Automotive Repair rules (16 CCR 3353 and 3356): every service and every part is listed and
+          priced on its own, in plain language; each part says whether it's new, used, rebuilt, or reconditioned; and a
+          generic "shop supplies" or "miscellaneous parts" charge is not allowed. A canned job here is a bundle of separate
+          lines, so it already prints itemized. The one thing to keep doing: describe each line, and mark any part that
+          isn't new.
         </p>
       </div>
       {edit && (
@@ -147,6 +154,13 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                   <button className="btn tiny" onClick={() => setPickFor(i)}>
                     {l.partId ? shop.parts[l.partId]?.number || "Inventory" : "Inventory"}
                   </button>
+                  <select value={l.condition || "new"} onChange={(e) => setLine(i, { condition: e.target.value })} title="Part condition (required on California invoices)" style={{ width: 120 }}>
+                    {PART_CONDITIONS.map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ) : (
                 <input
@@ -214,6 +228,8 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
           onClick={() => {
             if (!d.name.trim()) return setErr("The job needs a name.");
             if (!d.lines.length) return setErr("Add at least one line.");
+            const blank = d.lines.find((l) => !(l.description || "").trim() && !(l.kind === "part" && l.partId));
+            if (blank) return setErr("Every line needs a description the customer can understand. California requires each service and each part to be described on the invoice.");
             onSave({ ...d, name: d.name.trim() });
           }}
         >

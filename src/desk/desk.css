@@ -216,3 +216,7 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 /* start-a-ticket plate box */
 .stateFld { flex:0 0 110px; }
 .st.deleted { color:var(--muted); }
+
+/* part number over its condition, in one cell */
+table.lines .partCell { display:flex; flex-direction:column; gap:4px; }
+table.lines .partCell select { font-size:12px; min-height:28px; padding:3px 6px; color:var(--muted); }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText } from "../src/lib/invoice.js";
+import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText, conditionLabel } from "../src/lib/invoice.js";
 
 const cfg = {
   laborRate: 150,
@@ -182,4 +182,12 @@ test("an imported invoice keeps the tax the old system charged", () => {
   assert.equal(t.tax, 8.13);
   assert.equal(t.total, 108.13);
   assert.equal(orderTotals({ ...o, taxOverride: null }, cfg).tax, 7.75);
+});
+
+test("parts are new unless marked otherwise (California BAR)", () => {
+  assert.equal(makeLine("part", cfg).condition, "new");
+  assert.equal(conditionLabel(undefined), "New");
+  assert.equal(conditionLabel("rebuilt"), "Rebuilt");
+  const job = { name: "J", lines: [{ kind: "part", description: "Alternator", qty: 1, price: 150, condition: "rebuilt" }] };
+  assert.equal(jobLines(job, cfg, {}, () => "x")[0].condition, "rebuilt");
 });

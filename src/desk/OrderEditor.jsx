@@ -15,6 +15,7 @@ import {
   rulesFor,
   statusLabel,
   jobLines,
+  PART_CONDITIONS,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 
@@ -671,7 +672,16 @@ function LineRow({ l, prev, rules, techs, locked, set, remove }) {
           <>
             <td>
               {l.kind === "part" ? (
-                <input value={l.number || ""} onChange={(e) => set({ number: e.target.value.toUpperCase() })} placeholder="Part #" readOnly={locked} />
+                <div className="partCell">
+                  <input value={l.number || ""} onChange={(e) => set({ number: e.target.value.toUpperCase() })} placeholder="Part #" readOnly={locked} />
+                  <select value={l.condition || "new"} onChange={(e) => set({ condition: e.target.value })} disabled={locked} title="New, used, rebuilt, or reconditioned — printed on the invoice">
+                    {PART_CONDITIONS.map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : l.kind === "labor" ? (
                 <select value={l.techId || ""} onChange={(e) => set({ techId: e.target.value || null })} disabled={locked}>
                   <option value="">Tech —</option>

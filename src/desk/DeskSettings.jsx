@@ -100,6 +100,13 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster }) {
               <Text value={d.shopEmail} onChange={set("shopEmail")} type="email" />
             </Field>
           </div>
+          <Field label="BAR registration number (ARD)">
+            <Text value={d.ardNumber || ""} onChange={set("ardNumber")} placeholder="ARD00123456" />
+          </Field>
+          <p className="legalNote" style={{ marginTop: -6, marginBottom: 18 }}>
+            California requires the shop's Automotive Repair Dealer number, name, and address on every invoice. It prints in
+            the header once it's filled in.
+          </p>
 
           <h3 className="subhead">Plate lookup</h3>
           <Field label={`${PLATE_PROVIDER.name} API key`}>
@@ -137,6 +144,12 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster }) {
             </Field>
           </div>
           <Field label="Shop supplies charge">{onOff("suppliesTaxable", "Taxable", "Not taxable")}</Field>
+          {toNum(d.suppliesPct) > 0 && (
+            <div className="warnBox" style={{ marginBottom: 16 }}>
+              A generic "shop supplies" charge is prohibited on California invoices (16 CCR 3356). Leave this at 0 and put
+              real materials on the ticket as parts, described and priced.
+            </div>
+          )}
           <Field label="First ticket number (only matters before the first ticket)">
             <Num value={d.nextOrderNumber} onChange={set("nextOrderNumber")} />
           </Field>

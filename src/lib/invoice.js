@@ -11,6 +11,18 @@ export const STATUS = {
 };
 
 export const LINE_KINDS = ["part", "labor", "sublet", "fee", "discount", "note"];
+/* California BAR (16 CCR 3356): every part on an invoice states whether it
+   is new, used, reconditioned, rebuilt, an OEM crash part, or a non-OEM
+   aftermarket crash part. A part is new unless marked otherwise. */
+export const PART_CONDITIONS = [
+  ["new", "New"],
+  ["used", "Used"],
+  ["rebuilt", "Rebuilt"],
+  ["reconditioned", "Reconditioned"],
+  ["oem-crash", "OEM crash part"],
+  ["aftermarket-crash", "Non-OEM aftermarket crash part"],
+];
+export const conditionLabel = (c) => (PART_CONDITIONS.find(([k]) => k === (c || "new")) || PART_CONDITIONS[0])[1];
 export const PAY_METHODS = ["cash", "card", "check", "other"];
 
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -28,7 +40,7 @@ export function orderTitle(order) {
 export function makeLine(kind, cfg, extra = {}) {
   const base = { id: extra.id || "", kind, description: "", taxable: null, job: "" };
   if (kind === "part")
-    return { ...base, number: "", partId: null, qty: 1, price: 0, cost: 0, ...extra };
+    return { ...base, number: "", partId: null, qty: 1, price: 0, cost: 0, condition: "new", ...extra };
   if (kind === "labor")
     return { ...base, hours: 1, rate: num(cfg?.laborRate), techId: null, ...extra };
   if (kind === "sublet") return { ...base, qty: 1, price: 0, cost: 0, vendorId: null, ...extra };

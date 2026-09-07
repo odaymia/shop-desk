@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel } from "../lib/invoice.js";
+import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -43,6 +43,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               <h1>{cfg.shopName}</h1>
               <div>{cfg.shopAddress}</div>
               <div>{[fmtPhone(cfg.shopPhone), cfg.shopEmail].filter(Boolean).join(" · ")}</div>
+              {cfg.ardNumber && <div>Automotive Repair Dealer Reg. No. {cfg.ardNumber}</div>}
             </div>
             <div className="r">
               <div className="title">
@@ -196,7 +197,10 @@ function GroupRows({ g }) {
       {g.lines.map((l) => (
         <tr key={l.id}>
           <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>
-          <td>{l.description}</td>
+          <td>
+            {l.description}
+            {l.kind === "part" ? <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span> : null}
+          </td>
           <td className="r">{l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : l.qty}</td>
           <td className="r">{l.kind === "labor" ? fmtMoney(l.rate) : l.kind === "note" ? "" : fmtMoney(l.price)}</td>
           <td className="r">{l.kind === "note" ? "" : l.kind === "discount" ? `-${fmtMoney(lineAmount(l))}` : fmtMoney(lineAmount(l))}</td>
