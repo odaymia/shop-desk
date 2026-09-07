@@ -28,7 +28,7 @@ What a shop uses Manager SE for every day, in a browser:
 - [ ] Deferred work: recommendations carried to the next visit
 - [ ] Customer authorization signature on the estimate (reuse the timecard signature pad)
 - [ ] Appointments board
-- [ ] Import from Manager SE: customers, vehicles, history, inventory (CSV from the ShopMgt database)
+- [x] Import from Manager SE straight from the .bak backup: customers, vehicles, history, payments, inventory, canned jobs (tools/m1import)
 - [ ] Parts catalog and ordering through PartsTech (O'Reilly First Call, AutoZone, NAPA, WorldPac)
 - [ ] Labor guide: flat-rate table per shop first; MOTOR / third-party labor API later
 - [ ] Text and email the invoice to the customer
