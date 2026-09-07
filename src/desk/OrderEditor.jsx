@@ -93,12 +93,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const setLine = (id, patch) => update((d) => ({ ...d, lines: d.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
   const removeLine = (id) => update((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== id) }));
 
-  const pickCustomer = (c) => {
+  /* When the ticket already has a car with no owner (the plate-first
+     flow), the customer becomes that car's owner. Otherwise their cars
+     come up to choose from. */
+  const pickCustomer = async (c) => {
+    setPick(null);
+    if (vehicle && !vehicle.customerId) {
+      await shop.saveVehicle({ ...vehicle, customerId: c.id });
+      update({ customerId: c.id });
+      return;
+    }
+    if (vehicle && vehicle.customerId === c.id) {
+      update({ customerId: c.id });
+      return;
+    }
     const vehs = vehiclesOf(shop.vehicles, c.id);
     const v = vehs.length === 1 ? vehs[0] : null;
-    update({ customerId: c.id, vehicleId: v ? v.id : null, mileageIn: v && v.mileage ? v.mileage : o.mileageIn });
-    setPick(null);
-    if (!vehs.length) setVehEdit({});
+    update({ customerId: c.id, vehicleId: v ? v.id : o.vehicleId || null, mileageIn: v && v.mileage ? v.mileage : o.mileageIn });
+    if (!vehs.length && !vehicle) setVehEdit({});
   };
   /* `veh` is passed when the vehicle was just saved and isn't in the
      rendered shop.vehicles yet */
@@ -165,6 +177,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         {o.status === STATUS.invoiced && (t.balance > 0.001 ? <span className="st due">Balance due</span> : <span className="st paid">Paid</span>)}
         <div className="grow" />
         <div className="tkActions">
+          {!locked && !customer && (
+            <button className="btn primary" onClick={() => setPick("customer")}>
+              + Customer
+            </button>
+          )}
           <button className="btn" onClick={async () => (await flushNow(), nav.print(o.id))}>
             Print
           </button>
@@ -243,14 +260,14 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 </>
               ) : (
                 <button className="pick" onClick={() => setPick("customer")} disabled={locked}>
-                  + Choose customer
+                  + Add the customer when they're ready
                 </button>
               )}
             </div>
             <div className="card">
               <div className="cardHead">
                 <h3>Vehicle</h3>
-                {!locked && o.customerId && (
+                {!locked && (
                   <span className="rowBtns">
                     {vehicle && (
                       <button className="btn tiny" onClick={() => setVehEdit(vehicle)}>
@@ -258,14 +275,14 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                       </button>
                     )}
                     <button className="btn tiny" onClick={() => setVehEdit({})}>
-                      Add vehicle
+                      {vehicle ? "Different car" : "Add car"}
                     </button>
                   </span>
                 )}
               </div>
-              {!o.customerId ? (
+              {!o.customerId && !vehicle ? (
                 <p className="muted" style={{ margin: 0 }}>
-                  Pick the customer first.
+                  No car on this ticket.
                 </p>
               ) : (
                 <>
@@ -538,7 +555,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <VehicleForm
           cfg={cfg}
           initial={vehEdit.id ? vehEdit : null}
-          customerId={o.customerId}
+          customerId={o.customerId || null}
           onClose={() => setVehEdit(null)}
           onSave={async (v) => {
             const saved = await shop.saveVehicle(v);

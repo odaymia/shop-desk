@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Modal, Field, fmtPhone, fmtDate } from "./ui.jsx";
-import { CustomerPicker, VehicleForm } from "./forms.jsx";
+import { VehicleForm } from "./forms.jsx";
 import { customerName, vehicleName, activeList, ordersOf } from "./useShop.js";
 
-/* A new ticket starts with the plate. Type it, and either the car is on
-   file (one tap, the owner comes with it) or it's new and we build the
-   vehicle, then find or add the customer. Walk-ins can skip all of it. */
+/* A new ticket: plate → the car → the estimate. No customer questions up
+   front; people want a price before they give a name. The customer is
+   added from the ticket later. A car on file shows its details to confirm;
+   a new plate opens the vehicle form (with the plate lookup when a key is
+   set). Walk-ins can skip all of it. */
 
 const US_STATES = "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 const norm = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -13,8 +15,8 @@ const norm = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 export function StartTicket({ shop, cfg, onStart, onClose }) {
   const [plate, setPlate] = useState("");
   const [state, setState] = useState("CA");
-  const [step, setStep] = useState("plate"); // plate | customer | vehicle
-  const [customer, setCustomer] = useState(null);
+  const [step, setStep] = useState("plate"); // plate | confirm | vehicle | edit
+  const [chosen, setChosen] = useState(null); // vehicle on file being confirmed
   const inputRef = useRef(null);
   useEffect(() => inputRef.current && inputRef.current.focus(), []);
 
@@ -33,34 +35,79 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
 
   const exact = matches.find((m) => norm(m.v.plate) === norm(plate));
 
-  const pick = (m) => onStart({ customerId: m.v.customerId || null, vehicleId: m.v.id });
-
-  if (step === "customer")
-    return (
-      <CustomerPicker
-        shop={shop}
-        onClose={() => setStep("plate")}
-        onPick={(c) => {
-          setCustomer(c);
-          setStep("vehicle");
-        }}
-      />
-    );
+  const pick = (m) => {
+    setChosen(m.v);
+    setStep("confirm");
+  };
+  const start = (v) => onStart({ customerId: v.customerId || null, vehicleId: v.id });
 
   if (step === "vehicle")
     return (
       <VehicleForm
         cfg={cfg}
-        customerId={customer.id}
+        customerId={null}
         initial={{ plate: norm(plate), plateState: state }}
         autoLookup
         onClose={() => setStep("plate")}
         onSave={async (v) => {
           const saved = await shop.saveVehicle(v);
-          onStart({ customerId: customer.id, vehicleId: saved.id });
+          start(saved);
         }}
       />
     );
+
+  if (step === "edit" && chosen)
+    return (
+      <VehicleForm
+        cfg={cfg}
+        customerId={chosen.customerId || null}
+        initial={chosen}
+        onClose={() => setStep("confirm")}
+        onSave={async (v) => {
+          const saved = await shop.saveVehicle(v);
+          start(saved);
+        }}
+      />
+    );
+
+  if (step === "confirm" && chosen) {
+    const owner = shop.customers[chosen.customerId];
+    const last = ordersOf(shop.orders, { vehicleId: chosen.id })[0];
+    return (
+      <Modal title="Is this the car?" onClose={() => setStep("plate")}>
+        <div className="whoName" style={{ fontSize: 22 }}>
+          {vehicleName(chosen)}
+        </div>
+        <dl className="kv" style={{ margin: "12px 0 18px" }}>
+          <dt>Plate</dt>
+          <dd className="num">
+            {chosen.plate || "—"}
+            {chosen.plateState ? ` (${chosen.plateState})` : ""}
+          </dd>
+          <dt>VIN</dt>
+          <dd className="num">{chosen.vin || "—"}</dd>
+          <dt>Engine</dt>
+          <dd>{chosen.engine || "—"}</dd>
+          <dt>Color</dt>
+          <dd>{chosen.color || "—"}</dd>
+          <dt>Mileage</dt>
+          <dd className="num">{chosen.mileage ? Number(chosen.mileage).toLocaleString() : "—"}</dd>
+          <dt>Customer</dt>
+          <dd>{owner ? `${customerName(owner)}${owner.phone ? ` · ${fmtPhone(owner.phone)}` : ""}` : "none on file yet"}</dd>
+          <dt>Last visit</dt>
+          <dd>{last ? fmtDate(last.invoicedAt || last.createdAt) : "—"}</dd>
+        </dl>
+        <div className="rowBtns">
+          <button className="btn primary lg" onClick={() => start(chosen)} autoFocus>
+            Yes, start the estimate
+          </button>
+          <button className="btn lg" onClick={() => setStep("edit")}>
+            Fix car details
+          </button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal title="New ticket" onClose={onClose} size="wide">
@@ -79,7 +126,7 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
               if (e.key !== "Enter") return;
               if (exact) pick(exact);
               else if (matches.length === 1) pick(matches[0]);
-              else if (norm(plate).length >= 2) setStep("customer");
+              else if (norm(plate).length >= 2) setStep("vehicle");
             }}
           />
         </Field>
@@ -113,7 +160,7 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
       )}
 
       <div className="rowBtns" style={{ marginTop: 14 }}>
-        <button className="btn primary" disabled={norm(plate).length < 2} onClick={() => setStep("customer")}>
+        <button className="btn primary" disabled={norm(plate).length < 2} onClick={() => setStep("vehicle")}>
           {norm(plate).length >= 2 && !exact ? `New car with plate ${norm(plate)}` : "New car"}
         </button>
         <button className="btn ghost" onClick={() => onStart({})}>
@@ -121,8 +168,9 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
         </button>
       </div>
       <p className="legalNote">
-        A plate that's on file opens the ticket with the car and its owner already filled in. A new plate asks who the
-        customer is, then {cfg.plateApiKey ? "looks the car up from the plate" : "builds the car"}.
+        A plate on file shows the car to confirm, then opens the estimate. A new plate{" "}
+        {cfg.plateApiKey ? "is looked up and the car is built from it" : "opens a blank car to fill in"}. The customer's name
+        and number go on the ticket whenever they're ready, from the Customer button at the top.
       </p>
     </Modal>
   );
