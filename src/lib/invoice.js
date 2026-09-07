@@ -187,7 +187,9 @@ export function jobLines(job, cfg, parts, mkId, count = 1) {
       ...t,
       id: mkId(),
       job: job.name,
-      description: t.description || (part ? part.description : ""),
+      description:
+        t.description ||
+        (part ? (part.tire && part.size && !String(part.description || "").includes(part.size) ? `${part.description} ${part.size}`.trim() : part.description) : ""),
       number: t.number || (part ? part.number : ""),
       price: t.price != null ? t.price : part ? num(part.price) : 0,
       cost: t.cost != null ? t.cost : part ? num(part.cost) : 0,

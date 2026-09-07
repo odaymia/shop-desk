@@ -573,7 +573,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             addLine("part", {
               partId: p.id,
               number: p.number,
-              description: p.description,
+              description: p.tire && p.size && !String(p.description || "").includes(p.size) ? `${p.description} ${p.size}`.trim() : p.description,
               price: toNum(p.price),
               cost: toNum(p.cost),
               taxable: p.taxable === false ? false : null,

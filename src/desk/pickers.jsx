@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Modal, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
+import { tireName } from "../lib/tires.js";
 import { jobLines, orderTotals } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 
@@ -10,7 +11,7 @@ export function PartPicker({ shop, onPick, onTyped, onClose }) {
   const rows = useMemo(
     () =>
       activeList(shop.parts)
-        .filter((p) => searchText(q, p.number, p.description, p.category))
+        .filter((p) => searchText(q, p.number, p.description, p.size, p.category))
         .sort((a, b) => (a.number || "").localeCompare(b.number || ""))
         .slice(0, 80),
     [shop.parts, q]
@@ -47,7 +48,7 @@ export function PartPicker({ shop, onPick, onTyped, onClose }) {
             <li key={p.id} className={low ? "low" : ""} onClick={() => onPick(p)}>
               <div className="main">
                 <strong>
-                  {p.number} {p.description ? `— ${p.description}` : ""}
+                  {p.tire ? `${p.size} · ${tireName(p)}` : `${p.number} ${p.description ? `— ${p.description}` : ""}`}
                 </strong>
                 <span>{[p.category, p.location, (shop.vendors[p.vendorId] || {}).name].filter(Boolean).join(" · ")}</span>
               </div>

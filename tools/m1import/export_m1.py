@@ -175,6 +175,23 @@ def main(path, out, keep_canned=False):
             "taxable": not p["TaxExempt"], "active": not p["IsDeleted"], "createdAt": ts(p["LastChangeDate"]), "updatedAt": ts(p["LastChangeDate"]),
             "size": s(p["Size"]), "tire": bool(p["IsTire"]), "m1": {"partId": p["PartId"], "lastCost": money(i.get("LastCost"))},
         })
+        if parts[-1]["tire"]:
+            # "175/70R14 84T" → size 175/70R14, load/speed 84T; brand/model from "Ironman, iMOVE PT"
+            raw = parts[-1]["size"].upper().strip()
+            m = re.match(r"^[PLT]*\s*(\d{3})\s*[/-]?\s*/?\s*(\d{2,3})\s*[/-]?\s*Z?R?\s*(\d{2}(?:\.\d)?)(C?)(.*)$", raw)
+            f = re.match(r"^(\d{2})X(\d{1,2}(?:\.\d{1,2})?)R?(\d{2})(LT)?(.*)$", raw)
+            if m:
+                parts[-1]["size"] = f"{m[1]}/{m[2]}R{m[3]}{m[4]}"
+                parts[-1]["loadSpeed"] = re.sub(r"^[/\s]+", "", m[5]).strip()  # "94H", "XL 99Y", "10 120/1"
+            elif f:
+                parts[-1]["size"] = f"{f[1]}X{f[2]}R{f[3]}{f[4] or ''}"
+                parts[-1]["loadSpeed"] = f[5].strip()
+            desc = parts[-1]["description"]
+            if "," in desc:
+                br, mo = desc.split(",", 1)
+                parts[-1]["brand"], parts[-1]["model"] = br.strip(), mo.strip()
+                parts[-1]["description"] = f"{br.strip()} {mo.strip()}".strip()
+            parts[-1]["category"] = "Tires"
 
     # ---------- orders ----------
     lineitems = by(R("LineItem"), "LineItemId")

@@ -25,13 +25,14 @@ export function Inventory({ shop, flash }) {
   const rows = useMemo(
     () =>
       activeList(shop.parts)
+        .filter((p) => !p.tire) // tires have their own page
         .filter((p) => searchText(q, p.number, p.description, p.category, p.location, (shop.vendors[p.vendorId] || {}).name))
         .filter((p) => only === "all" || toNum(p.onHand) <= toNum(p.reorderAt))
         .sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.number || "").localeCompare(b.number || "")),
     [shop.parts, shop.vendors, q, only]
   );
   const value = rows.reduce((a, p) => a + toNum(p.onHand) * toNum(p.cost), 0);
-  const low = activeList(shop.parts).filter((p) => toNum(p.onHand) <= toNum(p.reorderAt) && toNum(p.reorderAt) > 0).length;
+  const low = activeList(shop.parts).filter((p) => !p.tire && toNum(p.onHand) <= toNum(p.reorderAt) && toNum(p.reorderAt) > 0).length;
 
   return (
     <>
