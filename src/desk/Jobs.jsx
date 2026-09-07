@@ -13,7 +13,7 @@ const blankLine = (kind) =>
   kind === "labor"
     ? { kind, description: "", details: "", hours: 0.5, rate: null }
     : kind === "fee"
-    ? { kind, description: "", qty: 1, price: 0 }
+    ? { kind, description: "", qty: 1, price: "" }
     : { kind, description: "", number: "", partId: null, qty: 1, price: null, cost: null, condition: "new" };
 const lineText = (l, parts, unit) =>
   l.kind === "labor"
@@ -166,7 +166,9 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
   const setLine = (i, patch) => setD((x) => ({ ...x, lines: x.lines.map((l, k) => (k === i ? { ...l, ...patch } : l)) }));
   const add = (kind) => setD((x) => ({ ...x, lines: [...x.lines, blankLine(kind)] }));
   const remove = (i) => setD((x) => ({ ...x, lines: x.lines.filter((_, k) => k !== i) }));
+  /* text as typed; "1." must survive the keystroke, so numbers are made on save */
   const numOrNull = (v) => (v === "" || v == null ? null : toNum(v));
+  const clean = (v) => String(v).replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 
   return (
     <>
@@ -233,17 +235,17 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                 />
               )}
               {l.kind === "labor" ? (
-                <input inputMode="decimal" value={l.hours} onChange={(e) => setLine(i, { hours: toNum(e.target.value) })} title={d.unit && l.perUnit ? `Per ${d.unit}` : "Hours"} />
+                <input inputMode="decimal" value={l.hours} onChange={(e) => setLine(i, { hours: clean(e.target.value) })} title={d.unit && l.perUnit ? `Per ${d.unit}` : "Hours"} />
               ) : (
-                <input inputMode="decimal" value={l.qty} onChange={(e) => setLine(i, { qty: toNum(e.target.value) })} title="Quantity" />
+                <input inputMode="decimal" value={l.qty} onChange={(e) => setLine(i, { qty: clean(e.target.value) })} title="Quantity" />
               )}
               {l.kind === "fee" ? (
-                <input inputMode="decimal" value={l.price == null ? "" : l.price} onChange={(e) => setLine(i, { price: toNum(e.target.value) })} placeholder="amount" title="Fee amount" />
+                <input inputMode="decimal" value={l.price == null ? "" : l.price} onChange={(e) => setLine(i, { price: clean(e.target.value) })} placeholder="1.75" title="Fee amount" />
               ) : l.kind === "part" ? (
                 <input
                   inputMode="decimal"
                   value={l.price == null ? "" : l.price}
-                  onChange={(e) => setLine(i, { price: numOrNull(e.target.value) })}
+                  onChange={(e) => setLine(i, { price: e.target.value === "" ? null : clean(e.target.value) })}
                   placeholder={l.partId ? `$${toNum(shop.parts[l.partId]?.price).toFixed(2)}` : "price"}
                   title="Price each — blank uses inventory price"
                 />
@@ -251,7 +253,7 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                 <input
                   inputMode="decimal"
                   value={l.rate == null ? "" : l.rate}
-                  onChange={(e) => setLine(i, { rate: numOrNull(e.target.value) })}
+                  onChange={(e) => setLine(i, { rate: e.target.value === "" ? null : clean(e.target.value) })}
                   placeholder={d.unit && l.perUnit ? `$ per ${d.unit}` : `$${toNum(cfg.laborRate)}/hr`}
                   title={d.unit && l.perUnit ? `Flat amount per ${d.unit}` : "Rate — blank uses the shop rate"}
                 />
@@ -293,7 +295,14 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
             if (!d.lines.length) return setErr("Add at least one line.");
             const blank = d.lines.find((l) => !(l.description || "").trim() && !(l.kind === "part" && l.partId));
             if (blank) return setErr("Every line needs a description the customer can understand. California requires each service and each part to be described on the invoice.");
-            onSave({ ...d, name: d.name.trim() });
+            const lines = d.lines.map((l) =>
+              l.kind === "labor"
+                ? { ...l, hours: toNum(l.hours) || 1, rate: numOrNull(l.rate) }
+                : l.kind === "fee"
+                ? { ...l, qty: toNum(l.qty) || 1, price: toNum(l.price) }
+                : { ...l, qty: toNum(l.qty) || 1, price: numOrNull(l.price), cost: numOrNull(l.cost) }
+            );
+            onSave({ ...d, name: d.name.trim(), lines });
           }}
         >
           Save job
