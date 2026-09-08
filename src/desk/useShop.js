@@ -7,6 +7,8 @@ import {
   VENDOR_PREFIX,
   JOB_PREFIX,
   ORDER_PREFIX,
+  SPEC_PREFIX,
+  specStoreKey,
   COUNTERS_KEY,
   customerKey,
   vehicleKey,
@@ -17,6 +19,7 @@ import {
 } from "../lib/keys.js";
 import { STATUS, canTransition, snapshotRules, stockMoves, round2 } from "../lib/invoice.js";
 import { STARTER_JOBS } from "../lib/starterJobs.js";
+import { specKey } from "../lib/specs.js";
 import { cloud, sGet, sGetAll, sSet } from "../storage/index.js";
 
 /* Front desk data: customers, vehicles, parts, vendors, canned jobs, and
@@ -35,6 +38,7 @@ const TABLES = [
   ["vendors", VENDOR_PREFIX, vendorKey],
   ["jobs", JOB_PREFIX, jobKey],
   ["orders", ORDER_PREFIX, orderKey],
+  ["specs", SPEC_PREFIX, specStoreKey],
 ];
 
 const empty = () => ({
@@ -44,6 +48,7 @@ const empty = () => ({
   vendors: {},
   jobs: {},
   orders: {},
+  specs: {},
   counters: {},
   loaded: false,
 });
@@ -143,6 +148,8 @@ export function useShop(cfg) {
   const saveVendor = useCallback((v) => put("vendors", vendorKey, v), [put]);
   const saveJob = useCallback((j) => put("jobs", jobKey, j), [put]);
   const saveOrder = useCallback((o) => put("orders", orderKey, o), [put]);
+  /* one spec per year/make/model/engine; the key is the id so a re-save replaces */
+  const saveSpec = useCallback((sp) => put("specs", specStoreKey, { ...sp, id: specKey(sp).replace(/[^A-Za-z0-9|.-]/g, "_") }), [put]);
 
   /* One sequence for estimates, ROs and invoices, like a modern shop
      system: the number never changes as the ticket moves along, so the
@@ -240,6 +247,7 @@ export function useShop(cfg) {
     saveVendor,
     saveJob,
     saveOrder,
+    saveSpec,
     createOrder,
     setStatus,
   };

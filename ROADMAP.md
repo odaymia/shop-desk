@@ -47,7 +47,7 @@ What a shop uses Manager SE for every day, in a browser:
 
 ## Phase 3 — Quick lube
 
-- Service intervals by year/make/model/engine: oil spec and capacity, filter part numbers, drain plug torque, reset procedure
+- [~] Service specs by year/make/model/engine: oil grade, spec, capacity, filter numbers, drain plug torque, reset steps. Shop-entered, learned per engine, with Valvoline product picks and "Add oil change." A MOTOR Fluids license (800-426-6867) can fill the same records automatically.
 - Bay board: cars in the bay, who is on which, timer per car
 - Sticker printing with next-service mileage and date
 - Oil inventory in bulk (gallons on hand per tank) plus filters and wipers by part

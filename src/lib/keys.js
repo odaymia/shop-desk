@@ -15,6 +15,8 @@ export const PART_PREFIX = "sd:part:";
 export const VENDOR_PREFIX = "sd:vendor:";
 export const JOB_PREFIX = "sd:job:";
 export const ORDER_PREFIX = "sd:order:";
+export const SPEC_PREFIX = "sd:spec:"; // service specs per engine (oil grade, capacity, filter numbers)
+export const specStoreKey = (id) => SPEC_PREFIX + id;
 export const CART_PREFIX = "sd:cart:"; // parts carts sent back by a catalog; one per punchout session
 export const customerKey = (id) => CUSTOMER_PREFIX + id;
 export const vehicleKey = (id) => VEHICLE_PREFIX + id;

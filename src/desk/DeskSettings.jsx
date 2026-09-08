@@ -48,6 +48,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       suppliesPct: toNum(d.suppliesPct),
       suppliesCap: toNum(d.suppliesCap),
       partsMarkupPct: toNum(d.partsMarkupPct),
+      oilChangeLaborPrice: toNum(d.oilChangeLaborPrice),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
     });
     flash("Settings saved");
@@ -148,6 +149,9 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </Field>
           </div>
           <Field label="Shop supplies charge">{onOff("suppliesTaxable", "Taxable", "Not taxable")}</Field>
+          <Field label="Oil change labor, flat ($, 0 = add your own labor line)">
+            <Num value={d.oilChangeLaborPrice} onChange={set("oilChangeLaborPrice")} />
+          </Field>
           {toNum(d.suppliesPct) > 0 && (
             <div className="warnBox" style={{ marginBottom: 16 }}>
               A generic "shop supplies" charge is prohibited on California invoices (16 CCR 3356). Leave this at 0 and put

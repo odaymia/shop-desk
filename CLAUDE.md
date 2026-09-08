@@ -59,6 +59,8 @@ sd:part:<id>               inventory
 sd:vendor:<id>
 sd:job:<id>                canned job
 sd:order:<id>              a ticket, whatever its status
+sd:spec:<id>               service specs per year/make/model/engine (oil, filter, torque)
+sd:cart:<id>               a parts cart sent back by a catalog punchout; applied to its ticket once
 gac:employees              the staff list, SHARED with the time clock
 _cloud:*                   this computer only, never synced
 ```

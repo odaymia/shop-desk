@@ -19,6 +19,9 @@ import {
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
+import { findSpec, oilChangeLines, matchOil, matchFilter } from "../lib/specs.js";
+import { valvolineFor } from "../lib/valvoline.js";
+import { SpecForm } from "./SpecForm.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX } from "../lib/keys.js";
 import { tireName } from "../lib/tires.js";
@@ -38,6 +41,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
   const [vehEdit, setVehEdit] = useState(null);
   const [custEdit, setCustEdit] = useState(false);
+  const [specEdit, setSpecEdit] = useState(false);
 
   /* adopt changes from another device only when we have nothing unsaved */
   useEffect(() => {
@@ -368,6 +372,20 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             </div>
           </div>
 
+          {vehicle && (
+            <SpecsCard
+              vehicle={vehicle}
+              shop={shop}
+              cfg={cfg}
+              locked={locked}
+              onEdit={() => setSpecEdit(true)}
+              onAdd={(lines) => {
+                addLines(lines);
+                flash(`${lines.length} line${lines.length === 1 ? "" : "s"} added for the oil change`);
+              }}
+            />
+          )}
+
           <div className="card" style={{ marginTop: 14 }}>
             <Field label="Customer states (prints on the ticket)">
               <textarea
@@ -600,6 +618,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       </div>
 
       {pick === "customer" && <CustomerPicker shop={shop} onPick={pickCustomer} onClose={() => setPick(null)} />}
+      {specEdit && vehicle && (
+        <SpecForm
+          vehicle={vehicle}
+          initial={(findSpec(shop.specs, vehicle) || {}).spec}
+          onClose={() => setSpecEdit(false)}
+          onSave={async (sp) => {
+            await shop.saveSpec(sp);
+            setSpecEdit(false);
+            flash("Specs saved for this engine");
+          }}
+        />
+      )}
       {custEdit && customer && (
         <CustomerForm
           initial={customer}
@@ -863,5 +893,86 @@ function PaymentModal({ balance, onClose, onSave }) {
       </button>
       <p className="legalNote">Card processing isn't wired in yet — run the card on your terminal and record it here.</p>
     </Modal>
+  );
+}
+
+
+/* Oil grade, quarts, filter numbers and Valvoline picks for the car on
+   the ticket. Learned once per engine; a licensed feed can fill it later. */
+function SpecsCard({ vehicle, shop, cfg, locked, onEdit, onAdd }) {
+  const found = findSpec(shop.specs, vehicle);
+  const sp = found && found.spec;
+  if (!sp)
+    return (
+      <div className="card specs" style={{ marginTop: 14 }}>
+        <div className="cardHead">
+          <h3>Service specs</h3>
+          {!locked && (
+            <button className="btn tiny" onClick={onEdit}>
+              Add specs for this engine
+            </button>
+          )}
+        </div>
+        <p className="muted" style={{ margin: 0 }}>
+          No oil grade or capacity on file yet for a {vehicle.year} {vehicle.make} {vehicle.model}
+          {vehicle.engine ? ` ${vehicle.engine}` : ""}. Enter it once from the oil cap or the Valvoline guide and it comes up for
+          every one of these from now on.
+        </p>
+      </div>
+    );
+  const oils = matchOil(shop.parts, sp.oilViscosity);
+  const filts = matchFilter(shop.parts, sp.oilFilters);
+  const valv = valvolineFor(sp.oilViscosity, sp.oilSpec, vehicle.mileage).slice(0, 3);
+  return (
+    <div className="card specs" style={{ marginTop: 14 }}>
+      <div className="cardHead">
+        <h3>
+          Service specs
+          {!found.exact ? <span className="st" style={{ marginLeft: 8 }}>from a {sp.year}, same engine — double-check</span> : null}
+        </h3>
+        {!locked && (
+          <span className="rowBtns">
+            <button className="btn tiny" onClick={onEdit}>
+              Edit
+            </button>
+            <button className="btn tiny primary" onClick={() => onAdd(oilChangeLines(sp, shop.parts, uid, cfg))}>
+              + Add oil change
+            </button>
+          </span>
+        )}
+      </div>
+      <div className="specGrid">
+        <div>
+          <span>Oil</span>
+          <strong>
+            {sp.oilViscosity} · {sp.oilCapacityQt} qt
+          </strong>
+          {sp.oilSpec ? <em>{sp.oilSpec}</em> : null}
+          {oils.length ? <em className="ok">Stocked: {oils[0].description}</em> : <em className="warn">No {sp.oilViscosity} oil in inventory</em>}
+        </div>
+        <div>
+          <span>Oil filter</span>
+          <strong>{(sp.oilFilters || []).map((f) => [f.brand, f.number].filter(Boolean).join(" ")).join(" · ") || "—"}</strong>
+          {filts.length ? <em className="ok">Stocked: {filts[0].number}</em> : (sp.oilFilters || []).length ? <em className="warn">Not in inventory</em> : null}
+        </div>
+        <div>
+          <span>Valvoline</span>
+          <strong>{valv[0] ? valv[0].product : "—"}</strong>
+          {valv.slice(1).map((v) => (
+            <em key={v.line}>{v.product}</em>
+          ))}
+        </div>
+        <div>
+          <span>Drain plug · reset</span>
+          <strong>{sp.drainPlugTorque || "—"}</strong>
+          {sp.resetProcedure ? <em>{sp.resetProcedure}</em> : null}
+        </div>
+      </div>
+      {(sp.otherFluids || sp.notes) && (
+        <p className="muted" style={{ margin: "10px 0 0", fontSize: 13, whiteSpace: "pre-wrap" }}>
+          {[sp.otherFluids, sp.notes].filter(Boolean).join("\n")}
+        </p>
+      )}
+    </div>
   );
 }

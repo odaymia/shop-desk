@@ -25,6 +25,7 @@ export const DEFAULT_CFG = {
   suppliesPct: 0, // a generic "shop supplies" charge is prohibited on California invoices (16 CCR 3356); other states may set a percent of labor
   suppliesCap: 0, // never more than this per ticket; 0 = no cap
   suppliesTaxable: true,
+  oilChangeLaborPrice: 0, // flat labor added by "Add oil change"; 0 = parts only, add your own labor
   nextOrderNumber: 1001, // first estimate/RO/invoice number; the live counter is in sd:counters
   invoiceFooter:
     "Thank you for your business. Parts and labor are warranted for 12 months or 12,000 miles, whichever comes first. Returned parts are subject to a restocking fee.",
