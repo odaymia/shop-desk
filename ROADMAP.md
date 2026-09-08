@@ -31,6 +31,7 @@ What a shop uses Manager SE for every day, in a browser:
 - [x] Import from Manager SE straight from the .bak backup: customers, vehicles, history, payments, inventory, canned jobs (tools/m1import)
 - [ ] Parts catalog and ordering through PartsTech (O'Reilly First Call, AutoZone, NAPA, WorldPac)
 - [ ] Labor guide: flat-rate table per shop first; MOTOR / third-party labor API later
+- [~] CARFAX: service-history file built to their spec; nightly FTP delivery and QuickVIN/history lookups wait on a CARFAX data agreement and a small server piece (their endpoints don't allow browser calls)
 - [ ] Text and email the invoice to the customer
 - [ ] Card processing (Square or Stripe terminal)
 - [ ] Roles: front desk vs technician vs owner. Today everything is behind the manager PIN.

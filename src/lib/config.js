@@ -5,6 +5,8 @@ export const DEFAULT_CFG = {
   shopPhone: "",
   shopAddress: "", // free text, printed on the invoice header
   shopEmail: "",
+  shopWebsite: "",
+  carfaxLocationId: "", // assigned by CARFAX when the shop joins the Service Network
   ardNumber: "", // California BAR registration (ARD) number, printed on every estimate and invoice
   logo: "", // data URL of the shop logo; blank shows the bundled Genie logo
   printStaffNames: "full", // off | full | first-initial | initials — writer and tech on printed tickets

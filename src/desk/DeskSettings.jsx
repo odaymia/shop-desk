@@ -4,6 +4,7 @@ import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { PLATE_PROVIDER } from "../lib/plate.js";
 import { ImportPanel } from "./Import.jsx";
+import { CarfaxPanel } from "./CarfaxPanel.jsx";
 import { NAME_MODES } from "../lib/names.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
@@ -28,7 +29,7 @@ function readLogo(file) {
 
 /* Shop info, pricing rules, what prints on the invoice, and the cloud
    account. */
-export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster }) {
+export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) {
   const [d, setD] = useState(cfg);
   useEffect(() => setD(cfg), [cfg]);
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
@@ -181,7 +182,9 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster }) {
           <Field label="Invoice footer (warranty, thank-you)">
             <textarea className="ta" value={d.invoiceFooter} onChange={(e) => set("invoiceFooter")(e.target.value)} />
           </Field>
-          <button className="btn primary lg" onClick={save}>
+          <CarfaxPanel cfg={cfg} shop={shop} d={d} set={set} flash={flash} />
+
+          <button className="btn primary lg" onClick={save} style={{ marginTop: 18 }}>
             Save settings
           </button>
 
