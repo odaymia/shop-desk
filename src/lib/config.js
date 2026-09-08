@@ -7,6 +7,11 @@ export const DEFAULT_CFG = {
   shopEmail: "",
   shopWebsite: "",
   carfaxLocationId: "", // assigned by CARFAX when the shop joins the Service Network
+  catalogs: { oreilly: true, partstech: true }, // which parts catalogs get a button on the ticket
+  partsMarkupPct: 35, // sell price = catalog cost + this percent, unless list is higher
+  partsPriceEnding99: false,
+  partsTechUser: "", // the shop's PartsTech login (email) and API key, from PartsTech → My Account → API
+  partsTechKey: "",
   ardNumber: "", // California BAR registration (ARD) number, printed on every estimate and invoice
   logo: "", // data URL of the shop logo; blank shows the bundled Genie logo
   printStaffNames: "full", // off | full | first-initial | initials — writer and tech on printed tickets

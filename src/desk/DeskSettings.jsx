@@ -5,6 +5,7 @@ import defaultLogo from "../assets/genie-logo.png";
 import { PLATE_PROVIDER } from "../lib/plate.js";
 import { ImportPanel } from "./Import.jsx";
 import { CarfaxPanel } from "./CarfaxPanel.jsx";
+import { CATALOGS } from "../lib/parts.js";
 import { NAME_MODES } from "../lib/names.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
@@ -46,6 +47,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       taxRate: toNum(d.taxRate),
       suppliesPct: toNum(d.suppliesPct),
       suppliesCap: toNum(d.suppliesCap),
+      partsMarkupPct: toNum(d.partsMarkupPct),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
     });
     flash("Settings saved");
@@ -182,6 +184,52 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <Field label="Invoice footer (warranty, thank-you)">
             <textarea className="ta" value={d.invoiceFooter} onChange={(e) => set("invoiceFooter")(e.target.value)} />
           </Field>
+          <h3 className="subhead" style={{ marginTop: 36 }}>
+            Parts catalogs
+          </h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Each catalog you tick gets a button on the ticket. It opens in a new tab with the car's VIN copied, ready to
+            paste. Parts you pick there are typed onto the ticket by hand until PartsTech ordering is switched on below.
+          </p>
+          {CATALOGS.map(([k, label]) => (
+            <label key={k} className="fld inline">
+              <input
+                type="checkbox"
+                checked={!!(d.catalogs && d.catalogs[k])}
+                onChange={(e) => set("catalogs")({ ...(d.catalogs || {}), [k]: e.target.checked })}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+          <div className="fldRow">
+            <Field label="Parts markup over cost (%)">
+              <Num value={d.partsMarkupPct} onChange={set("partsMarkupPct")} />
+            </Field>
+            <Field label="Round sell prices to .99">
+              <select value={d.partsPriceEnding99 ? "on" : "off"} onChange={(e) => set("partsPriceEnding99")(e.target.value === "on")}>
+                <option value="off">No, exact markup</option>
+                <option value="on">Yes, end in .99</option>
+              </select>
+            </Field>
+          </div>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Used for parts that come back from a catalog. A part whose list price is higher than cost plus markup sells at
+            list.
+          </p>
+          <div className="fldRow">
+            <Field label="PartsTech login (email)">
+              <Text value={d.partsTechUser || ""} onChange={set("partsTechUser")} placeholder="you@shop.com" />
+            </Field>
+            <Field label="PartsTech API key">
+              <input type="password" value={d.partsTechKey || ""} onChange={(e) => set("partsTechKey")(e.target.value.trim())} placeholder="From PartsTech → My Account → API" />
+            </Field>
+          </div>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            With a free PartsTech shop account linked to your O'Reilly First Call login, parts ordering inside the ticket
+            becomes possible once PartsTech issues Shop Desk a partner key. Your login and key are saved here so it's a
+            one-step switch-on when that arrives.
+          </p>
+
           <CarfaxPanel cfg={cfg} shop={shop} d={d} set={set} flash={flash} />
 
           <button className="btn primary lg" onClick={save} style={{ marginTop: 18 }}>

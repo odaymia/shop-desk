@@ -18,6 +18,9 @@ import {
   PART_CONDITIONS,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
+import { CATALOGS, cartToLines } from "../lib/parts.js";
+import { cloud, sGet, sSet, sList } from "../storage/index.js";
+import { CART_PREFIX } from "../lib/keys.js";
 import { tireName } from "../lib/tires.js";
 
 /* One ticket: estimate → repair order → invoice. Edits save themselves a
@@ -72,6 +75,42 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     },
     [flushNow]
   );
+
+  /* A parts cart sent back by a catalog lands as its own record; when
+     one names this ticket, its parts go on as lines. */
+  const applyCart = useCallback(
+    async (key) => {
+      const cart = await sGet(key, null);
+      if (!cart || cart.applied || cart.orderId !== orderId) return;
+      const lines = cartToLines(cart, cfg, uid);
+      if (lines.length) update((d) => ({ ...d, lines: [...d.lines, ...lines] }));
+      await sSet(key, { ...cart, applied: true, appliedAt: Date.now() });
+      flash(`${lines.length} part${lines.length === 1 ? "" : "s"} added from ${cart.supplier || cart.source || "the catalog"}`);
+    },
+    [orderId, cfg, update, flash]
+  );
+  useEffect(() => {
+    sList(CART_PREFIX).then((keys) => keys.forEach(applyCart));
+    return cloud.subscribe((e) => {
+      if (e.type !== "data") return;
+      for (const k of e.keys || []) if (k.startsWith(CART_PREFIX)) applyCart(k);
+    });
+  }, [applyCart]);
+
+  const openCatalog = async (key, url) => {
+    await flushNow();
+    const v = vehicle;
+    const text = v && v.vin ? v.vin : v && v.plate ? v.plate : "";
+    if (text && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(text);
+        flash(`${v.vin ? "VIN" : "Plate"} ${text} copied — paste it into the catalog's vehicle search`);
+      } catch {
+        /* clipboard blocked; the catalog still opens */
+      }
+    }
+    window.open(url, "catalog-" + key, "noopener");
+  };
 
   if (!draft)
     return (
@@ -387,6 +426,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   <button className="btn tiny primary" onClick={() => setPick("job")}>
                     + Canned job
                   </button>
+                  {CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
+                    <button key={k} className="btn tiny" onClick={() => openCatalog(k, url)} title={`Open ${label} in a new tab`}>
+                      {label} ↗
+                    </button>
+                  ))}
                   <button className="btn tiny" onClick={() => setPick("part")}>
                     + Part
                   </button>

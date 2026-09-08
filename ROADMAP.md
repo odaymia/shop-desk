@@ -29,7 +29,7 @@ What a shop uses Manager SE for every day, in a browser:
 - [ ] Customer authorization signature on the estimate (reuse the timecard signature pad)
 - [ ] Appointments board
 - [x] Import from Manager SE straight from the .bak backup: customers, vehicles, history, payments, inventory, canned jobs (tools/m1import)
-- [ ] Parts catalog and ordering through PartsTech (O'Reilly First Call, AutoZone, NAPA, WorldPac)
+- [~] Parts catalogs: buttons on the ticket open O'Reilly First Call, PartsTech, Nexpart, AutoZone Pro, NAPA PROLink with the VIN copied; cart-to-lines with markup is built. In-ticket ordering waits on a PartsTech partner key and a callback server (Supabase Edge Function writing `sd:cart:*`)
 - [ ] Labor guide: flat-rate table per shop first; MOTOR / third-party labor API later
 - [~] CARFAX: service-history file built to their spec; nightly FTP delivery and QuickVIN/history lookups wait on a CARFAX data agreement and a small server piece (their endpoints don't allow browser calls)
 - [ ] Text and email the invoice to the customer
