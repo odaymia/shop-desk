@@ -68,8 +68,8 @@ export default function Portal() {
             </p>
           </div>
         )}
-        {rows.map((r) => (
-          <ShopSection key={r.shop_id + r.customer_id} row={r} shop={shops[r.shop_id]} user={user} />
+        {[...new Set(rows.map((r) => r.shop_id))].map((sid) => (
+          <ShopSection key={sid} rows={rows.filter((r) => r.shop_id === sid)} shop={shops[sid]} user={user} />
         ))}
         <p className="ptFoot">
           Signed in as {user.email}.{" "}
@@ -235,17 +235,22 @@ function NewPassword({ onDone }) {
   );
 }
 
-function ShopSection({ row, shop, user }) {
-  const d = row.data || {};
+/* One garage per shop: every customer record carrying this email is
+   folded into a single list of cars. */
+function ShopSection({ rows, shop, user }) {
+  const shopId = rows[0].shop_id;
   const [hidden, setHidden] = useState([]); // vehicle ids the customer asked to drop
   useEffect(() => {
     supabase
       .from("portal_requests")
       .select("vehicle_id")
-      .eq("customer_id", row.customer_id)
+      .eq("shop_id", shopId)
       .then(({ data }) => setHidden((data || []).map((r) => r.vehicle_id).filter(Boolean)));
-  }, [row.customer_id]);
-  const vehs = (d.vehicles || []).filter((x) => !hidden.includes(x.id));
+  }, [shopId]);
+  const all = rows.flatMap((r) => ((r.data && r.data.vehicles) || []).map((x) => ({ ...x, customerId: r.customer_id })));
+  const vehs = all.filter((x) => !hidden.includes(x.id));
+  const names = [...new Set(rows.map((r) => r.data && r.data.name).filter(Boolean))];
+  const d = { name: names.length === 1 ? names[0] : "" };
   const [carId, setCarId] = useState("");
   const [section, setSection] = useState("due");
   const [dropping, setDropping] = useState(false);
@@ -254,8 +259,8 @@ function ShopSection({ row, shop, user }) {
   const drop = async (kind) => {
     if (!v) return;
     const { error } = await supabase.from("portal_requests").insert({
-      shop_id: row.shop_id,
-      customer_id: row.customer_id,
+      shop_id: shopId,
+      customer_id: v.customerId,
       email: user.email,
       vehicle_id: v.id,
       kind,
