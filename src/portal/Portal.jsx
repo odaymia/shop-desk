@@ -273,7 +273,7 @@ function ShopSection({ rows, shop, user }) {
   const sections = [
     ["due", "Recommended services"],
     ["receipts", "My receipts"],
-    ["call", "Call store"],
+    ["call", "Call / Directions"],
     ["ask", "Ask a question"],
   ];
   return (
