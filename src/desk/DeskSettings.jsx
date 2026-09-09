@@ -36,6 +36,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
   const [d, setD] = useState(cfg);
   useEffect(() => setD(cfg), [cfg]);
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
+  const setPkg = (i, patch) => setD((x) => ({ ...x, oilPackages: (x.oilPackages || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const onOff = (k, onText, offText) => (
     <select value={d[k] ? "on" : "off"} onChange={(e) => set(k)(e.target.value === "on")}>
       <option value="on">{onText}</option>
@@ -51,6 +52,9 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       suppliesCap: toNum(d.suppliesCap),
       partsMarkupPct: toNum(d.partsMarkupPct),
       oilChangeLaborPrice: toNum(d.oilChangeLaborPrice),
+      oilPackages: (d.oilPackages || [])
+        .filter((p) => String(p.name || "").trim())
+        .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart) })),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
     });
     flash("Settings saved");
@@ -182,6 +186,37 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
               ))}
             </select>
           </Field>
+
+          <h3 className="subhead">Oil change menu</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            What the Oil change button on a ticket offers. Each package includes the quarts shown, the filter, and a fluid
+            check; quarts past that are charged per quart. The package price is charged plus tax.
+          </p>
+          <div className="miniLines">
+            {(d.oilPackages || []).map((p, i) => (
+              <div key={p.id || i} className="miniLine" style={{ gridTemplateColumns: "2fr 90px 70px 90px 36px" }}>
+                <input value={p.name} onChange={(e) => setPkg(i, { name: e.target.value })} placeholder="Valvoline Full Synthetic Oil Change" />
+                <input inputMode="decimal" value={p.price} onChange={(e) => setPkg(i, { price: e.target.value })} placeholder="Price" title="Package price" />
+                <input inputMode="decimal" value={p.quarts} onChange={(e) => setPkg(i, { quarts: e.target.value })} placeholder="Qt" title="Quarts included" />
+                <input inputMode="decimal" value={p.extraQuart} onChange={(e) => setPkg(i, { extraQuart: e.target.value })} placeholder="$/qt over" title="Per quart past the included amount" />
+                <button className="lineX" onClick={() => set("oilPackages")(d.oilPackages.filter((_, k) => k !== i))} aria-label="Remove">
+                  ✕
+                </button>
+                <textarea
+                  className="ta"
+                  style={{ gridColumn: "1 / -1", minHeight: 44 }}
+                  value={p.details || ""}
+                  onChange={(e) => setPkg(i, { details: e.target.value })}
+                  placeholder="What's included (prints under the line)"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="addBar">
+            <button className="btn tiny" onClick={() => set("oilPackages")([...(d.oilPackages || []), { id: "pkg" + Date.now().toString(36), name: "", price: "", quarts: 5, extraQuart: "", details: "" }])}>
+              + Package
+            </button>
+          </div>
 
           <h3 className="subhead">Printed text</h3>
           <Field label="Authorization line (estimates and repair orders)">

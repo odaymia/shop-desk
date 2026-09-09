@@ -19,9 +19,10 @@ import {
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
-import { findSpec, oilChangeLines, matchOil, matchFilter } from "../lib/specs.js";
+import { findSpec, matchOil, matchFilter } from "../lib/specs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
+import { OilChangePicker } from "./OilChangePicker.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX } from "../lib/keys.js";
 import { tireName } from "../lib/tires.js";
@@ -379,10 +380,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               cfg={cfg}
               locked={locked}
               onEdit={() => setSpecEdit(true)}
-              onAdd={(lines) => {
-                addLines(lines);
-                flash(`${lines.length} line${lines.length === 1 ? "" : "s"} added for the oil change`);
-              }}
+              onAdd={() => setPick("oil")}
             />
           )}
 
@@ -443,6 +441,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 <div className="addBar">
                   <button className="btn tiny primary" onClick={() => setPick("job")}>
                     + Canned job
+                  </button>
+                  <button className="btn tiny primary" onClick={() => setPick("oil")}>
+                    + Oil change
                   </button>
                   {CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
                     <button key={k} className="btn tiny" onClick={() => openCatalog(k, url)} title={`Open ${label} in a new tab`}>
@@ -671,6 +672,19 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           onTyped={(text) => {
             addLine("part", { description: text });
             setPick(null);
+          }}
+        />
+      )}
+      {pick === "oil" && (
+        <OilChangePicker
+          cfg={cfg}
+          shop={shop}
+          spec={vehicle ? (findSpec(shop.specs, vehicle) || {}).spec : null}
+          onClose={() => setPick(null)}
+          onAdd={(lines, pkg) => {
+            addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
+            setPick(null);
+            flash(`${pkg.name} added`);
           }}
         />
       )}
@@ -935,8 +949,8 @@ function SpecsCard({ vehicle, shop, cfg, locked, onEdit, onAdd }) {
             <button className="btn tiny" onClick={onEdit}>
               Edit
             </button>
-            <button className="btn tiny primary" onClick={() => onAdd(oilChangeLines(sp, shop.parts, uid, cfg))}>
-              + Add oil change
+            <button className="btn tiny primary" onClick={onAdd}>
+              + Oil change
             </button>
           </span>
         )}
