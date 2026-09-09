@@ -17,11 +17,15 @@ export default function Portal() {
   const [rows, setRows] = useState([]);
   const [shops, setShops] = useState({});
   const [err, setErr] = useState("");
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setUser(data.session ? data.session.user : null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setUser(s ? s.user : null));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      setUser(s ? s.user : null);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -44,6 +48,7 @@ export default function Portal() {
   if (!supabase) return <div className="root pt">This portal isn't connected to a shop yet.</div>;
   if (user === undefined) return <div className="root pt" />;
   if (!user) return <Login onErr={setErr} err={err} />;
+  if (recovery) return <NewPassword onDone={() => setRecovery(false)} />;
 
   return (
     <div className="root">
@@ -72,37 +77,152 @@ export default function Portal() {
 }
 
 function Login({ err, onErr }) {
+  const [mode, setMode] = useState("signin"); // signin | create | link | forgot
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [sent, setSent] = useState("");
   const [busy, setBusy] = useState(false);
-  const send = async () => {
+  const here = window.location.href.split("#")[0];
+  const clean = () => email.trim().toLowerCase();
+
+  const run = async (fn) => {
     setBusy(true);
     onErr("");
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { emailRedirectTo: window.location.href.split("#")[0] } });
-    setBusy(false);
-    if (error) onErr(error.message);
-    else setSent(true);
+    try {
+      await fn();
+    } catch (e) {
+      onErr(friendly(e.message));
+    } finally {
+      setBusy(false);
+    }
   };
+  const signIn = () =>
+    run(async () => {
+      const { error } = await supabase.auth.signInWithPassword({ email: clean(), password });
+      if (error) throw error;
+    });
+  const create = () =>
+    run(async () => {
+      if (password.length < 8) throw new Error("Use at least 8 characters for the password.");
+      const { data, error } = await supabase.auth.signUp({ email: clean(), password, options: { emailRedirectTo: here } });
+      if (error) throw error;
+      if (!data.session) setSent("confirm");
+    });
+  const link = () =>
+    run(async () => {
+      const { error } = await supabase.auth.signInWithOtp({ email: clean(), options: { emailRedirectTo: here } });
+      if (error) throw error;
+      setSent("link");
+    });
+  const forgot = () =>
+    run(async () => {
+      const { error } = await supabase.auth.resetPasswordForEmail(clean(), { redirectTo: here });
+      if (error) throw error;
+      setSent("reset");
+    });
+  const submit = { signin: signIn, create, link, forgot }[mode];
+  const title = { signin: "Sign in", create: "Create your account", link: "Email me a sign-in link", forgot: "Reset your password" }[mode];
+
   return (
     <div className="root">
       <div className="pt ptLogin">
         <div className="ptCard">
           <h2>My garage</h2>
-          <p className="ptSub">See your vehicles, what's due, your service history, and prices. Enter the email the shop has for you.</p>
+          <p className="ptSub">Your vehicles, what's due, your service history, and prices.</p>
           {sent ? (
-            <p style={{ marginTop: 16 }}>Check your email for a sign-in link. It works on this device or your phone.</p>
+            <p style={{ marginTop: 16 }}>
+              {sent === "confirm" && "Check your email to confirm your account, then come back and sign in."}
+              {sent === "link" && "Check your email for a sign-in link. It works on this device or your phone."}
+              {sent === "reset" && "Check your email for a link to set a new password."}
+            </p>
           ) : (
             <>
-              <label className="fld" style={{ marginTop: 16 }}>
-                <span>Email</span>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoFocus onKeyDown={(e) => e.key === "Enter" && email && send()} />
+              <div className="ptTabs" style={{ marginTop: 14 }}>
+                <button className={`btn ${mode === "signin" ? "primary" : ""}`} onClick={() => setMode("signin")}>
+                  Sign in
+                </button>
+                <button className={`btn ${mode === "create" ? "primary" : ""}`} onClick={() => setMode("create")}>
+                  Create account
+                </button>
+              </div>
+              <label className="fld">
+                <span>Email (the one the shop has for you)</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoFocus autoCapitalize="none" />
               </label>
+              {(mode === "signin" || mode === "create") && (
+                <label className="fld">
+                  <span>{mode === "create" ? "Choose a password (8+ characters)" : "Password"}</span>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email && password && submit()} />
+                </label>
+              )}
               {err && <p className="fldErr">{err}</p>}
-              <button className="btn primary lg full" disabled={busy || !email} onClick={send}>
-                {busy ? "Sending…" : "Email me a sign-in link"}
+              <button className="btn primary lg full" disabled={busy || !email || ((mode === "signin" || mode === "create") && !password)} onClick={submit}>
+                {busy ? "Working…" : title}
               </button>
+              <p className="ptFoot" style={{ marginTop: 16 }}>
+                {mode === "signin" && (
+                  <>
+                    <button className="linkish" onClick={() => setMode("forgot")}>
+                      Forgot password
+                    </button>
+                    {" · "}
+                    <button className="linkish" onClick={() => setMode("link")}>
+                      Email me a sign-in link instead
+                    </button>
+                  </>
+                )}
+                {mode !== "signin" && (
+                  <button className="linkish" onClick={() => setMode("signin")}>
+                    Back to sign in
+                  </button>
+                )}
+              </p>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function friendly(msg) {
+  const m = String(msg || "");
+  if (/invalid login credentials/i.test(m)) return "That email and password don't match. Try Forgot password if you're not sure.";
+  if (/already registered/i.test(m)) return "There's already an account for that email. Sign in, or use Forgot password.";
+  if (/email not confirmed/i.test(m)) return "Confirm your email first — check your inbox for the confirmation link.";
+  if (/rate limit/i.test(m)) return "Too many tries in a row. Give it a minute and try again.";
+  return m;
+}
+
+/* After a password-reset link, Supabase signs the person in and tells
+   us; ask for the new password before showing anything else. */
+function NewPassword({ onDone }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="root">
+      <div className="pt ptLogin">
+        <div className="ptCard">
+          <h2>Set a new password</h2>
+          <label className="fld" style={{ marginTop: 14 }}>
+            <span>New password (8+ characters)</span>
+            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
+          </label>
+          {err && <p className="fldErr">{err}</p>}
+          <button
+            className="btn primary lg full"
+            disabled={busy || pw.length < 8}
+            onClick={async () => {
+              setBusy(true);
+              const { error } = await supabase.auth.updateUser({ password: pw });
+              setBusy(false);
+              if (error) setErr(error.message);
+              else onDone();
+            }}
+          >
+            Save password
+          </button>
         </div>
       </div>
     </div>
