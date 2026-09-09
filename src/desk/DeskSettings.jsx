@@ -30,6 +30,8 @@ function readLogo(file) {
 
 /* Shop info, pricing rules, what prints on the invoice, and the cloud
    account. */
+const portalUrl = () => new URL("portal/", window.location.href).toString();
+
 export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) {
   const [d, setD] = useState(cfg);
   useEffect(() => setD(cfg), [cfg]);
@@ -232,6 +234,45 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             With a free PartsTech shop account linked to your O'Reilly First Call login, parts ordering inside the ticket
             becomes possible once PartsTech issues Shop Desk a partner key. Your login and key are saved here so it's a
             one-step switch-on when that arrives.
+          </p>
+
+          <h3 className="subhead" style={{ marginTop: 36 }}>
+            Customer portal
+          </h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Customers sign in with a link sent to their email and see their cars, what's due, their service history, and
+            the prices you choose to show. Only customers with an email on their record can sign in, and each one sees only
+            their own cars. Needs the portal tables from supabase/portal.sql, and the portal address added under
+            Authentication → URL Configuration in Supabase.
+          </p>
+          <Field label="Customer portal">
+            <select value={d.portalEnabled ? "on" : "off"} onChange={(e) => set("portalEnabled")(e.target.value === "on")}>
+              <option value="off">Off</option>
+              <option value="on">On — publish customer records as invoices post</option>
+            </select>
+          </Field>
+          <Field label="Hours (shown on the portal)">
+            <Text value={d.hours || ""} onChange={set("hours")} placeholder="Mon–Fri 8–6, Sat 8–2" />
+          </Field>
+          <div className="rowBtns" style={{ alignItems: "center" }}>
+            <a className="btn" href={portalUrl()} target="_blank" rel="noreferrer">
+              Open the portal ↗
+            </a>
+            <button
+              className="btn"
+              disabled={!cfg.portalEnabled || !shop}
+              title={!cfg.portalEnabled ? "Turn the portal on and save first" : ""}
+              onClick={async () => {
+                const n = await shop.publishAll();
+                flash(`${n} customers queued for the portal`);
+              }}
+            >
+              Publish every customer now
+            </button>
+          </div>
+          <p className="legalNote" style={{ marginTop: 6 }}>
+            Prices on the portal come from canned jobs ticked "Show on the customer portal." Give customers the link:{" "}
+            {portalUrl()}
           </p>
 
           <CarfaxPanel cfg={cfg} shop={shop} d={d} set={set} flash={flash} />

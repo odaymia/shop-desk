@@ -20,6 +20,7 @@ import {
 import { STATUS, canTransition, snapshotRules, stockMoves, round2 } from "../lib/invoice.js";
 import { STARTER_JOBS } from "../lib/starterJobs.js";
 import { specKey } from "../lib/specs.js";
+import { portalPayload, shopPublicPayload } from "../lib/portal.js";
 import { cloud, sGet, sGetAll, sSet } from "../storage/index.js";
 
 /* Front desk data: customers, vehicles, parts, vendors, canned jobs, and
@@ -142,11 +143,43 @@ export function useShop(cfg) {
     return cloud.subscribe((e) => (e.type === "state" || e.type === "data") && trySeed());
   }, [data.loaded, put]);
 
-  const saveCustomer = useCallback((c) => put("customers", customerKey, c), [put]);
-  const saveVehicle = useCallback((v) => put("vehicles", vehicleKey, v), [put]);
+  /* customer portal: one row per customer with an email, rebuilt from
+     the current records whenever something they'd see changes */
+  const publishCustomer = useCallback(
+    (customerId) => {
+      const d = ref.current;
+      const c = d.customers[customerId];
+      if (!c || !cfg.portalEnabled) return;
+      const email = String(c.email || "").trim().toLowerCase();
+      if (!email) return;
+      const data = portalPayload({ customer: c, vehicles: Object.values(d.vehicles), orders: Object.values(d.orders), specs: d.specs, parts: d.parts, cfg, jobs: d.jobs });
+      cloud.publishPortal(customerId, email, String(c.phone || "").replace(/\D/g, ""), data).catch((e) => console.error("portal publish failed", e));
+    },
+    [cfg]
+  );
+  const publishShop = useCallback(() => {
+    if (!cfg.portalEnabled) return;
+    const d = ref.current;
+    cloud.publishShop(shopPublicPayload(cfg, d.jobs, d.parts)).catch((e) => console.error("shop publish failed", e));
+  }, [cfg]);
+
+  const saveCustomer = useCallback(async (c) => {
+    const saved = await put("customers", customerKey, c);
+    publishCustomer(saved.id);
+    return saved;
+  }, [put, publishCustomer]);
+  const saveVehicle = useCallback(async (v) => {
+    const saved = await put("vehicles", vehicleKey, v);
+    if (saved.customerId) publishCustomer(saved.customerId);
+    return saved;
+  }, [put, publishCustomer]);
   const savePart = useCallback((p) => put("parts", partKey, p), [put]);
   const saveVendor = useCallback((v) => put("vendors", vendorKey, v), [put]);
-  const saveJob = useCallback((j) => put("jobs", jobKey, j), [put]);
+  const saveJob = useCallback(async (j) => {
+    const saved = await put("jobs", jobKey, j);
+    if (saved.portal || (j.id && ref.current.jobs[j.id] && ref.current.jobs[j.id].portal !== saved.portal)) publishShop();
+    return saved;
+  }, [put, publishShop]);
   const saveOrder = useCallback((o) => put("orders", orderKey, o), [put]);
   /* one spec per year/make/model/engine; the key is the id so a re-save replaces */
   const saveSpec = useCallback((sp) => put("specs", specStoreKey, { ...sp, id: specKey(sp).replace(/[^A-Za-z0-9|.-]/g, "_") }), [put]);
@@ -234,10 +267,25 @@ export function useShop(cfg) {
           next.stockApplied = false;
         }
       }
-      return saveOrder(next);
+      const saved = await saveOrder(next);
+      if ((to === STATUS.invoiced || to === STATUS.void) && saved.customerId) publishCustomer(saved.customerId);
+      return saved;
     },
-    [cfg, moveStock, saveOrder, saveVehicle]
+    [cfg, moveStock, saveOrder, saveVehicle, publishCustomer]
   );
+
+  /* everything at once, for switching the portal on or after an import */
+  const publishAll = useCallback(async () => {
+    const d = ref.current;
+    let n = 0;
+    for (const c of Object.values(d.customers)) {
+      if (c.active === false || !String(c.email || "").trim()) continue;
+      publishCustomer(c.id);
+      n++;
+    }
+    publishShop();
+    return n;
+  }, [publishCustomer, publishShop]);
 
   return {
     ...data,
@@ -250,6 +298,8 @@ export function useShop(cfg) {
     saveSpec,
     createOrder,
     setStatus,
+    publishShop,
+    publishAll,
   };
 }
 

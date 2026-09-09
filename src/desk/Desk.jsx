@@ -115,7 +115,19 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}
-          {page === "settings" && <DeskSettings cfg={cfg} saveCfg={saveCfg} flash={flash} roster={roster} saveRoster={saveRoster} shop={shop} />}
+          {page === "settings" && (
+            <DeskSettings
+              cfg={cfg}
+              saveCfg={async (next) => {
+                await saveCfg(next);
+                if (next.portalEnabled) setTimeout(() => shop.publishShop(), 0);
+              }}
+              flash={flash}
+              roster={roster}
+              saveRoster={saveRoster}
+              shop={shop}
+            />
+          )}
         </div>
       </div>
       {starting && (

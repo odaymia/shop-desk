@@ -51,6 +51,7 @@ export default function App() {
     setCfg(next);
     await sSet(CFG_KEY, next);
   }, []);
+  /* the desk republishes the shop's public card after settings change */
   const saveRoster = useCallback(async (next) => {
     setRoster(next);
     await sSet(ROSTER_KEY, next);

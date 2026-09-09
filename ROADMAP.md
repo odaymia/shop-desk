@@ -55,6 +55,8 @@ What a shop uses Manager SE for every day, in a browser:
 
 ## Phase 4 — CRM
 
+- [x] Customer portal at /portal/: magic-link sign-in, their cars, what's due, service history, price menu, oil change quote for their engine
+
 - Service reminders by text and email, driven by mileage and time since last visit
 - Declined-work follow-up
 - Review requests after the visit

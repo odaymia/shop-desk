@@ -281,8 +281,12 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
             + Fee
           </button>
         </div>
+        <label className="fld inline" style={{ marginTop: 16 }}>
+          <input type="checkbox" checked={!!d.portal} onChange={(e) => setD({ ...d, portal: e.target.checked })} />
+          <span>Show this job and its price on the customer portal</span>
+        </label>
         {d.id && (
-          <label className="fld inline" style={{ marginTop: 16 }}>
+          <label className="fld inline">
             <input type="checkbox" checked={d.active === false} onChange={(e) => setD({ ...d, active: !e.target.checked })} />
             <span>Retire this job</span>
           </label>

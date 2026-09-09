@@ -1,0 +1,33 @@
+/* Customer portal: phone-first, one column, big type. */
+.pt { max-width:640px; margin:0 auto; padding:20px 18px 60px; }
+.ptHead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+.ptHead img { height:48px; }
+.ptHead h1 { margin:0; font-size:20px; }
+.ptHead p { margin:2px 0 0; color:var(--muted); font-size:14px; }
+.ptCard { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.ptCard h2 { margin:0 0 4px; font-size:18px; }
+.ptCard h3 { margin:14px 0 8px; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.ptSub { color:var(--muted); font-size:14px; margin:0; }
+.ptDue { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.ptDue li { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 12px; border-radius:10px; background:var(--panel); font-size:15px; }
+.ptDue li.overdue { background:rgba(198,40,40,.08); }
+.ptDue li.soon { background:rgba(196,122,0,.10); }
+.ptDue li span { color:var(--muted); font-size:13px; text-align:right; }
+.ptDue li.overdue span { color:var(--warn); font-weight:600; }
+.ptDue li.soon span { color:var(--amber); font-weight:600; }
+.ptHist { list-style:none; margin:0; padding:0; }
+.ptHist li { padding:10px 0; border-bottom:1px solid var(--line); }
+.ptHist li:last-child { border-bottom:none; }
+.ptHist .top { display:flex; justify-content:space-between; font-size:15px; }
+.ptHist .work { color:var(--muted); font-size:13px; margin-top:2px; line-height:1.4; }
+.ptMenu { list-style:none; margin:0; padding:0; }
+.ptMenu li { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:15px; }
+.ptMenu li:last-child { border-bottom:none; }
+.ptMenu li small { display:block; color:var(--muted); font-size:12px; }
+.ptMenu li strong { white-space:nowrap; }
+.ptQuote { margin-top:10px; padding:10px 12px; border-radius:10px; background:rgba(46,139,87,.08); color:var(--live); font-size:15px; }
+.ptLogin { max-width:420px; margin:60px auto; }
+.ptFoot { color:var(--muted); font-size:13px; text-align:center; margin-top:30px; line-height:1.5; }
+.ptTabs { display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; }
+.ptTabs button { flex-shrink:0; }
+.linkish { background:none; border:none; color:var(--signal); padding:0; font-size:inherit; text-decoration:underline; cursor:pointer; }

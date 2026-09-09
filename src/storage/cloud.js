@@ -127,6 +127,12 @@ async function push(item) {
         ? await q.delete().match({ shop_id, key: item.key })
         : await q.upsert({ shop_id, key: item.key, value: item.value });
     if (error) throw error;
+  } else if (item.kind === "portal") {
+    const { error } = await supabase.from("customer_portal").upsert({ shop_id, customer_id: item.customerId, email: item.email || null, phone: item.phone || null, data: item.data });
+    if (error) throw error;
+  } else if (item.kind === "shopPublic") {
+    const { error } = await supabase.from("shop_public").upsert({ shop_id, data: item.data });
+    if (error) throw error;
   } else if (item.kind === "media") {
     const bucket = supabase.storage.from("media");
     const path = mediaPath(shop_id, item.key);
@@ -389,6 +395,16 @@ async function recordDelete(key) {
   if (!state.linked || isLocalOnly(key) || !isOurs(key)) return;
   return enqueue({ kind: keyKind(key), op: "del", key });
 }
+/* The customer portal reads its own tables; the desk pushes rows there
+   through the same outbox so an offline post still gets published. */
+async function publishPortal(customerId, email, phone, data) {
+  if (!state.linked) return;
+  return enqueue({ kind: "portal", customerId, email, phone, data });
+}
+async function publishShop(data) {
+  if (!state.linked) return;
+  return enqueue({ kind: "shopPublic", data });
+}
 async function fetchMedia(key) {
   if (!state.linked) return null;
   const { data, error } = await supabase.storage.from("media").download(mediaPath(state.shopId, key));
@@ -415,4 +431,6 @@ export const cloud = {
   recordWrite,
   recordDelete,
   fetchMedia,
+  publishPortal,
+  publishShop,
 };
