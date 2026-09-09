@@ -338,7 +338,7 @@ function ShopSection({ rows, shop, user }) {
       </div>
 
       {section === "due" && <DueSection v={v} shop={shop} />}
-      {section === "receipts" && <ReceiptsSection v={v} />}
+      {section === "receipts" && <ReceiptsSection v={v} shop={shop} />}
       {section === "call" && <CallSection shop={shop} />}
       {section === "ask" && <AskSection v={v} shop={shop} />}
     </>
@@ -396,15 +396,18 @@ function DueSection({ v, shop }) {
   );
 }
 
-function ReceiptsSection({ v }) {
+function ReceiptsSection({ v, shop }) {
+  const [open, setOpen] = useState(null);
   if (!v) return <div className="ptCard"><p className="ptSub">Pick a car above.</p></div>;
+  if (open) return <Receipt h={open} v={v} shop={shop} onBack={() => setOpen(null)} />;
   return (
     <div className="ptCard">
       <h2>My receipts</h2>
+      <p className="ptSub">Tap a visit for the full receipt.</p>
       {v.history && v.history.length ? (
         <ul className="ptHist" style={{ marginTop: 8 }}>
           {v.history.map((h) => (
-            <li key={h.number}>
+            <li key={h.number} className={h.lines ? "tap" : ""} onClick={() => h.lines && setOpen(h)}>
               <div className="top">
                 <span>
                   {fmtDate(h.date)}
@@ -423,6 +426,96 @@ function ReceiptsSection({ v }) {
         </p>
       )}
     </div>
+  );
+}
+
+/* The full receipt, laid out like the printed invoice. */
+function Receipt({ h, v, shop, onBack }) {
+  const t = h.totals || {};
+  const groups = [];
+  for (const l of h.lines || []) {
+    const g = groups[groups.length - 1];
+    if (g && g.job === l.job) g.lines.push(l);
+    else groups.push({ job: l.job, lines: [l] });
+  }
+  const cond = { new: "New", used: "Used", rebuilt: "Rebuilt", reconditioned: "Reconditioned", "oem-crash": "OEM crash part", "aftermarket-crash": "Non-OEM aftermarket crash part" };
+  return (
+    <div className="ptCard ptReceipt">
+      <div className="ptReceiptBar">
+        <button className="btn" onClick={onBack}>
+          ← Receipts
+        </button>
+        <button className="btn primary" onClick={() => window.print()}>
+          Print / Save PDF
+        </button>
+      </div>
+      <div className="rcHead">
+        <div>
+          {shop && shop.logo ? <img src={shop.logo} alt="" /> : null}
+          <strong>{shop ? shop.name : ""}</strong>
+          <div className="rcMeta">{[shop && shop.address, shop && shop.phone, shop && shop.ardNumber ? `BAR ARD #${shop.ardNumber}` : ""].filter(Boolean).join(" · ")}</div>
+        </div>
+        <div className="r">
+          <strong>Invoice #{h.number}</strong>
+          <div className="rcMeta">{fmtDate(h.date)}</div>
+        </div>
+      </div>
+      <div className="rcWho">
+        <div>
+          <strong>{v.name}</strong>
+          <div className="rcMeta">{[v.plate, v.vin ? `VIN ${v.vin}` : "", h.miles ? fmtMiles(h.miles) : ""].filter(Boolean).join(" · ")}</div>
+        </div>
+      </div>
+      {h.concern ? <p className="rcConcern">Customer states: {h.concern}</p> : null}
+      <table className="rcTable">
+        <tbody>
+          {groups.map((g, gi) => (
+            <GroupRows key={gi} g={g} cond={cond} />
+          ))}
+        </tbody>
+      </table>
+      <div className="rcTotals">
+        {t.parts > 0 && <div><span>Parts</span><span>{fmtMoney(t.parts)}</span></div>}
+        {t.labor > 0 && <div><span>Labor</span><span>{fmtMoney(t.labor)}</span></div>}
+        {t.sublet > 0 && <div><span>Sublet</span><span>{fmtMoney(t.sublet)}</span></div>}
+        {t.fees > 0 && <div><span>Fees</span><span>{fmtMoney(t.fees)}</span></div>}
+        {t.supplies > 0 && <div><span>Shop supplies</span><span>{fmtMoney(t.supplies)}</span></div>}
+        {t.discounts > 0 && <div><span>Discounts</span><span>-{fmtMoney(t.discounts)}</span></div>}
+        <div><span>Sales tax{t.taxRate ? ` (${t.taxRate}%)` : ""}</span><span>{fmtMoney(t.tax)}</span></div>
+        <div className="grand"><span>Total</span><span>{fmtMoney(t.total)}</span></div>
+        {(h.payments || []).map((p, i) => (
+          <div key={i}><span>Paid {p.method} {fmtDate(p.at)}</span><span>-{fmtMoney(p.amount)}</span></div>
+        ))}
+        {(h.payments || []).length > 0 && <div className="grand"><span>Balance</span><span>{fmtMoney(t.balance)}</span></div>}
+      </div>
+      {shop && shop.invoiceFooter ? <p className="rcFoot">{shop.invoiceFooter}</p> : null}
+    </div>
+  );
+}
+
+function GroupRows({ g, cond }) {
+  return (
+    <>
+      {g.job ? (
+        <tr className="rcJob">
+          <td colSpan={3}>{g.job}</td>
+        </tr>
+      ) : null}
+      {g.lines.map((l, i) => (
+        <tr key={i} className={`rc-${l.kind}`}>
+          <td>
+            <div>
+              {l.kind === "part" && l.number ? <span className="rcNum">{l.number} </span> : null}
+              {l.text}
+              {l.kind === "part" ? <span className="rcMeta"> ({cond[l.condition] || "New"})</span> : null}
+            </div>
+            {l.details ? <div className="rcMeta">{l.details}</div> : null}
+          </td>
+          <td className="r rcMeta">{l.qtyText}{l.each != null && l.kind !== "note" ? ` × ${fmtMoney(l.each)}` : ""}</td>
+          <td className="r">{l.amount != null ? fmtMoney(l.amount) : ""}</td>
+        </tr>
+      ))}
+    </>
   );
 }
 

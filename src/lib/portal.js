@@ -1,7 +1,7 @@
 /* What a customer sees in the portal, built from the desk's records.
    Pure — no React, no storage. Prices and internal notes stay out
    except where the shop chose to publish a menu price. */
-import { orderTotals, jobLines } from "./invoice.js";
+import { orderTotals, jobLines, lineAmount, laborQtyText } from "./invoice.js";
 import { findSpec, oilChangeLines } from "./specs.js";
 
 const MONTH = 30.4 * 86400000;
@@ -48,13 +48,33 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
         .filter((o) => o.vehicleId === v.id && o.status === "invoiced")
         .sort((a, b) => (b.invoicedAt || 0) - (a.invoicedAt || 0))
         .slice(0, 50)
-        .map((o) => ({
-          number: o.number,
-          date: o.invoicedAt,
-          miles: Number(o.mileageOut || o.mileageIn) || null,
-          total: orderTotals(o, cfg, customer).total,
-          work: (o.lines || []).filter((l) => l.kind === "labor" || l.kind === "part").map((l) => ({ kind: l.kind, text: l.description, qty: l.kind === "part" ? l.qty : undefined })),
-        }));
+        .map((o) => {
+          const t = orderTotals(o, cfg, customer);
+          return {
+            number: o.number,
+            date: o.invoicedAt,
+            miles: Number(o.mileageOut || o.mileageIn) || null,
+            total: t.total,
+            work: (o.lines || []).filter((l) => l.kind === "labor" || l.kind === "part").map((l) => ({ kind: l.kind, text: l.description, qty: l.kind === "part" ? l.qty : undefined })),
+            /* the full receipt, as printed */
+            concern: o.concern || "",
+            lines: (o.lines || [])
+              .filter((l) => l.kind !== "note" || l.description)
+              .map((l) => ({
+                kind: l.kind,
+                job: l.job || "",
+                number: l.kind === "part" ? l.number || "" : "",
+                text: l.description || "",
+                details: l.kind === "labor" ? l.details || "" : "",
+                condition: l.kind === "part" ? l.condition || "new" : "",
+                qtyText: l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : String(l.qty),
+                each: l.kind === "labor" ? l.rate : l.kind === "note" ? null : l.price,
+                amount: l.kind === "note" ? null : l.kind === "discount" ? -lineAmount(l) : lineAmount(l),
+              })),
+            totals: { parts: t.parts, labor: t.labor, sublet: t.sublet, fees: t.fees, supplies: t.supplies, discounts: t.discounts, taxRate: t.taxRate, tax: t.tax, total: t.total, paid: t.paid, balance: t.balance },
+            payments: (o.payments || []).map((p) => ({ method: p.method, amount: p.amount, at: p.at })),
+          };
+        });
       const spec = findSpec(specs, v);
       const oilQuote = spec ? quoteOilChange(spec.spec, parts, cfg) : null;
       return {
@@ -101,6 +121,8 @@ export function shopPublicPayload(cfg, jobs, parts) {
     website: cfg.shopWebsite || "",
     logo: cfg.logo || "",
     hours: cfg.hours || "",
+    ardNumber: cfg.ardNumber || "",
+    invoiceFooter: cfg.invoiceFooter || "",
     menu,
     taxRate: cfg.taxRate,
     updatedAt: Date.now(),

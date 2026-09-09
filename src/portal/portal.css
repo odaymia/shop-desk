@@ -47,3 +47,29 @@
 .ptAsk { display:flex; gap:8px; }
 .ptAsk input { flex:1; min-width:0; background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; font-size:16px; }
 .ptDrop { margin-top:12px; padding:12px; border-radius:10px; background:var(--panel); }
+
+/* receipts */
+.ptHist li.tap { cursor:pointer; }
+.ptHist li.tap:active { background:var(--panel); }
+.ptReceiptBar { display:flex; justify-content:space-between; gap:10px; margin-bottom:14px; }
+.rcHead { display:flex; justify-content:space-between; gap:12px; border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:10px; }
+.rcHead img { height:40px; display:block; margin-bottom:4px; }
+.rcHead .r { text-align:right; }
+.rcMeta { color:var(--muted); font-size:12px; }
+.rcNum { color:var(--muted); font-size:12px; }
+.rcWho { margin-bottom:8px; }
+.rcConcern { background:var(--panel); border-radius:8px; padding:8px 10px; font-size:13px; margin:0 0 8px; }
+.rcTable { width:100%; border-collapse:collapse; font-size:14px; }
+.rcTable td { padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
+.rcTable td.r { text-align:right; white-space:nowrap; }
+.rcTable tr.rcJob td { font-weight:700; border-bottom:none; padding-top:10px; }
+.rcTotals { margin:10px 0 0 auto; max-width:300px; font-size:14px; }
+.rcTotals div { display:flex; justify-content:space-between; padding:3px 0; }
+.rcTotals div.grand { border-top:2px solid var(--ink); font-weight:700; font-size:16px; margin-top:4px; padding-top:6px; }
+.rcFoot { margin-top:14px; font-size:11px; color:var(--muted); white-space:pre-wrap; line-height:1.4; }
+@media print {
+  @page { margin:.5in; }
+  body { background:#fff !important; }
+  .pt > *:not(.ptReceipt), .ptReceiptBar, .ptHead, .ptPick, .ptTabs, .ptFoot { display:none !important; }
+  .ptReceipt { border:none; box-shadow:none; padding:0; }
+}
