@@ -28,8 +28,13 @@
 .ptQuote { margin-top:10px; padding:10px 12px; border-radius:10px; background:rgba(46,139,87,.08); color:var(--live); font-size:15px; }
 .ptLogin { max-width:420px; margin:60px auto; }
 .ptFoot { color:var(--muted); font-size:13px; text-align:center; margin-top:30px; line-height:1.5; }
-.ptTabs { display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; }
-.ptTabs button { flex-shrink:0; }
+/* section buttons: a vertical stack of big targets on phones, a row on wide screens */
+.ptTabs { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.ptTabs .btn { width:100%; padding:18px 20px; font-size:18px; text-align:left; border-radius:14px; }
+@media (min-width:640px) {
+  .ptTabs { flex-direction:row; flex-wrap:wrap; }
+  .ptTabs .btn { width:auto; flex:1 1 40%; text-align:center; }
+}
 .linkish { background:none; border:none; color:var(--signal); padding:0; font-size:inherit; text-decoration:underline; cursor:pointer; }
 .ptPick select { width:100%; font-size:17px; }
 .ptCall { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
