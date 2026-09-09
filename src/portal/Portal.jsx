@@ -69,7 +69,7 @@ export default function Portal() {
           </div>
         )}
         {rows.map((r) => (
-          <ShopSection key={r.shop_id + r.customer_id} row={r} shop={shops[r.shop_id]} />
+          <ShopSection key={r.shop_id + r.customer_id} row={r} shop={shops[r.shop_id]} user={user} />
         ))}
         <p className="ptFoot">
           Signed in as {user.email}.{" "}
@@ -235,12 +235,36 @@ function NewPassword({ onDone }) {
   );
 }
 
-function ShopSection({ row, shop }) {
+function ShopSection({ row, shop, user }) {
   const d = row.data || {};
-  const vehs = d.vehicles || [];
-  const [carId, setCarId] = useState(vehs[0] ? vehs[0].id : "");
+  const [hidden, setHidden] = useState([]); // vehicle ids the customer asked to drop
+  useEffect(() => {
+    supabase
+      .from("portal_requests")
+      .select("vehicle_id")
+      .eq("customer_id", row.customer_id)
+      .then(({ data }) => setHidden((data || []).map((r) => r.vehicle_id).filter(Boolean)));
+  }, [row.customer_id]);
+  const vehs = (d.vehicles || []).filter((x) => !hidden.includes(x.id));
+  const [carId, setCarId] = useState("");
   const [section, setSection] = useState("due");
+  const [dropping, setDropping] = useState(false);
   const v = vehs.find((x) => x.id === carId) || vehs[0];
+
+  const drop = async (kind) => {
+    if (!v) return;
+    const { error } = await supabase.from("portal_requests").insert({
+      shop_id: row.shop_id,
+      customer_id: row.customer_id,
+      email: user.email,
+      vehicle_id: v.id,
+      kind,
+    });
+    if (error) return alert("Couldn't send that right now. Please call the shop.");
+    setHidden([...hidden, v.id]);
+    setCarId("");
+    setDropping(false);
+  };
   const sections = [
     ["due", "Recommended services"],
     ["receipts", "My receipts"],
@@ -276,7 +300,27 @@ function ShopSection({ row, shop }) {
         {v && (
           <p className="ptSub" style={{ marginTop: 8 }}>
             {[fmtMiles(v.mileage) && `Last mileage ${fmtMiles(v.mileage)}`, v.oil ? `Oil ${v.oil.grade}, ${v.oil.quarts} qt` : ""].filter(Boolean).join(" · ")}
+            {" · "}
+            <button className="linkish" onClick={() => setDropping(true)}>
+              Not my car, or sold it?
+            </button>
           </p>
+        )}
+        {dropping && v && (
+          <div className="ptDrop">
+            <p className="ptSub">Remove {v.name} from your garage. The shop is told, and it stays in the shop's records.</p>
+            <div className="ptCall" style={{ marginTop: 8 }}>
+              <button className="btn" onClick={() => drop("sold")}>
+                I sold this car
+              </button>
+              <button className="btn" onClick={() => drop("not_mine")}>
+                This was never my car
+              </button>
+              <button className="btn ghost" onClick={() => setDropping(false)}>
+                Keep it
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

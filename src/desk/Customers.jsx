@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { cloud } from "../storage/index.js";
 import { Money, fmtDate, fmtPhone } from "./ui.jsx";
 import { CustomerForm, VehicleForm } from "./forms.jsx";
 import { customerName, vehicleName, vehiclesOf, ordersOf, searchText } from "./useShop.js";
@@ -6,6 +7,11 @@ import { orderTotals, orderTitle, statusLabel } from "../lib/invoice.js";
 
 export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
   const [q, setQ] = useState("");
+  const [requests, setRequests] = useState([]);
+  const loadRequests = () => cloud.listPortalRequests().then(setRequests).catch(() => setRequests([]));
+  useEffect(() => {
+    loadRequests();
+  }, []);
   const [editing, setEditing] = useState(null); // customer draft
   const [showInactive, setShowInactive] = useState(false);
 
@@ -43,6 +49,43 @@ export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
         </button>
       </header>
       <div className="deskBody">
+        {requests.length > 0 && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="cardHead">
+              <h3>From the customer portal</h3>
+            </div>
+            <ul className="fillList">
+              {requests.map((r) => {
+                const c = shop.customers[r.customer_id];
+                const v = shop.vehicles[r.vehicle_id];
+                const done = async (detach) => {
+                  if (detach && v) await shop.saveVehicle({ ...v, customerId: null, active: r.kind === "sold" ? false : v.active });
+                  await cloud.handlePortalRequest(r.id);
+                  if (c) await shop.saveCustomer(c); // republish their portal record
+                  flash(detach ? "Car removed from the customer" : "Request dismissed");
+                  loadRequests();
+                };
+                return (
+                  <li key={r.id} style={{ alignItems: "center" }}>
+                    <div>
+                      <strong>{customerName(c)}</strong> ({r.email}) says {r.kind === "sold" ? "they sold" : "they never owned"}{" "}
+                      <strong>{vehicleName(v)}</strong>
+                      {v && v.plate ? ` · ${v.plate}` : ""}
+                    </div>
+                    <span className="rowActs">
+                      <button className="btn tiny primary" onClick={() => done(true)}>
+                        {r.kind === "sold" ? "Mark sold, remove" : "Remove from them"}
+                      </button>
+                      <button className="btn tiny" onClick={() => done(false)}>
+                        Keep as is
+                      </button>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <div className="tableCard scroll">
           <table className="dk">
             <thead>

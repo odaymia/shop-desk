@@ -41,3 +41,4 @@
 .ptMsg.assistant { align-self:flex-start; background:var(--panel); }
 .ptAsk { display:flex; gap:8px; }
 .ptAsk input { flex:1; min-width:0; background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; font-size:16px; }
+.ptDrop { margin-top:12px; padding:12px; border-radius:10px; background:var(--panel); }

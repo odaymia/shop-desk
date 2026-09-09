@@ -444,6 +444,23 @@ async function publishShop(data) {
   if (!state.linked) return;
   return enqueue({ kind: "shopPublic", data });
 }
+/* Customer requests from the portal. Read live; handled by staff. */
+async function listPortalRequests() {
+  if (!state.linked) return [];
+  const { data, error } = await supabase
+    .from("portal_requests")
+    .select("id, customer_id, email, vehicle_id, kind, note, created_at")
+    .eq("shop_id", state.shopId)
+    .is("handled_at", null)
+    .order("created_at");
+  if (error) throw error;
+  return data || [];
+}
+async function handlePortalRequest(id) {
+  if (!state.linked) return;
+  const { error } = await supabase.from("portal_requests").update({ handled_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
 async function fetchMedia(key) {
   if (!state.linked) return null;
   const { data, error } = await supabase.storage.from("media").download(mediaPath(state.shopId, key));
@@ -472,4 +489,6 @@ export const cloud = {
   fetchMedia,
   publishPortal,
   publishShop,
+  listPortalRequests,
+  handlePortalRequest,
 };
