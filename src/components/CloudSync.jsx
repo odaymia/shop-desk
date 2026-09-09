@@ -28,6 +28,34 @@ export function CloudSync({ compact }) {
     }
   };
 
+  if (s.needsSignIn) {
+    return (
+      <div className="cloudBox">
+        <p className="fldErr">{s.error || "Your sign-in expired."}</p>
+        <p className="muted">
+          Sign in again with the shop account. {s.pending ? `${s.pending} waiting change${s.pending === 1 ? "" : "s"} upload right after.` : ""}
+        </p>
+        <label className="fld">
+          <span>Email</span>
+          <input type="email" autoCapitalize="none" autoCorrect="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={s.user ? s.user.email : "you@example.com"} />
+        </label>
+        <label className="fld">
+          <span>Password</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </label>
+        {err && <p className="fldErr">{err}</p>}
+        <div className="fldRow">
+          <button className="btn primary" disabled={busy || !password} onClick={() => run(() => cloud.signIn((email || (s.user && s.user.email) || "").trim(), password))}>
+            {busy ? "Working…" : "Sign in"}
+          </button>
+          <button className="btn ghost" disabled={busy} onClick={() => run(() => cloud.signOut())}>
+            Sign out instead
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (s.user && s.shopId) {
     return (
       <div className="cloudBox">
@@ -48,8 +76,8 @@ export function CloudSync({ compact }) {
           </button>
           <button
             className="btn ghost"
-            disabled={busy || s.pending > 0}
-            title={s.pending > 0 ? "Wait for pending changes to upload first" : ""}
+            disabled={busy}
+            title={s.pending > 0 ? "Waiting changes stay on this computer and upload after the next sign-in" : ""}
             onClick={() => run(() => cloud.signOut())}
           >
             Sign out

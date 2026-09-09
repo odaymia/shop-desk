@@ -62,6 +62,31 @@ const blobToDataUrl = (blob) =>
 const isNetworkError = (e) =>
   (typeof navigator !== "undefined" && !navigator.onLine) ||
   /fetch|network|load failed|timed? ?out/i.test(String(e?.message || e));
+const isAuthError = (e) => /jwt|expired|invalid token|not authenticated|401/i.test(String(e?.message || e)) || e?.status === 401;
+
+/* The sign-in token normally renews itself. When it hasn't (the tab sat
+   in the background, the computer slept), renew it once and retry; if
+   that fails the shop has to sign in again, and the outbox waits. */
+let renewing = null;
+async function renewSession() {
+  if (!renewing) {
+    renewing = supabase.auth
+      .refreshSession()
+      .then(({ data, error }) => {
+        if (error || !data.session) throw error || new Error("no session");
+        setState({ user: userOf(data.session), needsSignIn: false });
+        return true;
+      })
+      .catch(() => {
+        setState({ needsSignIn: true, error: "Your sign-in expired. Sign in again under Cloud account — nothing is lost, waiting changes upload after." });
+        return false;
+      })
+      .finally(() => {
+        renewing = null;
+      });
+  }
+  return renewing;
+}
 
 /* ---------- state ---------- */
 let local = null; // raw backend: get/set/delete/list on JSON strings
@@ -78,6 +103,7 @@ const state = {
   lastSync: null,
   syncing: false,
   error: "",
+  needsSignIn: false,
 };
 function emit(type, extra) {
   for (const fn of listeners) {
@@ -169,9 +195,16 @@ async function flush() {
         while (n < outbox.length && n < BATCH && outbox[n].kind === "kv" && outbox[n].op === "put") n++;
       }
       try {
-        if (n > 1) await pushBatch(outbox.slice(0, n));
-        else await push(item);
+        try {
+          if (n > 1) await pushBatch(outbox.slice(0, n));
+          else await push(item);
+        } catch (e) {
+          if (!isAuthError(e) || !(await renewSession())) throw e;
+          if (n > 1) await pushBatch(outbox.slice(0, n));
+          else await push(item);
+        }
       } catch (e) {
+        if (isAuthError(e)) return; // renewal failed; the state says to sign in again
         if (isNetworkError(e)) {
           setState({ error: "Offline — changes will upload when the connection is back" });
           clearTimeout(retryTimer);
@@ -239,8 +272,12 @@ async function pull() {
     await lset(SYNC_KEY, sync);
     setState({ lastSync: Date.now(), error: /Offline|Sync error/.test(state.error) ? "" : state.error });
   } catch (e) {
-    if (!isNetworkError(e)) console.error("cloud pull failed", e);
-    setState({ error: isNetworkError(e) ? "Offline — showing what's on this computer" : `Sync error: ${e.message || e}` });
+    if (isAuthError(e)) {
+      if (await renewSession()) pullAgain = true;
+    } else {
+      if (!isNetworkError(e)) console.error("cloud pull failed", e);
+      setState({ error: isNetworkError(e) ? "Offline — showing what's on this computer" : `Sync error: ${e.message || e}` });
+    }
   } finally {
     pulling = false;
     if (changed.size) emit("data", { keys: [...changed] });
@@ -368,7 +405,9 @@ async function uploadEverything(skipKv) {
 async function signIn(email, password) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
-  await linkShop();
+  setState({ needsSignIn: false, error: "" });
+  if (state.shopId) start(); // same shop, session renewed: pick up where we left off
+  else await linkShop();
 }
 async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password });
@@ -381,9 +420,9 @@ async function signUp(email, password) {
 }
 async function signOut() {
   stop();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut().catch(() => {});
   await local.delete(SHOP_KEY);
-  setState({ user: null, shopId: null, shopName: "" });
+  setState({ user: null, shopId: null, shopName: "", needsSignIn: false, error: "" });
 }
 
 /* ---------- called by the storage module ---------- */
