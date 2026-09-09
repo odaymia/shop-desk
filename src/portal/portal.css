@@ -31,3 +31,13 @@
 .ptTabs { display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; }
 .ptTabs button { flex-shrink:0; }
 .linkish { background:none; border:none; color:var(--signal); padding:0; font-size:inherit; text-decoration:underline; cursor:pointer; }
+.ptPick select { width:100%; font-size:17px; }
+.ptCall { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.ptCall .btn { text-align:center; text-decoration:none; }
+.ptChat { display:flex; flex-direction:column; gap:8px; margin:14px 0; min-height:60px; }
+.ptStarters { display:flex; flex-wrap:wrap; gap:6px; }
+.ptMsg { padding:10px 12px; border-radius:12px; font-size:15px; line-height:1.45; max-width:92%; white-space:pre-wrap; }
+.ptMsg.user { align-self:flex-end; background:var(--signal); color:#fff; }
+.ptMsg.assistant { align-self:flex-start; background:var(--panel); }
+.ptAsk { display:flex; gap:8px; }
+.ptAsk input { flex:1; min-width:0; background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; font-size:16px; }

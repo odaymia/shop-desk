@@ -238,83 +238,92 @@ function NewPassword({ onDone }) {
 function ShopSection({ row, shop }) {
   const d = row.data || {};
   const vehs = d.vehicles || [];
-  const [tab, setTab] = useState(0);
-  const v = vehs[tab];
+  const [carId, setCarId] = useState(vehs[0] ? vehs[0].id : "");
+  const [section, setSection] = useState("due");
+  const v = vehs.find((x) => x.id === carId) || vehs[0];
+  const sections = [
+    ["due", "Recommended services"],
+    ["receipts", "My receipts"],
+    ["call", "Call store"],
+    ["ask", "Ask a question"],
+  ];
   return (
     <>
       <div className="ptHead">
         {shop && shop.logo ? <img src={shop.logo} alt="" /> : null}
         <div>
           <h1>{shop ? shop.name : "Your shop"}</h1>
-          <p>
-            {[shop && shop.phone, shop && shop.address].filter(Boolean).join(" · ")}
-            {shop && shop.hours ? ` · ${shop.hours}` : ""}
-          </p>
+          <p>{d.name ? `Welcome back, ${d.name.split(" ")[0]}` : ""}</p>
         </div>
       </div>
-      {vehs.length > 1 && (
-        <div className="ptTabs">
-          {vehs.map((x, i) => (
-            <button key={x.id} className={`btn ${i === tab ? "primary" : ""}`} onClick={() => setTab(i)}>
-              {x.name}
-            </button>
+
+      <div className="ptCard ptPick">
+        <label className="fld" style={{ margin: 0 }}>
+          <span>My cars</span>
+          {vehs.length ? (
+            <select value={carId} onChange={(e) => setCarId(e.target.value)}>
+              {vehs.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                  {x.plate ? ` · ${x.plate}` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="ptSub">No cars on file yet.</p>
+          )}
+        </label>
+        {v && (
+          <p className="ptSub" style={{ marginTop: 8 }}>
+            {[fmtMiles(v.mileage) && `Last mileage ${fmtMiles(v.mileage)}`, v.oil ? `Oil ${v.oil.grade}, ${v.oil.quarts} qt` : ""].filter(Boolean).join(" · ")}
+          </p>
+        )}
+      </div>
+
+      <div className="ptTabs">
+        {sections.map(([k, label]) => (
+          <button key={k} className={`btn ${section === k ? "primary" : ""}`} onClick={() => setSection(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {section === "due" && <DueSection v={v} shop={shop} />}
+      {section === "receipts" && <ReceiptsSection v={v} />}
+      {section === "call" && <CallSection shop={shop} />}
+      {section === "ask" && <AskSection v={v} shop={shop} />}
+    </>
+  );
+}
+
+function DueSection({ v, shop }) {
+  if (!v) return <div className="ptCard"><p className="ptSub">Pick a car above.</p></div>;
+  return (
+    <div className="ptCard">
+      <h2>Recommended services</h2>
+      <p className="ptSub">Based on your last visits and the shop's service intervals.</p>
+      {v.due && v.due.length ? (
+        <ul className="ptDue" style={{ marginTop: 12 }}>
+          {v.due.map((s) => (
+            <li key={s.key} className={s.status}>
+              {s.label}
+              <span>
+                {s.status === "overdue" ? "Due now" : s.status === "soon" ? "Due soon" : "Due"}
+                {s.dueDate ? ` · ${fmtDate(s.dueDate)}` : ""}
+                {s.dueMiles ? ` or ${fmtMiles(s.dueMiles)}` : ""}
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
+      ) : (
+        <p className="ptSub" style={{ marginTop: 12 }}>
+          Nothing on the schedule yet. It fills in after your first service here.
+        </p>
       )}
-      {v && (
-        <>
-          <div className="ptCard">
-            <h2>{v.name}</h2>
-            <p className="ptSub">
-              {[v.plate, fmtMiles(v.mileage), v.oil ? `${v.oil.grade} · ${v.oil.quarts} qt` : ""].filter(Boolean).join(" · ")}
-            </p>
-            <h3>Coming up</h3>
-            {v.due && v.due.length ? (
-              <ul className="ptDue">
-                {v.due.map((s) => (
-                  <li key={s.key} className={s.status}>
-                    {s.label}
-                    <span>
-                      {s.status === "overdue" ? "Due now" : s.status === "soon" ? "Due soon" : "Due"}
-                      {s.dueDate ? ` · ${fmtDate(s.dueDate)}` : ""}
-                      {s.dueMiles ? ` or ${fmtMiles(s.dueMiles)}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="ptSub">Nothing on the schedule yet. It fills in after your first service here.</p>
-            )}
-            {v.oilQuote && (
-              <div className="ptQuote">
-                Oil change for this car: {fmtMoney(v.oilQuote.total)} out the door
-              </div>
-            )}
-            <h3>Service history</h3>
-            {v.history && v.history.length ? (
-              <ul className="ptHist">
-                {v.history.map((h) => (
-                  <li key={h.number}>
-                    <div className="top">
-                      <span>
-                        {fmtDate(h.date)}
-                        {h.miles ? ` · ${fmtMiles(h.miles)}` : ""}
-                      </span>
-                      <strong>{fmtMoney(h.total)}</strong>
-                    </div>
-                    <div className="work">{h.work.map((w) => (w.qty && w.qty !== 1 ? `${w.qty}× ${w.text}` : w.text)).join(" · ")}</div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="ptSub">No visits on record for this car.</p>
-            )}
-          </div>
-        </>
-      )}
+      {v.oilQuote && <div className="ptQuote">Oil change for this car: {fmtMoney(v.oilQuote.total)} out the door</div>}
       {shop && shop.menu && shop.menu.length > 0 && (
-        <div className="ptCard">
-          <h2>Prices</h2>
+        <>
+          <h3>Prices</h3>
           <ul className="ptMenu">
             {shop.menu.map((m) => (
               <li key={m.name}>
@@ -332,8 +341,128 @@ function ShopSection({ row, shop }) {
           <p className="ptSub" style={{ marginTop: 10 }}>
             Plus sales tax on parts. Your car's exact price is a phone call away.
           </p>
-        </div>
+        </>
       )}
-    </>
+    </div>
+  );
+}
+
+function ReceiptsSection({ v }) {
+  if (!v) return <div className="ptCard"><p className="ptSub">Pick a car above.</p></div>;
+  return (
+    <div className="ptCard">
+      <h2>My receipts</h2>
+      {v.history && v.history.length ? (
+        <ul className="ptHist" style={{ marginTop: 8 }}>
+          {v.history.map((h) => (
+            <li key={h.number}>
+              <div className="top">
+                <span>
+                  {fmtDate(h.date)}
+                  {h.miles ? ` · ${fmtMiles(h.miles)}` : ""}
+                  <small style={{ color: "var(--muted)" }}> · Invoice #{h.number}</small>
+                </span>
+                <strong>{fmtMoney(h.total)}</strong>
+              </div>
+              <div className="work">{h.work.map((w) => (w.qty && w.qty !== 1 ? `${w.qty}× ${w.text}` : w.text)).join(" · ")}</div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="ptSub" style={{ marginTop: 8 }}>
+          No visits on record for this car.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CallSection({ shop }) {
+  const phone = shop && shop.phone ? String(shop.phone).replace(/\D/g, "") : "";
+  const addr = shop && shop.address ? shop.address : "";
+  return (
+    <div className="ptCard">
+      <h2>{shop ? shop.name : "The shop"}</h2>
+      {shop && shop.hours ? <p className="ptSub">{shop.hours}</p> : null}
+      <div className="ptCall">
+        {phone ? (
+          <a className="btn primary lg" href={`tel:${phone}`}>
+            Call {shop.phone}
+          </a>
+        ) : null}
+        {addr ? (
+          <a className="btn lg" href={`https://maps.apple.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer">
+            Directions
+          </a>
+        ) : null}
+        {shop && shop.email ? (
+          <a className="btn lg" href={`mailto:${shop.email}`}>
+            Email the shop
+          </a>
+        ) : null}
+      </div>
+      {addr ? <p className="ptSub" style={{ marginTop: 12 }}>{addr}</p> : null}
+    </div>
+  );
+}
+
+/* Questions about services, answered by the shop's helper (an Edge
+   Function that knows this car and the shop's prices). */
+function AskSection({ v, shop }) {
+  const [msgs, setMsgs] = useState([]);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const send = async () => {
+    const question = q.trim();
+    if (!question || busy) return;
+    setQ("");
+    setErr("");
+    const next = [...msgs, { role: "user", content: question }];
+    setMsgs(next);
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke("portal-chat", {
+      body: { question, history: msgs.slice(-10), vehicleId: v ? v.id : null },
+    });
+    setBusy(false);
+    if (error || !data || data.error) {
+      setErr((data && data.error) || "The helper isn't available right now. Call the shop and they'll help.");
+      return;
+    }
+    setMsgs([...next, { role: "assistant", content: data.answer }]);
+  };
+  const starters = ["What does a brake fluid flush do?", "Why is my oil change due by date and not just miles?", "What's included in the tire mount package?"];
+  return (
+    <div className="ptCard">
+      <h2>Ask a question</h2>
+      <p className="ptSub">About services, what they're for, or what's due{v ? ` on your ${v.name}` : ""}. For anything urgent, call the shop.</p>
+      <div className="ptChat">
+        {msgs.length === 0 && (
+          <div className="ptStarters">
+            {starters.map((t) => (
+              <button key={t} className="btn tiny" onClick={() => setQ(t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+        {msgs.map((m, i) => (
+          <div key={i} className={`ptMsg ${m.role}`}>
+            {m.content}
+          </div>
+        ))}
+        {busy && <div className="ptMsg assistant muted">Thinking…</div>}
+        {err && <p className="fldErr">{err}</p>}
+      </div>
+      <div className="ptAsk">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type your question" onKeyDown={(e) => e.key === "Enter" && send()} />
+        <button className="btn primary" disabled={busy || !q.trim()} onClick={send}>
+          Ask
+        </button>
+      </div>
+      <p className="ptSub" style={{ marginTop: 10, fontSize: 12 }}>
+        General guidance, not a diagnosis. Prices other than those listed come from the shop.
+      </p>
+    </div>
   );
 }
