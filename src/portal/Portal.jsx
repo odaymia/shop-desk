@@ -32,7 +32,13 @@ export default function Portal() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data, error } = await supabase.from("customer_portal").select("shop_id, customer_id, data, updated_at");
+      /* only the record carrying this login's email — the database rule
+         already limits customers to that, but shop staff can read every
+         row, and the portal should never act as a browser of all of them */
+      const { data, error } = await supabase
+        .from("customer_portal")
+        .select("shop_id, customer_id, data, updated_at")
+        .ilike("email", String(user.email || "").trim());
       if (error) return setErr(error.message);
       setRows(data || []);
       const ids = [...new Set((data || []).map((r) => r.shop_id))];
