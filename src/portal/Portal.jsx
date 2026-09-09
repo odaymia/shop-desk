@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/cloudConfig.js";
 import { fmtMoney } from "../lib/invoice.js";
+import defaultLogo from "../assets/genie-logo.png";
+const logoOf = (shop) => (shop && shop.logo) || defaultLogo;
 
 /* The customer's side. Sign in with a link to your email, see your cars,
    what's due, what was done, and the shop's prices. Reads two tables the
@@ -133,6 +135,7 @@ function Login({ err, onErr }) {
     <div className="root">
       <div className="pt ptLogin">
         <div className="ptCard">
+          <img src={defaultLogo} alt="" className="ptLoginLogo" />
           <h2>My garage</h2>
           <p className="ptSub">Your vehicles, what's due, your service history, and prices.</p>
           {sent ? (
@@ -279,11 +282,9 @@ function ShopSection({ rows, shop, user }) {
   return (
     <>
       <div className="ptHead">
-        {shop && shop.logo ? <img src={shop.logo} alt="" /> : null}
-        <div>
-          <h1>{shop ? shop.name : "Your shop"}</h1>
-          <p>{d.name ? `Welcome back, ${d.name.split(" ")[0]}` : ""}</p>
-        </div>
+        <img src={logoOf(shop)} alt="" />
+        <h1>{shop ? shop.name : "Your shop"}</h1>
+        <p>{d.name ? `Welcome back, ${d.name.split(" ")[0]}` : ""}</p>
       </div>
 
       <div className="ptCard ptPick">
@@ -451,7 +452,7 @@ function Receipt({ h, v, shop, onBack }) {
       </div>
       <div className="rcHead">
         <div>
-          {shop && shop.logo ? <img src={shop.logo} alt="" /> : null}
+          <img src={logoOf(shop)} alt="" />
           <strong>{shop ? shop.name : ""}</strong>
           <div className="rcMeta">{[shop && shop.address, shop && shop.phone, shop && shop.ardNumber ? `BAR ARD #${shop.ardNumber}` : ""].filter(Boolean).join(" · ")}</div>
         </div>
