@@ -7,6 +7,7 @@ import { ImportPanel } from "./Import.jsx";
 import { CarfaxPanel } from "./CarfaxPanel.jsx";
 import { CATALOGS } from "../lib/parts.js";
 import { NAME_MODES } from "../lib/names.js";
+import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -36,6 +37,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
   const [d, setD] = useState(cfg);
   useEffect(() => setD(cfg), [cfg]);
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
+  const setCk = (i, patch) => setD((x) => ({ ...x, checklist: (x.checklist || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const setPkg = (i, patch) => setD((x) => ({ ...x, oilPackages: (x.oilPackages || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const onOff = (k, onText, offText) => (
     <select value={d[k] ? "on" : "off"} onChange={(e) => set(k)(e.target.value === "on")}>
@@ -55,6 +57,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       oilPackages: (d.oilPackages || [])
         .filter((p) => String(p.name || "").trim())
         .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart) })),
+      checklist: normalizeChecklist(d.checklist),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
     });
     flash("Settings saved");
@@ -215,6 +218,55 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <div className="addBar">
             <button className="btn tiny" onClick={() => set("oilPackages")([...(d.oilPackages || []), { id: "pkg" + Date.now().toString(36), name: "", price: "", quarts: 5, extraQuart: "", details: "" }])}>
               + Package
+            </button>
+          </div>
+
+          <h3 className="subhead">Service checklist</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            The walk-around that prints on the invoice. It opens on its own when an oil change goes on a ticket and runs
+            from the keyboard: Enter takes the answer, Space picks a different one. An item whose part or service is on
+            the ticket starts at Replaced; the words that mean that go in the last box ("oil filter", or "air filter
+            -cabin" to leave the cabin filter out, alternatives split with |).
+          </p>
+          <Field label="When an oil change goes on a ticket">
+            {onOff("checklistOnOil", "Open the checklist right away", "Wait for the Checklist button")}
+          </Field>
+          <div className="miniLines">
+            {(d.checklist || []).map((it, i) => (
+              <div key={it.id || i} className="miniLine" style={{ gridTemplateColumns: "1.4fr 110px 2fr 1fr 1fr 36px" }}>
+                <input value={it.label || ""} onChange={(e) => setCk(i, { label: e.target.value })} placeholder="Engine oil" />
+                <select value={it.kind || "choice"} onChange={(e) => setCk(i, { kind: e.target.value })} title="How it's answered">
+                  <option value="choice">Choices</option>
+                  <option value="text">Typed</option>
+                  <option value="depth">Tire depth</option>
+                </select>
+                <input
+                  value={Array.isArray(it.options) ? it.options.join(", ") : it.options || ""}
+                  onChange={(e) => setCk(i, { options: e.target.value })}
+                  placeholder={(it.kind || "choice") === "choice" ? "Checked OK, Added, Replaced" : ""}
+                  title="Choices, comma separated"
+                  disabled={(it.kind || "choice") !== "choice"}
+                />
+                <input value={it.value || ""} onChange={(e) => setCk(i, { value: e.target.value })} placeholder="Starts at" title="What it starts at" />
+                <input
+                  value={it.auto || ""}
+                  onChange={(e) => setCk(i, { auto: e.target.value })}
+                  placeholder="Replaced when the ticket has…"
+                  title="Words on a ticket line that mean this was replaced"
+                  disabled={(it.kind || "choice") !== "choice"}
+                />
+                <button className="lineX" onClick={() => set("checklist")(d.checklist.filter((_, k) => k !== i))} aria-label="Remove">
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="addBar">
+            <button className="btn tiny" onClick={() => set("checklist")([...(d.checklist || []), { id: "ck" + Date.now().toString(36), label: "", kind: "choice", options: "", value: "", auto: "" }])}>
+              + Item
+            </button>
+            <button className="btn tiny ghost" onClick={() => set("checklist")(DEFAULT_CHECKLIST)}>
+              Reset to the standard list
             </button>
           </div>
 

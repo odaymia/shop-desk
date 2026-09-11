@@ -23,6 +23,8 @@ import { findSpec, matchOil, matchFilter } from "../lib/specs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
 import { OilChangePicker } from "./OilChangePicker.jsx";
+import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
+import { priorChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX } from "../lib/keys.js";
 import { tireName } from "../lib/tires.js";
@@ -468,6 +470,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   <button className="btn tiny" onClick={() => addLine("note")}>
                     + Note
                   </button>
+                  <button className="btn tiny" onClick={() => setPick("checklist")} title="The walk-around checklist, filled from the keyboard">
+                    Checklist
+                  </button>
                 </div>
               )}
             </div>
@@ -602,6 +607,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             </Field>
           </div>
 
+          <ChecklistCard order={o} locked={locked} onOpen={() => setPick("checklist")} />
+
           <div className="card">
             <div className="cardHead">
               <h3>History</h3>
@@ -683,7 +690,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           onClose={() => setPick(null)}
           onAdd={(lines, pkg) => {
             addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
-            setPick(null);
+            setPick(!o.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
             flash(`${pkg.name} added`);
           }}
         />
@@ -717,6 +724,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             }
             addLines(lines);
             setPick(null);
+          }}
+        />
+      )}
+      {pick === "checklist" && (
+        <ChecklistModal
+          cfg={cfg}
+          order={o}
+          prior={priorChecklist(shop.orders, o.vehicleId, o.id)}
+          onCancel={() => setPick(null)}
+          onSave={(items) => {
+            const at = Date.now();
+            update((d) => ({
+              ...d,
+              checklist: { at, byId: d.techId || null, items },
+              history: d.checklist ? d.history : [...(d.history || []), { at, what: "service checklist filled" }],
+            }));
+            setPick(null);
+            flash("Checklist saved");
           }}
         />
       )}

@@ -3,6 +3,7 @@
    except where the shop chose to publish a menu price. */
 import { orderTotals, jobLines, lineAmount, laborQtyText } from "./invoice.js";
 import { findSpec, oilChangeLines } from "./specs.js";
+import { checklistSummary } from "./checklist.js";
 
 const MONTH = 30.4 * 86400000;
 
@@ -58,6 +59,7 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
             work: (o.lines || []).filter((l) => l.kind === "labor" || l.kind === "part").map((l) => ({ kind: l.kind, text: l.description, qty: l.kind === "part" ? l.qty : undefined })),
             /* the full receipt, as printed */
             concern: o.concern || "",
+            checklist: o.checklist && o.checklist.items ? checklistSummary(o.checklist.items) : [],
             lines: (o.lines || [])
               .filter((l) => l.kind !== "note" || l.description)
               .map((l) => ({

@@ -238,3 +238,32 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .specGrid em { font-style:normal; font-size:12px; color:var(--muted); }
 .specGrid em.ok { color:var(--live); }
 .specGrid em.warn { color:var(--warn); }
+
+/* service checklist: the keyboard modal, the card on the ticket, the print block */
+.ckWrap { display:grid; grid-template-columns:300px minmax(0,1fr); gap:18px; margin-top:8px; }
+.ckList { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:10px; max-height:64vh; overflow:auto; }
+.ckList li { display:grid; grid-template-columns:22px 1fr auto; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); font-size:13px; cursor:pointer; align-items:center; }
+.ckList li:last-child { border-bottom:none; }
+.ckList li .n { color:var(--muted); font-variant-numeric:tabular-nums; }
+.ckList li .val { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ckList li.done .val { color:var(--ink); }
+.ckList li.cur { background:var(--panel2); font-weight:600; }
+.ckList li.cur .val { color:var(--signal); }
+.ckCur h3 { margin:4px 0 12px; font-size:22px; }
+.ckStep { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.ckOpts { display:flex; flex-wrap:wrap; gap:8px; }
+.ckOpts .btn { font-size:15px; padding:10px 14px; }
+.ckOpts kbd { display:inline-block; margin-right:8px; font:600 11px/1 ui-monospace, Menlo, monospace; padding:3px 5px; border:1px solid currentColor; border-radius:4px; opacity:.7; }
+.ckText { display:flex; align-items:center; gap:8px; }
+.ckText input { font-size:22px; width:160px; min-width:0; padding:8px 12px; border:1px solid var(--line); border-radius:9px; background:var(--asphalt); color:var(--ink); }
+.ckKeys { margin:16px 0 12px; font-size:12px; color:var(--muted); }
+.ckKeys b { color:var(--ink); font-weight:600; }
+.ckGrid { display:grid; grid-template-columns:1fr auto; gap:3px 12px; font-size:13px; }
+.ckGrid span { color:var(--muted); }
+.ckGrid strong { font-weight:600; text-align:right; white-space:nowrap; }
+.sheet .shCheck { margin:6px 0 4px; }
+.sheet .shCheck h4 { margin:0 0 3px; font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; color:#555; }
+.sheet .shCheck .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px 14px; font-size:10px; }
+.sheet .shCheck .grid div { display:flex; justify-content:space-between; gap:6px; border-bottom:1px dotted #bbb; padding:1px 0; }
+.sheet .shCheck .grid strong { white-space:nowrap; }
+@media (max-width:760px) { .ckWrap { grid-template-columns:1fr; } .ckList { max-height:30vh; } }

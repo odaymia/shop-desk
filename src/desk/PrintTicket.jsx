@@ -4,6 +4,7 @@ import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { staffLabel } from "../lib/names.js";
+import { checklistSummary } from "../lib/checklist.js";
 
 /* The paper copy. Black on white, one page for most tickets. */
 export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
@@ -113,6 +114,22 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               ))}
             </tbody>
           </table>
+
+          {o.checklist && o.checklist.items && o.checklist.items.length > 0 && (
+            <div className="shCheck">
+              <h4>Service checklist</h4>
+              <div className="grid">
+                {checklistSummary(o.checklist.items).map((c, i) => (
+                  <div key={i}>
+                    <span>
+                      {i + 1}. {c.label}
+                    </span>
+                    <strong>{c.text}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="shTotals">
             {t.parts > 0 && (

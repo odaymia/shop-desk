@@ -74,3 +74,11 @@
   .pt > *:not(.ptReceipt), .ptReceiptBar, .ptHead, .ptPick, .ptTabs, .ptFoot { display:none !important; }
   .ptReceipt { border:none; box-shadow:none; padding:0; }
 }
+
+/* service checklist on a receipt */
+.rcCheck { margin:0 0 10px; }
+.rcCheck h4 { margin:0 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.rcCheck .grid { display:grid; grid-template-columns:1fr 1fr; gap:2px 14px; font-size:13px; }
+.rcCheck .grid div { display:flex; justify-content:space-between; gap:6px; border-bottom:1px dotted var(--line); padding:2px 0; }
+.rcCheck .grid strong { white-space:nowrap; }
+@media (max-width:520px) { .rcCheck .grid { grid-template-columns:1fr; } }

@@ -25,8 +25,10 @@ src/desk/                  the front desk pages
 src/desk/Desk.jsx          shell and navigation
 src/desk/useShop.js        loads every record into memory; saves; status moves
 src/desk/OrderEditor.jsx   the ticket screen
+src/desk/ChecklistModal.jsx  the keyboard-driven service checklist and its card on the ticket
 src/desk/desk.css          desk stylesheet, including print rules
 src/lib/invoice.js         ticket math: lines, tax, supplies, payments — no UI
+src/lib/checklist.js       service checklist: defaults, auto-Replaced from ticket lines, cycling — no UI
 src/lib/vin.js             VIN decode via NHTSA vPIC
 src/lib/config.js          DEFAULT_CFG
 src/lib/keys.js            storage key layout

@@ -51,7 +51,8 @@ What a shop uses Manager SE for every day, in a browser:
 - Bay board: cars in the bay, who is on which, timer per car
 - Sticker printing with next-service mileage and date
 - Oil inventory in bulk (gallons on hand per tank) plus filters and wipers by part
-- Upsell checklist per vehicle (cabin filter, wipers, coolant, differential) driven by the interval data
+- [x] Service checklist on every oil change (the LubeSoft "standard checklist"): 17 items from the keyboard — Enter next, Space changes, 1–9 picks — parts sold on the ticket start at Replaced, tire pressure remembered per car, printed on the invoice and in the portal receipt. Items editable in Settings.
+- Upsell prompts driven by the interval data
 
 ## Phase 4 — CRM
 

@@ -468,6 +468,19 @@ function Receipt({ h, v, shop, onBack }) {
         </div>
       </div>
       {h.concern ? <p className="rcConcern">Customer states: {h.concern}</p> : null}
+      {h.checklist && h.checklist.length ? (
+        <div className="rcCheck">
+          <h4>Service checklist</h4>
+          <div className="grid">
+            {h.checklist.map((c, i) => (
+              <div key={i}>
+                <span>{c.label}</span>
+                <strong>{c.text || "—"}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <table className="rcTable">
         <tbody>
           {groups.map((g, gi) => (
