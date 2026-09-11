@@ -12,6 +12,9 @@ import {
 } from "../lib/keys.js";
 import { uid } from "../lib/ids.js";
 import { sGet, sSet } from "../storage/index.js";
+import { specStoreKey } from "../lib/keys.js";
+import { planMerge, remap, mergeCustomer, mergeVehicle } from "../lib/importMerge.js";
+import { specKey } from "../lib/specs.js";
 
 /* Load an import bundle (tools/m1import/export_m1.py makes one from a
    Mitchell1 Manager SE backup). Ids in the bundle are stable, so running
@@ -25,9 +28,10 @@ const TABLES = [
   ["parts", partKey, "Parts"],
   ["jobs", jobKey, "Canned jobs"],
   ["orders", orderKey, "Tickets"],
+  ["specs", specStoreKey, "Service specs"],
 ];
 
-export function ImportPanel({ roster, saveRoster, flash }) {
+export function ImportPanel({ roster, saveRoster, flash, shop }) {
   const [bundle, setBundle] = useState(null);
   const [err, setErr] = useState("");
   const [progress, setProgress] = useState(null); // { done, total, label }
@@ -71,9 +75,28 @@ export function ImportPanel({ roster, saveRoster, flash }) {
     }
     if (next.length !== roster.length) await saveRoster(next);
 
+    /* match onto what the shop already has: cars by VIN or plate,
+       people by phone or email, so a second system's history lands on
+       the same records instead of doubling them */
+    const plan = planMerge(b, { customers: shop.customers, vehicles: shop.vehicles });
     for (const [k, keyFn, label] of TABLES) {
       for (const rec of b[k] || []) {
-        const r = { ...rec };
+        let r = { ...rec };
+        if (k === "customers" && plan.dropCustomers.has(rec.id)) {
+          tick(label);
+          continue;
+        }
+        if (k === "customers" || k === "vehicles" || k === "orders") r = remap(k, r, plan);
+        if (k === "customers" && plan.customerMap[rec.id] && shop.customers[r.id]) r = mergeCustomer(shop.customers[r.id], r);
+        if (k === "vehicles" && plan.vehicleMap[rec.id] && shop.vehicles[r.id]) r = mergeVehicle(shop.vehicles[r.id], r);
+        if (k === "specs") {
+          r.id = specKey(r).replace(/[^A-Za-z0-9|.-]/g, "_");
+          const have = shop.specs && shop.specs[r.id];
+          if (have && have.source !== "lubesoft" && have.source !== "import") {
+            tick(label);
+            continue; // the shop typed this one; don't overwrite
+          }
+        }
         if (k === "orders") {
           if (r.writerId) r.writerId = idMap[r.writerId] || null;
           if (r.techId) r.techId = idMap[r.techId] || null;
@@ -90,7 +113,7 @@ export function ImportPanel({ roster, saveRoster, flash }) {
       const counters = (await sGet(COUNTERS_KEY, null)) || {};
       if (!counters.nextOrder || counters.nextOrder < b.nextOrderNumber) await sSet(COUNTERS_KEY, { ...counters, nextOrder: b.nextOrderNumber });
     }
-    setProgress({ done: total, total, label: "Done" });
+    setProgress({ done: total, total, label: "Done", merged: plan.counts });
     setFinished(true);
     flash("Import finished");
   };
@@ -123,7 +146,7 @@ export function ImportPanel({ roster, saveRoster, flash }) {
             <h3>{bundle.source}</h3>
           </div>
           <dl className="kv">
-            {TABLES.map(([k, , label]) => (
+            {TABLES.filter(([k]) => (bundle[k] || []).length).map(([k, , label]) => (
               <div key={k} style={{ display: "contents" }}>
                 <dt>{label}</dt>
                 <dd className="num">{(bundle[k] || []).length.toLocaleString()}</dd>
@@ -158,6 +181,12 @@ export function ImportPanel({ roster, saveRoster, flash }) {
           </div>
           {finished ? (
             <>
+              {progress.merged && (progress.merged.vehiclesMatched || progress.merged.customersMatched) ? (
+                <p className="muted">
+                  Matched onto records you already had: {progress.merged.vehiclesMatched} cars and {progress.merged.customersMatched} customers.
+                  {progress.merged.customersDropped ? ` ${progress.merged.customersDropped} walk-in placeholders folded into existing owners.` : ""}
+                </p>
+              ) : null}
               <p className="muted">
                 Everything is on this computer. If this desk is signed in to the shop, it's uploading in the background
                 now; the Settings page shows how many changes are still waiting.

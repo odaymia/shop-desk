@@ -35,3 +35,17 @@ time clock uses. Run it once per Supabase project.
 4. Start a ticket.
 
 See `ROADMAP.md` for what's built and what's next.
+
+## Importing from ISI LubeSoft
+
+LubeSoft writes a nightly transfer file (`itf_<store><date>_1.xml`) for
+every day's invoices. Point the converter at the folder holding them:
+
+```
+python3 tools/lsimport/export_ls.py /path/to/transfer/folder lubesoft.import.json
+```
+
+Then Settings → Import from Mitchell1 → choose the file. The import
+matches cars by VIN or plate and people by phone or email, so a car both
+systems know ends up as one record with both histories. Each car's oil
+capacity and the oil and filter actually used become its service spec.

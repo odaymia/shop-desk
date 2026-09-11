@@ -320,7 +320,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Cloud account
           </h3>
           <CloudSync />
-          <ImportPanel roster={roster} saveRoster={saveRoster} flash={flash} />
+          <ImportPanel roster={roster} saveRoster={saveRoster} flash={flash} shop={shop} />
           <p className="legalNote">
             Posting an invoice freezes the tax rate and supplies rule on that ticket. Changing them here affects new
             tickets and open estimates only.
