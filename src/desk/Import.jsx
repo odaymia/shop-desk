@@ -121,11 +121,12 @@ export function ImportPanel({ roster, saveRoster, flash, shop }) {
   return (
     <>
       <h3 className="subhead" style={{ marginTop: 36 }}>
-        Import from Mitchell1
+        Import from Mitchell1 or LubeSoft
       </h3>
       <p className="legalNote" style={{ marginTop: 0 }}>
-        Bring over customers, vehicles, history, inventory, and canned jobs from Manager SE. Pick the import file made
-        from your Manager SE backup. Running it again later updates the same records rather than doubling them.
+        Bring over customers, vehicles, history, inventory, and canned jobs. Pick the import file made from your
+        Manager SE backup or your LubeSoft transfer folder; the same button takes either. Cars and people already on
+        file are matched by VIN, plate, phone, and email, so a second import adds to them rather than doubling them.
       </p>
       <div className="rowBtns" style={{ marginBottom: 12 }}>
         <label className="btn">
