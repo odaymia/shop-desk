@@ -1,5 +1,6 @@
 import { DEFAULT_OIL_PACKAGES } from "./oilchange.js";
 import { DEFAULT_CHECKLIST } from "./checklist.js";
+import { DEFAULT_SERVICE_MENU } from "./services.js";
 /* Shop settings and their defaults. Saved config is merged over these. */
 
 export const DEFAULT_CFG = {
@@ -29,6 +30,7 @@ export const DEFAULT_CFG = {
   suppliesTaxable: true,
   oilChangeLaborPrice: 0, // flat labor added by "Add oil change"; 0 = parts only, add your own labor
   oilPackages: DEFAULT_OIL_PACKAGES, // the Oil change button's menu; edited in Settings
+  serviceMenu: DEFAULT_SERVICE_MENU, // the buttons on a ticket: oil change, then a button per canned job category
   checklist: DEFAULT_CHECKLIST, // the service checklist run on every oil change; edited in Settings
   checklistOnOil: true, // open the checklist as soon as an oil change goes on a ticket
   portalEnabled: false, // customer portal: publish customer records for sign-in at /portal/

@@ -8,6 +8,7 @@ import { CarfaxPanel } from "./CarfaxPanel.jsx";
 import { CATALOGS } from "../lib/parts.js";
 import { NAME_MODES } from "../lib/names.js";
 import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
+import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -37,6 +38,15 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
   const [d, setD] = useState(cfg);
   useEffect(() => setD(cfg), [cfg]);
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
+  const setMenu = (i, patch) => setD((x) => ({ ...x, serviceMenu: (x.serviceMenu || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
+  const moveMenu = (i, dir) =>
+    setD((x) => {
+      const m = [...(x.serviceMenu || [])];
+      const j = i + dir;
+      if (j < 0 || j >= m.length) return x;
+      [m[i], m[j]] = [m[j], m[i]];
+      return { ...x, serviceMenu: m };
+    });
   const setCk = (i, patch) => setD((x) => ({ ...x, checklist: (x.checklist || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const setPkg = (i, patch) => setD((x) => ({ ...x, oilPackages: (x.oilPackages || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const onOff = (k, onText, offText) => (
@@ -58,6 +68,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
         .filter((p) => String(p.name || "").trim())
         .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart) })),
       checklist: normalizeChecklist(d.checklist),
+      serviceMenu: normalizeMenu(d.serviceMenu),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
     });
     flash("Settings saved");
@@ -189,6 +200,47 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
               ))}
             </select>
           </Field>
+
+          <h3 className="subhead">Service menu</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            The buttons on a ticket, in this order. Oil change opens the oil change packages below; every other
+            button opens the canned jobs filed under its category. Red for the big three, green for the rest.
+          </p>
+          <div className="miniLines">
+            {(d.serviceMenu || []).map((m, i) => (
+              <div key={m.id || i} className="miniLine" style={{ gridTemplateColumns: "1fr 1.4fr 90px 30px 30px 36px" }}>
+                <input value={m.name || ""} onChange={(e) => setMenu(i, { name: e.target.value })} placeholder="Button" />
+                {m.oil ? (
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    Opens the oil change packages
+                  </span>
+                ) : (
+                  <input value={m.category || ""} onChange={(e) => setMenu(i, { category: e.target.value })} placeholder="Canned job category" title="Jobs with this category show under the button" />
+                )}
+                <select value={m.color === "green" ? "green" : "red"} onChange={(e) => setMenu(i, { color: e.target.value })}>
+                  <option value="red">Red</option>
+                  <option value="green">Green</option>
+                </select>
+                <button className="lineX" onClick={() => moveMenu(i, -1)} aria-label="Move up" title="Move up">
+                  ↑
+                </button>
+                <button className="lineX" onClick={() => moveMenu(i, 1)} aria-label="Move down" title="Move down">
+                  ↓
+                </button>
+                <button className="lineX" onClick={() => set("serviceMenu")(d.serviceMenu.filter((_, k) => k !== i))} aria-label="Remove">
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="addBar">
+            <button className="btn tiny" onClick={() => set("serviceMenu")([...(d.serviceMenu || []), { id: "svc" + Date.now().toString(36), name: "", category: "", color: "green" }])}>
+              + Button
+            </button>
+            <button className="btn tiny ghost" onClick={() => set("serviceMenu")(DEFAULT_SERVICE_MENU)}>
+              Reset to the standard menu
+            </button>
+          </div>
 
           <h3 className="subhead">Oil change menu</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>

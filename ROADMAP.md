@@ -17,6 +17,7 @@ What a shop uses Manager SE for every day, in a browser:
 - [x] Customers and their vehicles, with service history per vehicle
 - [x] Estimates → repair orders → invoices, one number sequence, never deleted
 - [x] Parts, labor, sublet, fee, and discount lines; canned jobs that drop in a bundle
+- [x] Service menu on the ticket: Oil change, Brakes, Tires in red, then Air filters, Cabin air filters, Transmission, Radiator, Brake fluid, Fuel system, Power steering, Differential fluid in green. Each button opens the canned jobs filed under its category; starter jobs seed every category. Order, names, colors editable in Settings.
 - [x] Sales tax with configurable rates; parts taxable, labor not (California default)
 - [x] Shop supplies as a percentage with a cap
 - [x] Payments: cash, card, check, other; split tenders; balance due

@@ -42,6 +42,8 @@ input, select, textarea { font-family:inherit; font-size:16px; }
 .btn.ghost { background:transparent; color:var(--muted); }
 .btn.tiny { padding:7px 12px; font-size:13px; }
 .btn.tiny.primary { color:var(--signalInk); }
+.btn.menuRed { color:var(--signal); border-color:var(--signal); font-weight:700; }
+.btn.menuGreen { color:var(--live); border-color:var(--live); font-weight:700; }
 .btn.danger { color:var(--warn); border-color:rgba(198,40,40,.35); }
 .btn.lg { padding:16px 26px; font-size:18px; }
 .btn.full { width:100%; margin-top:8px; }

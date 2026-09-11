@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { menuCategories } from "../lib/services.js";
 import { Modal, Field, Text, Money, toNum, ConfirmModal } from "./ui.jsx";
 import { PartPicker } from "./pickers.jsx";
 
@@ -178,7 +179,12 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
             <Text value={d.name} onChange={(v) => setD({ ...d, name: v })} autoFocus placeholder="Full synthetic oil change" />
           </Field>
           <Field label="Category">
-            <Text value={d.category} onChange={(v) => setD({ ...d, category: v })} placeholder="Oil, Brakes, Tires…" />
+            <Text value={d.category} onChange={(v) => setD({ ...d, category: v })} placeholder="Brakes, Tires, Air filters…" list="jobCategories" />
+            <datalist id="jobCategories">
+              {menuCategories(cfg.serviceMenu).map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </Field>
           <Field label="Priced per (leave blank for a fixed job)">
             <Text value={d.unit || ""} onChange={(v) => setD({ ...d, unit: v.trim().toLowerCase() })} placeholder="tire, wheel, quart" />

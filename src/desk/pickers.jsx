@@ -66,17 +66,20 @@ export function PartPicker({ shop, onPick, onTyped, onClose }) {
 
 /* Pick a canned job. Shows what it would cost at today's prices. A job
    priced per unit asks how many first. */
-export function JobPicker({ shop, cfg, onPick, onClose, lastTireSize }) {
+export function JobPicker({ shop, cfg, onPick, onClose, lastTireSize, category }) {
   const [q, setQ] = useState("");
+  const [all, setAll] = useState(!category);
+  const cat = String(category || "").trim().toLowerCase();
   const [asking, setAsking] = useState(null); // job waiting for a count
   const [count, setCount] = useState(4);
   const [pickingTire, setPickingTire] = useState(false);
   const rows = useMemo(
     () =>
       activeList(shop.jobs)
+        .filter((j) => all || String(j.category || "").trim().toLowerCase() === cat)
         .filter((j) => searchText(q, j.name, j.category))
         .sort((a, b) => (a.category || "").localeCompare(b.category || "") || a.name.localeCompare(b.name)),
-    [shop.jobs, q]
+    [shop.jobs, q, all, cat]
   );
   const lineText = (l, unit) =>
     l.kind === "labor"
@@ -143,10 +146,21 @@ export function JobPicker({ shop, cfg, onPick, onClose, lastTireSize }) {
   }
 
   return (
-    <Modal title="Add a job" onClose={onClose} size="wide">
-      <input className="search" style={{ width: "100%" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Job name" autoFocus />
+    <Modal title={category && !all ? category : "All canned jobs"} onClose={onClose} size="wide">
+      <div className="rowBtns">
+        <input className="search" style={{ flex: 1 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Job name" autoFocus />
+        {category && (
+          <button className="btn" onClick={() => setAll((x) => !x)}>
+            {all ? `Just ${category}` : "All jobs"}
+          </button>
+        )}
+      </div>
       <ul className="pickList">
-        {rows.length === 0 && <li className="emptyNote">{q ? "No job matches." : "No canned jobs yet. Build them under Canned jobs."}</li>}
+        {rows.length === 0 && (
+          <li className="emptyNote">
+            {q ? "No job matches." : category && !all ? `Nothing filed under ${category} yet. Under Canned jobs, give a job that category and it shows up here.` : "No canned jobs yet. Build them under Canned jobs."}
+          </li>
+        )}
         {rows.map((j) => {
           const price = orderTotals({ lines: jobLines(j, cfg, shop.parts, uid), noSupplies: true }, cfg).subtotal;
           return (

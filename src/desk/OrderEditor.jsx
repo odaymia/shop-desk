@@ -42,6 +42,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const saveRef = useRef(shop.saveOrder);
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
+  const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
   const [vehEdit, setVehEdit] = useState(null);
   const [custEdit, setCustEdit] = useState(false);
   const [specEdit, setSpecEdit] = useState(false);
@@ -441,12 +442,33 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               </table>
               {!locked && (
                 <div className="addBar">
-                  <button className="btn tiny primary" onClick={() => setPick("job")}>
-                    + Canned job
+                  {(cfg.serviceMenu || []).map((m) => (
+                    <button
+                      key={m.id}
+                      className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`}
+                      onClick={() => {
+                        if (m.oil) return setPick("oil");
+                        setJobCat(m.category || m.name);
+                        setPick("job");
+                      }}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                  <button
+                    className="btn tiny ghost"
+                    onClick={() => {
+                      setJobCat("");
+                      setPick("job");
+                    }}
+                    title="Every canned job, whatever its category"
+                  >
+                    All jobs
                   </button>
-                  <button className="btn tiny primary" onClick={() => setPick("oil")}>
-                    + Oil change
-                  </button>
+                </div>
+              )}
+              {!locked && (
+                <div className="addBar" style={{ paddingTop: 6 }}>
                   {CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
                     <button key={k} className="btn tiny" onClick={() => openCatalog(k, url)} title={`Open ${label} in a new tab`}>
                       {label} ↗
@@ -699,6 +721,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <JobPicker
           shop={shop}
           cfg={cfg}
+          category={jobCat}
           lastTireSize={lastTireSize}
           onClose={() => setPick(null)}
           onPick={(j, count, tire) => {

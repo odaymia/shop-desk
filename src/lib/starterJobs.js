@@ -41,4 +41,27 @@ export const STARTER_JOBS = [
       { kind: "labor", description: "Replace rear brake pads", hours: 1, rate: 170 },
     ],
   },
+  /* The rest of the service menu. Labor is at the shop's rate (rate null)
+     and the part's price is typed on the ticket or comes from inventory
+     (price null) until the shop sets its own numbers under Canned jobs. */
+  ...[
+    ["air-filter", "Engine air filter replacement", "Air filters", "Engine air filter", 0.2],
+    ["cabin-filter", "Cabin air filter replacement", "Cabin air filters", "Cabin air filter", 0.3],
+    ["trans-exchange", "Transmission fluid exchange", "Transmission services", "Transmission fluid", 1],
+    ["trans-drain", "Transmission drain and fill", "Transmission services", "Transmission fluid", 0.5],
+    ["coolant-flush", "Coolant flush and fill", "Radiator services", "Coolant", 1],
+    ["brake-flush", "Brake fluid flush", "Brake fluid services", "Brake fluid", 0.8],
+    ["fuel-clean", "Fuel system cleaning service", "Fuel system services", "Fuel system cleaner", 0.5],
+    ["ps-flush", "Power steering fluid flush", "Power steering services", "Power steering fluid", 0.7],
+    ["rear-diff", "Rear differential fluid service", "Differential fluid services", "Gear oil", 0.7],
+    ["front-diff", "Front differential fluid service", "Differential fluid services", "Gear oil", 0.7],
+  ].map(([starterKey, name, category, part, hours]) => ({
+    starterKey,
+    name,
+    category,
+    lines: [
+      { kind: "part", description: part, number: "", partId: null, qty: 1, price: null, cost: null, condition: "new" },
+      { kind: "labor", description: name, hours, rate: null },
+    ],
+  })),
 ];
