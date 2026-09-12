@@ -19,12 +19,17 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      await storageReady();
+      /* Open from the local copy first. Reads come straight from IndexedDB,
+         which is independent of the cloud, so the desk shows up even with no
+         signal or a stalled sign-in. Cloud sync then starts in the
+         background — it must never gate this screen, or a slow getSession
+         (or a big post-import outbox) leaves the counter PC spinning. */
       if (DEMO) await seedDemoIfEmpty(sGet, sSet);
       const c = await sGet(CFG_KEY, null);
       if (c) setCfg({ ...DEFAULT_CFG, ...c });
       setRoster((await sGet(ROSTER_KEY, [])) || []);
       setReady(true);
+      storageReady().catch((e) => console.error("cloud init failed", e));
     })();
   }, []);
 
