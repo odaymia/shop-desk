@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, Fragment } from "react";
 import { fmtDate } from "./ui.jsx";
 import { fmtMoney, orderTotals, lineAmount, laborQtyText, conditionLabel, statusLabel, owesBalance } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
@@ -103,14 +103,24 @@ function LineRows({ order }) {
           const packaged = g.lines.filter((l) => l.packaged);
           const rest = g.lines.filter((l) => !l.packaged);
           const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
+          const pkgParts = packaged.filter((l) => l.kind === "part");
           return (
-            <tr key={gi} style={{ display: "contents" }}>
+            <Fragment key={gi}>
               {packaged.length > 0 && (
                 <tr>
                   <td>{g.job}</td>
                   <td className="r">{fmtMoney(pkgAmt)}</td>
                 </tr>
               )}
+              {pkgParts.map((l) => (
+                <tr key={l.id}>
+                  <td className="muted" style={{ paddingLeft: 14 }}>
+                    {l.description}
+                    {Number(l.qty) > 1 ? ` · ${l.qty}` : ""} · included
+                  </td>
+                  <td className="r muted">{fmtMoney(0)}</td>
+                </tr>
+              ))}
               {rest.map((l) => (
                 <tr key={l.id}>
                   <td>
@@ -122,7 +132,7 @@ function LineRows({ order }) {
                   <td className="r">{l.kind === "discount" ? `-${fmtMoney(lineAmount(l))}` : fmtMoney(lineAmount(l))}</td>
                 </tr>
               ))}
-            </tr>
+            </Fragment>
           );
         })}
       </tbody>

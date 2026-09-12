@@ -510,27 +510,31 @@ function GroupRows({ g, cond }) {
   return (
     <>
       {packaged.length > 0 ? (
-        <tr className="rc-labor">
-          <td>
-            <div>{g.job}</div>
-            {details ? <div className="rcMeta">{details}</div> : null}
-            {packaged.filter((l) => l.kind === "part").length > 0 && (
-              <div className="rcMeta">
-                {packaged
-                  .filter((l) => l.kind === "part")
-                  .map((l, i) => (
-                    <div key={i}>
-                      • {Number(l.qtyText) > 1 ? `${l.qtyText} × ` : ""}
-                      {l.number ? `${l.number} ` : ""}
-                      {l.text}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </td>
-          <td className="r rcMeta"></td>
-          <td className="r">{fmtMoney(pkgAmt)}</td>
-        </tr>
+        <>
+          <tr className="rc-labor">
+            <td>
+              <div>{g.job}</div>
+              {details ? <div className="rcMeta">{details}</div> : null}
+            </td>
+            <td className="r rcMeta"></td>
+            <td className="r">{fmtMoney(pkgAmt)}</td>
+          </tr>
+          {packaged
+            .filter((l) => l.kind === "part")
+            .map((l, i) => (
+              <tr key={`p${i}`} className="rc-part">
+                <td>
+                  <div>
+                    {l.number ? <span className="rcNum">{l.number} </span> : null}
+                    {l.text}
+                    <span className="rcMeta"> · included in package</span>
+                  </div>
+                </td>
+                <td className="r rcMeta">{l.qtyText}</td>
+                <td className="r">{fmtMoney(0)}</td>
+              </tr>
+            ))}
+        </>
       ) : g.job ? (
         <tr className="rcJob">
           <td colSpan={3}>{g.job}</td>

@@ -141,6 +141,9 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               <span>Sales tax{t.taxRate ? ` (${t.taxRate}%)` : ""}</span>
               <span>{fmtMoney(t.tax)}</span>
             </div>
+            {(o.lines || []).some((l) => l.packaged && l.kind === "part") && (
+              <div style={{ fontSize: 9.5, color: "#666", justifyContent: "flex-start" }}>Tax includes the taxable oil and filter in the oil-change package.</div>
+            )}
             <div className="grand">
               <span>Total</span>
               <span>{fmtMoney(t.total)}</span>
@@ -255,10 +258,10 @@ function LineRow({ l }) {
   );
 }
 
-/* A package (an oil change) folds its service/oil/filter lines into one
-   line at the package price. The parts-vs-labor split still shows in the
-   totals below. Anything else in the group (extra quarts) prints as its
-   own line. */
+/* A package (an oil change) prints its service line at the package price,
+   then each included part itemized at $0 (it's covered by the package
+   price). The parts still carry their taxable value in the totals. Extra
+   quarts and a canister-filter charge print as their own priced lines. */
 function GroupRows({ g }) {
   const packaged = g.lines.filter((l) => l.packaged);
   const rest = g.lines.filter((l) => !l.packaged);
@@ -268,27 +271,31 @@ function GroupRows({ g }) {
   return (
     <>
       {packaged.length > 0 ? (
-        <tr>
-          <td>Service</td>
-          <td>
-            {g.job}
-            {details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{details}</div> : null}
-            {parts.length > 0 && (
-              <div style={{ color: "#444", fontSize: 11, marginTop: 3 }}>
-                {parts.map((l) => (
-                  <div key={l.id}>
-                    • {Number(l.qty) > 1 ? `${l.qty} × ` : ""}
-                    {l.description}
-                    {l.number ? ` (${l.number})` : ""}
-                  </div>
-                ))}
-              </div>
-            )}
-          </td>
-          <td className="r">1</td>
-          <td className="r">{fmtMoney(pkgAmt)}</td>
-          <td className="r">{fmtMoney(pkgAmt)}</td>
-        </tr>
+        <>
+          <tr>
+            <td>Service</td>
+            <td>
+              {g.job}
+              {details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{details}</div> : null}
+            </td>
+            <td className="r">1</td>
+            <td className="r">{fmtMoney(pkgAmt)}</td>
+            <td className="r">{fmtMoney(pkgAmt)}</td>
+          </tr>
+          {parts.map((l) => (
+            <tr key={l.id}>
+              <td>{l.number || "Part"}</td>
+              <td>
+                {l.description}
+                <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span>
+                <span style={{ color: "#777" }}> · included in package</span>
+              </td>
+              <td className="r">{l.qty}</td>
+              <td className="r">{fmtMoney(0)}</td>
+              <td className="r">{fmtMoney(0)}</td>
+            </tr>
+          ))}
+        </>
       ) : (
         g.job && (
           <tr className="job">
