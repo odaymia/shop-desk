@@ -36,6 +36,8 @@ function sampleData() {
     taxRate: 8,
     hours: "Mon–Fri 7:30–6, Sat 8–2",
     portalEnabled: false,
+    authorizationText:
+      "I authorize the repair work described on this estimate, along with the necessary parts and materials, at the price shown. No additional work will be done without my approval.\n\nRETURN OF REPLACED PARTS (California): [ ] SAVE my old parts   [ ] Do NOT save my old parts\n\nTEARDOWN: if I do not authorize the repair, the vehicle will be reassembled within ____ days of this estimate.\n\nAn express mechanic's lien is acknowledged on the vehicle to secure the amount of repairs.",
   };
 
   const customers = [

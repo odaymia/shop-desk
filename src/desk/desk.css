@@ -322,3 +322,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .sheet .shSign.signed div:first-child { border-top:none; }
 .sheet .shSigImg { display:block; max-height:46px; margin-bottom:2px; }
 @media print { .sheet .shSigImg { max-height:46px; } }
+
+/* fill-in fields in the authorization text */
+.authChk { border:none; background:none; font-size:19px; line-height:1; padding:0 2px; cursor:pointer; vertical-align:-2px; color:var(--ink); }
+.authChk.on { color:var(--live); }
+.authBlank { display:inline-block; width:70px; min-width:0; border:none; border-bottom:1.5px solid var(--ink); background:transparent; font:inherit; text-align:center; padding:0 4px; margin:0 2px; }
+.authBlank:focus { outline:none; border-bottom-color:var(--signal); }

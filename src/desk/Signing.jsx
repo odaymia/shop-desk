@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { fmtDate } from "./ui.jsx";
 import { fmtMoney, orderTotals, lineAmount, laborQtyText, conditionLabel, statusLabel, owesBalance } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
+import { parseAuthText } from "../lib/authForm.js";
 import { cloud, sGet, sDel } from "../storage/index.js";
 import { SIGNREQ_KEY } from "../lib/keys.js";
 import defaultLogo from "../assets/genie-logo.png";
@@ -143,6 +144,8 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
   const existing = (order.signatures || {})[slot] || {};
   const [img, setImg] = useState(existing.img || "");
   const [name, setName] = useState(existing.name || customerName(c) || "");
+  const [checks, setChecks] = useState((order.authFill && order.authFill.checks) || {});
+  const [blanks, setBlanks] = useState((order.authFill && order.authFill.blanks) || {});
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
@@ -150,7 +153,7 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
     setBusy(true);
     const at = Date.now();
     const signatures = { ...(order.signatures || {}), [slot]: { img, name: name.trim(), at } };
-    await shop.saveOrder({ ...order, signatures, history: [...(order.history || []), { at, what: `signed: ${slot === "delivery" ? "vehicle received" : "estimate approved"}` }] });
+    await shop.saveOrder({ ...order, signatures, authFill: { checks, blanks }, history: [...(order.history || []), { at, what: `signed: ${slot === "delivery" ? "vehicle received" : "estimate approved"}` }] });
     flash("Signature saved");
     onDone(true);
   };
@@ -208,7 +211,25 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
           ) : null}
         </div>
 
-        <p className="signStatement">{statement}</p>
+        <div className="signStatement">
+          {parseAuthText(statement).map((tk, idx) =>
+            tk.type === "text" ? (
+              <span key={idx}>{tk.text}</span>
+            ) : tk.type === "check" ? (
+              <button
+                key={idx}
+                type="button"
+                className={`authChk ${checks[tk.i] ? "on" : ""}`}
+                onClick={() => setChecks((c) => ({ ...c, [tk.i]: !c[tk.i] }))}
+                aria-label="checkbox"
+              >
+                {checks[tk.i] ? "☑" : "☐"}
+              </button>
+            ) : (
+              <input key={idx} className="authBlank" value={blanks[tk.i] || ""} onChange={(e) => setBlanks((b) => ({ ...b, [tk.i]: e.target.value }))} />
+            )
+          )}
+        </div>
 
         <label className="fld">
           <span>Your name</span>

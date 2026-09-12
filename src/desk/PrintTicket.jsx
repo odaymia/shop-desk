@@ -5,6 +5,7 @@ import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { staffLabel } from "../lib/names.js";
 import { checklistSummary } from "../lib/checklist.js";
+import { parseAuthText } from "../lib/authForm.js";
 
 /* The paper copy. Black on white, one page for most tickets. */
 export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
@@ -163,18 +164,40 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
 
           {isInvoice ? (
             <>
-              {cfg.invoiceFooter && <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>{cfg.invoiceFooter}</p>}
+              {cfg.invoiceFooter && <AuthNote text={cfg.invoiceFooter} fill={o.authFill} />}
               <SignBlock sig={(o.signatures || {}).delivery} label="Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty" />
             </>
           ) : (
             <>
-              {cfg.authorizationText && <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>{cfg.authorizationText}</p>}
+              {cfg.authorizationText && <AuthNote text={cfg.authorizationText} fill={o.authFill} />}
               <SignBlock sig={(o.signatures || {}).authorization} label="Customer signature" />
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/* The authorization/warranty text, with any checkbox and fill-in fields
+   the customer answered shown filled in. */
+function AuthNote({ text, fill }) {
+  const checks = (fill && fill.checks) || {};
+  const blanks = (fill && fill.blanks) || {};
+  return (
+    <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>
+      {parseAuthText(text).map((tk, idx) =>
+        tk.type === "text" ? (
+          tk.text
+        ) : tk.type === "check" ? (
+          <span key={idx} style={{ fontWeight: 700 }}>{checks[tk.i] ? "[X]" : "[  ]"}</span>
+        ) : blanks[tk.i] ? (
+          <span key={idx} style={{ fontWeight: 700, textDecoration: "underline" }}> {blanks[tk.i]} </span>
+        ) : (
+          "____"
+        )
+      )}
+    </p>
   );
 }
 
