@@ -192,12 +192,12 @@ export function PartForm({ part, vendors, onClose, onSave }) {
           <Num value={d.surcharge} onChange={set("surcharge")} placeholder="0.00" />
         </Field>
         <Field label="Charge shows as">
-          <Text value={d.surchargeLabel} onChange={set("surchargeLabel")} placeholder="Canister filter charge" />
+          <Text value={d.surchargeLabel} onChange={set("surchargeLabel")} placeholder="Canister filter charge / Bottled oil surcharge" />
         </Field>
       </div>
       <p className="legalNote" style={{ marginTop: -6 }}>
-        An extra charge added on top of the oil-change package when this filter is used — for canister or cartridge
-        filters that cost more. Leave the amount blank for none.
+        An extra charge added on top of the oil-change package when this oil or filter is used — for canister and
+        cartridge filters, or bottled and boxed oils, that cost more than bulk. Leave the amount blank for none.
       </p>
       <label className="fld inline">
         <input type="checkbox" checked={d.taxable !== false} onChange={(e) => set("taxable")(e.target.checked)} />

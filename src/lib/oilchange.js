@@ -101,24 +101,28 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       job,
     });
   }
-  /* a pricier filter (canister/cartridge) can carry a surcharge added on
-     top of the package price — its own taxable line, not folded in */
-  const surcharge = filterPart ? round2(Number(filterPart.surcharge) || 0) : 0;
-  if (surcharge > 0) {
+  /* a pricier oil (bottled, boxed) or filter (canister/cartridge) can
+     carry a surcharge added on top of the package price — its own taxable
+     line, not folded in */
+  const surchargeLine = (part, fallback) => {
+    const amt = part ? round2(Number(part.surcharge) || 0) : 0;
+    if (amt <= 0) return;
     lines.push({
       id: mkId(),
       kind: "part",
       partId: null,
-      number: filterPart.number || "",
-      description: (filterPart.surchargeLabel || "").trim() || `${filterPart.description || "Filter"} charge`,
+      number: part.number || "",
+      description: (part.surchargeLabel || "").trim() || `${part.description || fallback} charge`,
       qty: 1,
-      price: surcharge,
+      price: amt,
       cost: 0,
       condition: "new",
       taxable: true,
       job,
     });
-  }
+  };
+  surchargeLine(oilPart, "Oil");
+  surchargeLine(filterPart, "Filter");
   return lines;
 }
 

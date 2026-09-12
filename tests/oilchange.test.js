@@ -143,3 +143,18 @@ test("no surcharge line when the filter has none", () => {
   const lines = oilPackageLines(conv, 5, null, filt, () => `L${++n}`);
   assert.equal(lines.filter((l) => !l.packaged).length, 0); // only the folded package, nothing extra
 });
+
+test("a bottled/boxed oil surcharge adds on top too, alongside a filter surcharge", () => {
+  const oil = { id: "o5", number: "VAL-BOX", description: "Valvoline 5W-30 (5-gal box)", price: 6.99, cost: 3.1, surcharge: 10, surchargeLabel: "Bottled oil surcharge" };
+  const canister = { id: "f9", description: "Canister oil filter", price: 12.99, cost: 6, surcharge: 15, surchargeLabel: "Canister filter charge" };
+  let n = 0;
+  const lines = oilPackageLines(conv, 5, oil, canister, () => `L${++n}`);
+  const oilChg = lines.find((l) => l.description === "Bottled oil surcharge");
+  const filtChg = lines.find((l) => l.description === "Canister filter charge");
+  assert.equal(oilChg.price, 10);
+  assert.equal(oilChg.taxable, true);
+  assert.equal(oilChg.packaged, undefined);
+  assert.equal(filtChg.price, 15);
+  const t = orderTotals({ lines, noSupplies: true }, cfg);
+  assert.equal(t.subtotal, 79.99); // 54.99 package + 10 oil + 15 filter
+});
