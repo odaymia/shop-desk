@@ -291,9 +291,10 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .demoBanner .btn:hover { background:rgba(255,255,255,.25); }
 
 /* ---------- electronic signatures ---------- */
-.signOverlay { position:fixed; inset:0; z-index:70; background:rgba(20,24,33,.55); display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:24px 16px; }
-.signSheet { background:#fff; width:100%; max-width:640px; border-radius:14px; padding:22px 24px 28px; box-shadow:0 12px 40px rgba(0,0,0,.3); }
-.signHead { display:flex; align-items:center; gap:12px; border-bottom:2px solid #111; padding-bottom:10px; }
+.signOverlay { position:fixed; inset:0; z-index:70; background:rgba(20,24,33,.55); overflow:auto; padding:16px; }
+.signSheet { background:#fff; width:100%; max-width:640px; margin:0 auto; box-sizing:border-box; border-radius:14px; padding:20px 18px 26px; box-shadow:0 12px 40px rgba(0,0,0,.3); overflow-wrap:anywhere; }
+.signHead { display:flex; align-items:center; gap:12px; border-bottom:2px solid #111; padding-bottom:10px; flex-wrap:wrap; }
+.signHead .muted { font-size:12px; }
 .signHead img { height:44px; }
 .signHead .grow { flex:1; }
 .signHead strong { font-size:16px; }
@@ -301,14 +302,15 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .signWho { display:flex; justify-content:space-between; gap:12px; font-size:14px; margin-bottom:10px; }
 .signWho .r { text-align:right; }
 .signConcern { background:var(--panel); border-radius:8px; padding:8px 10px; font-size:13px; margin:0 0 10px; }
-.signLines { width:100%; border-collapse:collapse; font-size:14px; margin:4px 0 8px; }
+.signLines { width:100%; table-layout:fixed; border-collapse:collapse; font-size:14px; margin:4px 0 8px; }
 .signLines td { padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
-.signLines td.r { text-align:right; white-space:nowrap; }
+.signLines td.r { text-align:right; white-space:nowrap; width:90px; }
+.signLines td:first-child { overflow-wrap:anywhere; }
 .signJob { font-weight:600; }
 .signTotals { margin:6px 0 0 auto; max-width:280px; font-size:14px; }
 .signTotals div { display:flex; justify-content:space-between; padding:3px 0; }
 .signTotals div.grand { border-top:2px solid #111; font-weight:700; font-size:16px; margin-top:4px; padding-top:6px; }
-.signStatement { font-size:12px; color:#333; line-height:1.4; background:var(--panel); border-radius:8px; padding:10px 12px; margin:14px 0; white-space:pre-wrap; }
+.signStatement { font-size:13px; color:#333; line-height:1.7; background:var(--panel); border-radius:8px; padding:12px 14px; margin:14px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .sigPad { border:1px solid var(--line); border-radius:10px; background:#fff; }
 .sigCanvas { display:block; width:100%; height:180px; touch-action:none; cursor:crosshair; border-radius:10px 10px 0 0; }
 .sigBase { display:flex; align-items:center; justify-content:space-between; border-top:1px dashed var(--line); padding:6px 10px; }
@@ -324,7 +326,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 @media print { .sheet .shSigImg { max-height:46px; } }
 
 /* fill-in fields in the authorization text */
-.authChk { border:none; background:none; font-size:19px; line-height:1; padding:0 2px; cursor:pointer; vertical-align:-2px; color:var(--ink); }
-.authChk.on { color:var(--live); }
-.authBlank { display:inline-block; width:70px; min-width:0; border:none; border-bottom:1.5px solid var(--ink); background:transparent; font:inherit; text-align:center; padding:0 4px; margin:0 2px; }
+.authChk { display:inline-block; width:26px; height:26px; border:2px solid var(--ink); border-radius:6px; background:#fff; padding:0; margin:0 5px; vertical-align:-7px; cursor:pointer; position:relative; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+.authChk:active { transform:scale(.94); }
+.authChk.on { background:var(--live); border-color:var(--live); }
+.authChk.on::after { content:"\2713"; color:#fff; font-weight:800; font-size:17px; line-height:1; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+.authBlank { display:inline-block; width:64px; min-width:0; border:none; border-bottom:2px solid var(--ink); background:transparent; font:inherit; text-align:center; padding:6px 4px; margin:0 3px; touch-action:manipulation; }
 .authBlank:focus { outline:none; border-bottom-color:var(--signal); }

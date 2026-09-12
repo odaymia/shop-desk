@@ -222,9 +222,8 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
                 className={`authChk ${checks[tk.i] ? "on" : ""}`}
                 onClick={() => setChecks((c) => ({ ...c, [tk.i]: !c[tk.i] }))}
                 aria-label="checkbox"
-              >
-                {checks[tk.i] ? "☑" : "☐"}
-              </button>
+                aria-pressed={!!checks[tk.i]}
+              />
             ) : (
               <input key={idx} className="authBlank" value={blanks[tk.i] || ""} onChange={(e) => setBlanks((b) => ({ ...b, [tk.i]: e.target.value }))} />
             )
