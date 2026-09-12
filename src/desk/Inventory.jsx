@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Modal, Field, Text, Num, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
 import { OIL_TYPE_OPTIONS } from "../lib/oilchange.js";
+import { itemCategory } from "../lib/inventoryReports.js";
 
 const blank = () => ({
   number: "",
@@ -28,17 +29,24 @@ const PACK_PLACEHOLDER = { case: "6", box: "5", bulk: "110" };
 export function Inventory({ shop, flash }) {
   const [q, setQ] = useState("");
   const [only, setOnly] = useState("all"); // all | low
+  const [cat, setCat] = useState("all");
   const [edit, setEdit] = useState(null);
   const vendors = activeList(shop.vendors).sort((a, b) => a.name.localeCompare(b.name));
 
+  const stock = useMemo(
+    () => activeList(shop.parts).filter((p) => !p.tire).map((p) => ({ p, cat: itemCategory(p) })),
+    [shop.parts]
+  );
+  const cats = useMemo(() => [...new Set(stock.map((x) => x.cat).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [stock]);
   const rows = useMemo(
     () =>
-      activeList(shop.parts)
-        .filter((p) => !p.tire) // tires have their own page
-        .filter((p) => searchText(q, p.number, p.description, p.category, p.location, (shop.vendors[p.vendorId] || {}).name))
-        .filter((p) => only === "all" || toNum(p.onHand) <= toNum(p.reorderAt))
-        .sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.number || "").localeCompare(b.number || "")),
-    [shop.parts, shop.vendors, q, only]
+      stock
+        .filter((x) => cat === "all" || x.cat === cat)
+        .filter(({ p }) => searchText(q, p.number, p.description, p.category, p.location, (shop.vendors[p.vendorId] || {}).name))
+        .filter(({ p }) => only === "all" || toNum(p.onHand) <= toNum(p.reorderAt))
+        .map((x) => x.p)
+        .sort((a, b) => itemCategory(a).localeCompare(itemCategory(b)) || (a.number || "").localeCompare(b.number || "")),
+    [stock, shop.vendors, q, only, cat]
   );
   const value = rows.reduce((a, p) => a + toNum(p.onHand) * toNum(p.cost), 0);
   const low = activeList(shop.parts).filter((p) => !p.tire && toNum(p.onHand) <= toNum(p.reorderAt) && toNum(p.reorderAt) > 0).length;
@@ -65,6 +73,18 @@ export function Inventory({ shop, flash }) {
         </button>
       </header>
       <div className="deskBody">
+        {cats.length > 1 && (
+          <div className="catBar" style={{ paddingBottom: 14 }}>
+            <button className={`btn tiny ${cat === "all" ? "primary" : ""}`} onClick={() => setCat("all")}>
+              All
+            </button>
+            {cats.map((c) => (
+              <button key={c} className={`btn tiny ${cat === c ? "primary" : ""}`} onClick={() => setCat(c)}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="tableCard scroll">
           <table className="dk">
             <thead>
@@ -97,7 +117,7 @@ export function Inventory({ shop, flash }) {
                       <strong>{p.number || "—"}</strong>
                     </td>
                     <td>{p.description}</td>
-                    <td className="muted">{p.category}</td>
+                    <td className="muted">{itemCategory(p)}</td>
                     <td className="muted">{(shop.vendors[p.vendorId] || {}).name || ""}</td>
                     <td className="muted">{p.location}</td>
                     <td className="r num" style={lowRow ? { color: "var(--warn)", fontWeight: 600 } : null}>
