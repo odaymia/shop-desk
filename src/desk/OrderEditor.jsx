@@ -31,6 +31,23 @@ import { CART_PREFIX, SIGNREQ_KEY } from "../lib/keys.js";
 import { OrderSign } from "./Signing.jsx";
 import { tireName } from "../lib/tires.js";
 
+/* Service-menu buttons whose job is really "put a part on the ticket" open
+   the inventory list filtered to that category instead of the canned-job
+   picker. Matched on the button's category or name so it works without the
+   shop re-saving its menu; a menu item can also set `partCat` outright. */
+const MENU_PART_CATS = {
+  "air filters": "Engine Air Filters",
+  "air filter": "Engine Air Filters",
+  "engine air filters": "Engine Air Filters",
+  "engine air filter": "Engine Air Filters",
+  "cabin air filters": "Cabin Air Filters",
+  "cabin air filter": "Cabin Air Filters",
+};
+function menuPartCat(m) {
+  if (m.partCat) return m.partCat;
+  return MENU_PART_CATS[String(m.category || m.name || "").trim().toLowerCase()] || "";
+}
+
 /* One ticket: estimate → repair order → invoice. Edits save themselves a
    moment after you stop typing. Once posted, the lines lock; only
    payments can change. */
@@ -45,6 +62,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
   const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
+  const [partCat, setPartCat] = useState(""); // inventory category a menu button opened the part picker to
   const [signing, setSigning] = useState(false);
   const [vehEdit, setVehEdit] = useState(null);
   const [custEdit, setCustEdit] = useState(false);
@@ -471,6 +489,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                       className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`}
                       onClick={() => {
                         if (m.oil) return setPick("oil");
+                        const pc = menuPartCat(m);
+                        if (pc) {
+                          setPartCat(pc);
+                          return setPick("part");
+                        }
                         setJobCat(m.category || m.name);
                         setPick("job");
                       }}
@@ -497,7 +520,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                       {label} ↗
                     </button>
                   ))}
-                  <button className="btn tiny" onClick={() => setPick("part")}>
+                  <button
+                    className="btn tiny"
+                    onClick={() => {
+                      setPartCat("");
+                      setPick("part");
+                    }}
+                  >
                     + Part
                   </button>
                   <button className="btn tiny" onClick={() => addLine("labor", { techId: o.techId || null })}>
@@ -711,6 +740,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       {pick === "part" && (
         <PartPicker
           shop={shop}
+          category={partCat}
           onClose={() => setPick(null)}
           onPick={(p) => {
             addLine("part", {

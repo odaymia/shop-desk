@@ -3,21 +3,27 @@ import { Modal, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
 import { tireName, tireSizeKey } from "../lib/tires.js";
 import { jobLines, orderTotals } from "../lib/invoice.js";
+import { itemCategory } from "../lib/inventoryReports.js";
 import { uid } from "../lib/ids.js";
 
-/* Pick a part from inventory, or type one in. */
-export function PartPicker({ shop, onPick, onTyped, onClose }) {
+/* Pick a part from inventory, or type one in. When `category` is set the
+   list opens filtered to that inventory category (e.g. Engine Air Filters),
+   with a toggle to fall back to everything. */
+export function PartPicker({ shop, onPick, onTyped, onClose, category }) {
   const [q, setQ] = useState("");
+  const [all, setAll] = useState(!category);
+  const cat = String(category || "").trim();
   const rows = useMemo(
     () =>
       activeList(shop.parts)
+        .filter((p) => all || itemCategory(p) === cat)
         .filter((p) => searchText(q, p.number, p.description, p.size, p.category))
         .sort((a, b) => (a.number || "").localeCompare(b.number || ""))
         .slice(0, 80),
-    [shop.parts, q]
+    [shop.parts, q, all, cat]
   );
   return (
-    <Modal title="Add a part" onClose={onClose} size="wide">
+    <Modal title={cat && !all ? cat : "Add a part"} onClose={onClose} size="wide">
       <div className="rowBtns">
         <input
           className="search"
@@ -30,6 +36,11 @@ export function PartPicker({ shop, onPick, onTyped, onClose }) {
             if (e.key === "Enter" && rows.length === 1) onPick(rows[0]);
           }}
         />
+        {cat && (
+          <button className="btn" onClick={() => setAll((x) => !x)}>
+            {all ? `Just ${cat}` : "All parts"}
+          </button>
+        )}
         {onTyped && (
           <button className="btn" onClick={() => onTyped(q.trim())}>
             Type it in
@@ -39,7 +50,7 @@ export function PartPicker({ shop, onPick, onTyped, onClose }) {
       <ul className="pickList">
         {rows.length === 0 && (
           <li className="emptyNote">
-            {q ? "Not in inventory." : "Nothing stocked yet."} {onTyped ? "Use “Type it in” for a part you're buying for this job." : ""}
+            {q ? "Not in inventory." : cat && !all ? `Nothing filed under ${cat} yet.` : "Nothing stocked yet."} {onTyped ? "Use “Type it in” for a part you're buying for this job." : ""}
           </li>
         )}
         {rows.map((p) => {
