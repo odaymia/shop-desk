@@ -264,10 +264,16 @@ function LineRow({ l }) {
    quarts and a canister-filter charge print as their own priced lines. */
 function GroupRows({ g }) {
   const packaged = g.lines.filter((l) => l.packaged);
-  const rest = g.lines.filter((l) => !l.packaged);
+  const rest0 = g.lines.filter((l) => !l.packaged);
   const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
   const details = (packaged.find((l) => l.details) || {}).details;
   const parts = packaged.filter((l) => l.kind === "part");
+  /* a filter surcharge is shown on the filter's own line, not as a
+     separate charge line */
+  const pkgPartIds = new Set(parts.filter((l) => l.partId).map((l) => l.partId));
+  const surBy = {};
+  for (const l of rest0) if (l.surchargeKind === "filter" && l.surchargeForId && pkgPartIds.has(l.surchargeForId)) surBy[l.surchargeForId] = l;
+  const rest = rest0.filter((l) => !(l.surchargeKind === "filter" && l.surchargeForId && pkgPartIds.has(l.surchargeForId)));
   return (
     <>
       {packaged.length > 0 ? (
@@ -282,19 +288,23 @@ function GroupRows({ g }) {
             <td className="r">{fmtMoney(pkgAmt)}</td>
             <td className="r">{fmtMoney(pkgAmt)}</td>
           </tr>
-          {parts.map((l) => (
-            <tr key={l.id}>
-              <td>{l.number || "Part"}</td>
-              <td>
-                {l.description}
-                <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span>
-                <span style={{ color: "#777" }}> · included in package</span>
-              </td>
-              <td className="r">{l.qty}</td>
-              <td className="r">{fmtMoney(0)}</td>
-              <td className="r">{fmtMoney(0)}</td>
-            </tr>
-          ))}
+          {parts.map((l) => {
+            const sur = l.partId ? surBy[l.partId] : null;
+            const amt = sur ? lineAmount(sur) : 0;
+            return (
+              <tr key={l.id}>
+                <td>{l.number || "Part"}</td>
+                <td>
+                  {l.description}
+                  <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span>
+                  <span style={{ color: "#777" }}> · {sur ? "Filter not standard, additional charge applied" : "included in package"}</span>
+                </td>
+                <td className="r">{l.qty}</td>
+                <td className="r">{fmtMoney(amt)}</td>
+                <td className="r">{fmtMoney(amt)}</td>
+              </tr>
+            );
+          })}
         </>
       ) : (
         g.job && (

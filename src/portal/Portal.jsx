@@ -504,9 +504,13 @@ function Receipt({ h, v, shop, onBack }) {
 
 function GroupRows({ g, cond }) {
   const packaged = g.lines.filter((l) => l.packaged);
-  const rest = g.lines.filter((l) => !l.packaged);
+  const rest0 = g.lines.filter((l) => !l.packaged);
   const pkgAmt = packaged.reduce((a, l) => a + (Number(l.amount) || 0), 0);
   const details = (packaged.find((l) => l.details) || {}).details;
+  const pkgPartIds = new Set(packaged.filter((l) => l.kind === "part" && l.partId).map((l) => l.partId));
+  const surBy = {};
+  for (const l of rest0) if (l.surchargeKind === "filter" && l.surchargeForId && pkgPartIds.has(l.surchargeForId)) surBy[l.surchargeForId] = l;
+  const rest = rest0.filter((l) => !(l.surchargeKind === "filter" && l.surchargeForId && pkgPartIds.has(l.surchargeForId)));
   return (
     <>
       {packaged.length > 0 ? (
@@ -521,19 +525,23 @@ function GroupRows({ g, cond }) {
           </tr>
           {packaged
             .filter((l) => l.kind === "part")
-            .map((l, i) => (
-              <tr key={`p${i}`} className="rc-part">
-                <td>
-                  <div>
-                    {l.number ? <span className="rcNum">{l.number} </span> : null}
-                    {l.text}
-                    <span className="rcMeta"> · included in package</span>
-                  </div>
-                </td>
-                <td className="r rcMeta">{l.qtyText}</td>
-                <td className="r">{fmtMoney(0)}</td>
-              </tr>
-            ))}
+            .map((l, i) => {
+              const sur = l.partId ? surBy[l.partId] : null;
+              const amt = sur ? Number(sur.amount) || 0 : 0;
+              return (
+                <tr key={`p${i}`} className="rc-part">
+                  <td>
+                    <div>
+                      {l.number ? <span className="rcNum">{l.number} </span> : null}
+                      {l.text}
+                      <span className="rcMeta"> · {sur ? "Filter not standard, additional charge applied" : "included in package"}</span>
+                    </div>
+                  </td>
+                  <td className="r rcMeta">{l.qtyText}</td>
+                  <td className="r">{fmtMoney(amt)}</td>
+                </tr>
+              );
+            })}
         </>
       ) : g.job ? (
         <tr className="rcJob">

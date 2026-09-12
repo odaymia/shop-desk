@@ -101,9 +101,13 @@ function LineRows({ order }) {
       <tbody>
         {groups.map((g, gi) => {
           const packaged = g.lines.filter((l) => l.packaged);
-          const rest = g.lines.filter((l) => !l.packaged);
+          const rest0 = g.lines.filter((l) => !l.packaged);
           const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
           const pkgParts = packaged.filter((l) => l.kind === "part");
+          const pkgPartIds = new Set(pkgParts.filter((l) => l.partId).map((l) => l.partId));
+          const surBy = {};
+          for (const l of rest0) if (l.surchargeKind === "filter" && l.surchargeForId && pkgPartIds.has(l.surchargeForId)) surBy[l.surchargeForId] = l;
+          const rest = rest0.filter((l) => !(l.surchargeKind === "filter" && l.surchargeForId && pkgPartIds.has(l.surchargeForId)));
           return (
             <Fragment key={gi}>
               {packaged.length > 0 && (
@@ -112,15 +116,19 @@ function LineRows({ order }) {
                   <td className="r">{fmtMoney(pkgAmt)}</td>
                 </tr>
               )}
-              {pkgParts.map((l) => (
-                <tr key={l.id}>
-                  <td className="muted" style={{ paddingLeft: 14 }}>
-                    {l.description}
-                    {Number(l.qty) > 1 ? ` · ${l.qty}` : ""} · included
-                  </td>
-                  <td className="r muted">{fmtMoney(0)}</td>
-                </tr>
-              ))}
+              {pkgParts.map((l) => {
+                const sur = l.partId ? surBy[l.partId] : null;
+                const amt = sur ? lineAmount(sur) : 0;
+                return (
+                  <tr key={l.id}>
+                    <td className="muted" style={{ paddingLeft: 14 }}>
+                      {l.description}
+                      {Number(l.qty) > 1 ? ` · ${l.qty}` : ""} · {sur ? "Filter not standard, additional charge applied" : "included"}
+                    </td>
+                    <td className="r muted">{fmtMoney(amt)}</td>
+                  </tr>
+                );
+              })}
               {rest.map((l) => (
                 <tr key={l.id}>
                   <td>

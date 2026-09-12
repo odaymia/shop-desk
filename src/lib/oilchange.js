@@ -104,7 +104,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
   /* a pricier oil (bottled, boxed) or filter (canister/cartridge) can
      carry a surcharge added on top of the package price — its own taxable
      line, not folded in */
-  const surchargeLine = (part, fallback) => {
+  const surchargeLine = (part, kind) => {
     const amt = part ? round2(Number(part.surcharge) || 0) : 0;
     if (amt <= 0) return;
     lines.push({
@@ -112,12 +112,14 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       kind: "part",
       partId: null,
       number: part.number || "",
-      description: (part.surchargeLabel || "").trim() || `${part.description || fallback} charge`,
+      description: (part.surchargeLabel || "").trim() || `${part.description || kind} charge`,
       qty: 1,
       price: amt,
       cost: 0,
       condition: "new",
       taxable: true,
+      surchargeForId: part.id || null, // the package part this charge belongs to
+      surchargeKind: kind.toLowerCase(), // "oil" | "filter"
       job,
     });
   };
