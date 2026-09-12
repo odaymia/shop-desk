@@ -132,42 +132,10 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
           )}
 
           <div className="shTotals">
-            {t.parts > 0 && (
-              <div>
-                <span>Parts</span>
-                <span>{fmtMoney(t.parts)}</span>
-              </div>
-            )}
-            {t.labor > 0 && (
-              <div>
-                <span>Labor</span>
-                <span>{fmtMoney(t.labor)}</span>
-              </div>
-            )}
-            {t.sublet > 0 && (
-              <div>
-                <span>Sublet</span>
-                <span>{fmtMoney(t.sublet)}</span>
-              </div>
-            )}
-            {t.fees > 0 && (
-              <div>
-                <span>Fees</span>
-                <span>{fmtMoney(t.fees)}</span>
-              </div>
-            )}
-            {t.supplies > 0 && (
-              <div>
-                <span>Shop supplies</span>
-                <span>{fmtMoney(t.supplies)}</span>
-              </div>
-            )}
-            {t.discounts > 0 && (
-              <div>
-                <span>Discounts</span>
-                <span>-{fmtMoney(t.discounts)}</span>
-              </div>
-            )}
+            <div>
+              <span>Subtotal</span>
+              <span>{fmtMoney(t.subtotal)}</span>
+            </div>
             <div>
               <span>Sales tax{t.taxRate ? ` (${t.taxRate}%)` : ""}</span>
               <span>{fmtMoney(t.tax)}</span>
@@ -253,6 +221,7 @@ function GroupRows({ g }) {
   const rest = g.lines.filter((l) => !l.packaged);
   const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
   const details = (packaged.find((l) => l.details) || {}).details;
+  const parts = packaged.filter((l) => l.kind === "part");
   return (
     <>
       {packaged.length > 0 ? (
@@ -261,6 +230,17 @@ function GroupRows({ g }) {
           <td>
             {g.job}
             {details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{details}</div> : null}
+            {parts.length > 0 && (
+              <div style={{ color: "#444", fontSize: 11, marginTop: 3 }}>
+                {parts.map((l) => (
+                  <div key={l.id}>
+                    • {Number(l.qty) > 1 ? `${l.qty} × ` : ""}
+                    {l.description}
+                    {l.number ? ` (${l.number})` : ""}
+                  </div>
+                ))}
+              </div>
+            )}
           </td>
           <td className="r">1</td>
           <td className="r">{fmtMoney(pkgAmt)}</td>

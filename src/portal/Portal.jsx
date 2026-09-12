@@ -489,12 +489,7 @@ function Receipt({ h, v, shop, onBack }) {
         </tbody>
       </table>
       <div className="rcTotals">
-        {t.parts > 0 && <div><span>Parts</span><span>{fmtMoney(t.parts)}</span></div>}
-        {t.labor > 0 && <div><span>Labor</span><span>{fmtMoney(t.labor)}</span></div>}
-        {t.sublet > 0 && <div><span>Sublet</span><span>{fmtMoney(t.sublet)}</span></div>}
-        {t.fees > 0 && <div><span>Fees</span><span>{fmtMoney(t.fees)}</span></div>}
-        {t.supplies > 0 && <div><span>Shop supplies</span><span>{fmtMoney(t.supplies)}</span></div>}
-        {t.discounts > 0 && <div><span>Discounts</span><span>-{fmtMoney(t.discounts)}</span></div>}
+        <div><span>Subtotal</span><span>{fmtMoney(t.subtotal != null ? t.subtotal : t.total - t.tax)}</span></div>
         <div><span>Sales tax{t.taxRate ? ` (${t.taxRate}%)` : ""}</span><span>{fmtMoney(t.tax)}</span></div>
         <div className="grand"><span>Total</span><span>{fmtMoney(t.total)}</span></div>
         {(h.payments || []).map((p, i) => (
@@ -519,6 +514,19 @@ function GroupRows({ g, cond }) {
           <td>
             <div>{g.job}</div>
             {details ? <div className="rcMeta">{details}</div> : null}
+            {packaged.filter((l) => l.kind === "part").length > 0 && (
+              <div className="rcMeta">
+                {packaged
+                  .filter((l) => l.kind === "part")
+                  .map((l, i) => (
+                    <div key={i}>
+                      • {Number(l.qtyText) > 1 ? `${l.qtyText} × ` : ""}
+                      {l.number ? `${l.number} ` : ""}
+                      {l.text}
+                    </div>
+                  ))}
+              </div>
+            )}
           </td>
           <td className="r rcMeta"></td>
           <td className="r">{fmtMoney(pkgAmt)}</td>

@@ -74,7 +74,7 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
                 each: l.kind === "labor" ? l.rate : l.kind === "note" ? null : l.price,
                 amount: l.kind === "note" ? null : l.kind === "discount" ? -lineAmount(l) : lineAmount(l),
               })),
-            totals: { parts: t.parts, labor: t.labor, sublet: t.sublet, fees: t.fees, supplies: t.supplies, discounts: t.discounts, taxRate: t.taxRate, tax: t.tax, total: t.total, paid: t.paid, balance: t.balance },
+            totals: { subtotal: t.subtotal, parts: t.parts, labor: t.labor, sublet: t.sublet, fees: t.fees, supplies: t.supplies, discounts: t.discounts, taxRate: t.taxRate, tax: t.tax, total: t.total, paid: t.paid, balance: t.balance },
             owed: owesBalance(o, t), // imported history is settled; don't show the customer a phantom balance
             payments: (o.payments || []).map((p) => ({ method: p.method, amount: p.amount, at: p.at })),
           };
