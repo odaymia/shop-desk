@@ -6,15 +6,40 @@ import { orderTotals } from "../src/lib/invoice.js";
 const cfg = { taxRate: 7.75, partsTaxable: true, laborTaxable: false, suppliesPct: 0 };
 const conv = DEFAULT_OIL_PACKAGES[0];
 
-test("a 5-quart conventional oil change is the package price plus tax", () => {
+test("with no oil or filter chosen, the package is service labor and carries no tax yet", () => {
   let n = 0;
   const lines = oilPackageLines(conv, 5, null, null, () => `L${++n}`);
   assert.equal(lines.length, 3);
   const t = orderTotals({ lines, noSupplies: true }, cfg);
   assert.equal(t.labor, 54.99);
   assert.equal(t.parts, 0);
+  assert.equal(t.taxable, 0); // labor isn't taxed; parts aren't priced yet
+  assert.equal(t.total, 54.99);
+});
+
+test("tax falls only on the oil and filter, never the labor, and the price still ties out", () => {
+  const oil = { id: "o1", number: "VAL-5W30", description: "Valvoline 5W-30, qt", price: 6.99, cost: 3.1 };
+  const filt = { id: "f1", number: "PH3614", description: "Oil filter", price: 9.99, cost: 4 };
+  let n = 0;
+  const lines = oilPackageLines(conv, 5, oil, filt, () => `L${++n}`);
+  const t = orderTotals({ lines, noSupplies: true }, cfg);
+  assert.equal(t.parts, 44.94); // 5 × 6.99 + 9.99
+  assert.equal(t.labor, 10.05); // 54.99 − 44.94
+  assert.equal(t.taxable, 44.94); // only the oil and filter
+  assert.equal(t.subtotal, 54.99); // customer's package price, unchanged
+  assert.equal(t.tax, 3.48); // 44.94 × 7.75%
+  assert.equal(t.total, 58.47);
+});
+
+test("if the parts list above the package price, the package is fully taxable and labor is zero", () => {
+  const oil = { id: "o", description: "pricey oil, qt", price: 12, cost: 5 };
+  const filt = { id: "f", description: "filter", price: 8, cost: 3 };
+  let n = 0;
+  const lines = oilPackageLines(conv, 5, oil, filt, () => `L${++n}`); // 5×12 + 8 = 68 > 54.99
+  const t = orderTotals({ lines, noSupplies: true }, cfg);
+  assert.equal(t.labor, 0);
+  assert.equal(t.subtotal, 54.99);
   assert.equal(t.taxable, 54.99);
-  assert.equal(t.total, 59.25);
 });
 
 test("a 6.5-quart car pays the extra quarts at the package rate, stock links carry", () => {

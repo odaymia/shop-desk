@@ -9,14 +9,40 @@ export const DEFAULT_OIL_PACKAGES = [
 ];
 
 /* Lines for one package on a ticket.
-   - the package itself, taxable (the price is "+ tax"), as the labor line
-   - the oil at $0 with the real quart count, linked to inventory when
-     picked so the bottles come off the shelf
-   - the filter at $0, linked when picked
-   - extra quarts past the included amount at the package's rate */
+
+   California taxes the oil and filter (tangible parts) but not the labor,
+   so the fixed package price is split: the oil and filter carry their
+   inventory retail price and are taxable, and whatever is left of the
+   package price is the service labor, which is not taxed. The customer's
+   package price is unchanged; only the tax base is the parts. A part with
+   no retail price on file adds nothing to the tax (price it under
+   Inventory). Extra quarts past the included amount are taxable oil.
+
+   - the service labor line (package price minus the parts), not taxed
+   - the oil at its retail price, taxable, linked to inventory when picked
+   - the filter at its retail price, taxable, linked when picked
+   - extra quarts past the included amount at the package's per-quart rate */
 export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
   const q = Math.max(0, Math.round((Number(quarts) || pkg.quarts) * 10) / 10);
+  const incQ = Math.min(q, pkg.quarts) || pkg.quarts;
   const job = pkg.name;
+  const pkgPrice = round2(pkg.price);
+
+  const oilEach = oilPart ? round2(Number(oilPart.price) || 0) : 0;
+  const filterRetail = filterPart ? round2(Number(filterPart.price) || 0) : 0;
+  let oilPrice = oilEach;
+  let filterPrice = filterRetail;
+  const partsAmt = round2(round2(oilEach * incQ) + filterRetail);
+  let laborAmt = round2(pkgPrice - partsAmt);
+  if (laborAmt < 0 && partsAmt > 0) {
+    /* the parts list for more than the package price (a loss leader):
+       scale them to the package so the total still ties out, no labor */
+    const f = pkgPrice / partsAmt;
+    oilPrice = round2(oilEach * f);
+    filterPrice = round2(pkgPrice - round2(oilPrice * incQ));
+    laborAmt = 0;
+  }
+
   const lines = [
     {
       id: mkId(),
@@ -24,9 +50,9 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       description: pkg.name,
       details: pkg.details || "",
       hours: 1,
-      rate: round2(pkg.price),
+      rate: laborAmt,
       unit: "service",
-      taxable: true,
+      taxable: false,
       job,
     },
     {
@@ -35,11 +61,11 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       partId: oilPart ? oilPart.id : null,
       number: oilPart ? oilPart.number : "",
       description: oilPart ? oilPart.description : "Motor oil (included)",
-      qty: Math.min(q, pkg.quarts) || pkg.quarts,
-      price: 0,
+      qty: incQ,
+      price: oilPrice,
       cost: oilPart ? Number(oilPart.cost) || 0 : 0,
       condition: "new",
-      taxable: false,
+      taxable: true,
       job,
     },
     {
@@ -49,10 +75,10 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       number: filterPart ? filterPart.number : "",
       description: filterPart ? filterPart.description : "Oil filter (included)",
       qty: 1,
-      price: 0,
+      price: filterPrice,
       cost: filterPart ? Number(filterPart.cost) || 0 : 0,
       condition: "new",
-      taxable: false,
+      taxable: true,
       job,
     },
   ];
