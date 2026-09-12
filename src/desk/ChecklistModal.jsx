@@ -13,6 +13,7 @@ export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
   );
   const [idx, setIdx] = useState(0);
   const inputRef = useRef(null);
+  const rearRef = useRef(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const cur = items[idx];
@@ -27,12 +28,16 @@ export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
     setIdx(n);
   };
 
+  /* Focus (and select, so the default is easy to overwrite) only when the
+     step changes — not on every keystroke, or typing a second digit would
+     land on a re-selected field and replace the first. */
   useEffect(() => {
-    if (cur && cur.kind !== "choice" && inputRef.current) {
+    const it = itemsRef.current[idx];
+    if (it && it.kind !== "choice" && inputRef.current) {
       inputRef.current.focus();
       if (inputRef.current.select) inputRef.current.select();
     }
-  }, [idx, cur]);
+  }, [idx]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -40,6 +45,13 @@ export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
       const inText = e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
       if (e.key === "Enter") {
         e.preventDefault();
+        /* Tire pressure has two boxes: the first Enter jumps from the front
+           box to the rear box, the next Enter moves on to the next step. */
+        if (cur.kind === "pressure" && document.activeElement === inputRef.current && rearRef.current) {
+          rearRef.current.focus();
+          rearRef.current.select();
+          return;
+        }
         go(idx + 1);
         return;
       }
@@ -116,6 +128,7 @@ export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
                   <label>
                     <span>Rear</span>
                     <input
+                      ref={rearRef}
                       inputMode="numeric"
                       value={r}
                       onChange={(e) => setVal(formatPressure(f, e.target.value))}
