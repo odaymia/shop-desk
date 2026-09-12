@@ -4,7 +4,8 @@ import { Setup } from "./components/Setup.jsx";
 import { Toast } from "./components/Toast.jsx";
 import { DEFAULT_CFG } from "./lib/config.js";
 import { CFG_KEY, ROSTER_KEY } from "./lib/keys.js";
-import { cloud, sGet, sSet, storageReady } from "./storage/index.js";
+import { cloud, sGet, sSet, sList, sDel, storageReady } from "./storage/index.js";
+import { DEMO, seedDemoIfEmpty, resetDemo } from "./lib/demo.js";
 
 /* Root: loads settings and the shared staff list, then shows the desk.
    No PIN — this runs on the counter PC signed in with the shop account.
@@ -19,6 +20,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       await storageReady();
+      if (DEMO) await seedDemoIfEmpty(sGet, sSet);
       const c = await sGet(CFG_KEY, null);
       if (c) setCfg({ ...DEFAULT_CFG, ...c });
       setRoster((await sGet(ROSTER_KEY, [])) || []);
@@ -75,7 +77,23 @@ export default function App() {
     );
 
   return (
-    <div className="root">
+    <div className={`root ${DEMO ? "demo" : ""}`}>
+      {DEMO && (
+        <div className="demoBanner">
+          <span>
+            <strong>Demo</strong> — sample data for a made-up shop. Everything stays in this browser; nothing is saved to
+            the cloud. Explore freely.
+          </span>
+          <button
+            className="btn tiny"
+            onClick={() => {
+              if (window.confirm("Reset the demo back to the original sample data?")) resetDemo(sList, sDel);
+            }}
+          >
+            Reset demo
+          </button>
+        </div>
+      )}
       <Desk cfg={cfg} saveCfg={saveCfg} roster={roster} saveRoster={saveRoster} flash={flash} />
       <Toast text={toast?.text} tone={toast?.tone} />
     </div>

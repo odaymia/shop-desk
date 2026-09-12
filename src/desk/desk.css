@@ -283,3 +283,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 
 .rcvIn { display:flex; align-items:center; gap:6px; }
 .rcvIn input { flex:1; }
+
+/* demo-mode banner */
+.demoBanner { position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#1e293b; color:#fff; padding:8px 16px; font-size:13px; line-height:1.4; }
+.demoBanner strong { color:#fbbf24; }
+.demoBanner .btn { background:rgba(255,255,255,.15); border-color:rgba(255,255,255,.3); color:#fff; white-space:nowrap; }
+.demoBanner .btn:hover { background:rgba(255,255,255,.25); }

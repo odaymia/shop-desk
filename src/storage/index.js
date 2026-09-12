@@ -7,6 +7,7 @@
    by src/storage/cloud.js when the computer is signed in to a shop. */
 import { createIndexedDbStorage } from "./indexeddb.js";
 import { cloud, keyKind } from "./cloud.js";
+import { DEMO } from "../lib/demo.js";
 
 export { cloud };
 export const storage = window.storage || createIndexedDbStorage();
@@ -20,7 +21,7 @@ const applyRemote = async (key, value) => {
 let readyPromise = null;
 export function storageReady() {
   if (!readyPromise) {
-    readyPromise = cloud.init(storage, applyRemote).catch((e) => console.error("cloud init failed", e));
+    readyPromise = cloud.init(storage, applyRemote, { demo: DEMO }).catch((e) => console.error("cloud init failed", e));
   }
   return readyPromise;
 }

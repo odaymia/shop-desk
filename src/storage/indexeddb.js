@@ -4,7 +4,8 @@
    localStorage because a year of punch photos blows past the
    localStorage quota. */
 
-const DB = "shopDesk";
+import { DEMO, DEMO_DB } from "../lib/demo.js";
+const DB = DEMO ? DEMO_DB : "shopDesk";
 const STORE = "kv";
 
 export function createIndexedDbStorage() {

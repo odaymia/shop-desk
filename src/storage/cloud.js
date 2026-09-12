@@ -376,12 +376,12 @@ if (typeof window !== "undefined") {
 const userOf = (session) =>
   session?.user ? { id: session.user.id, email: session.user.email } : null;
 
-async function init(backend, apply) {
+async function init(backend, apply, opts = {}) {
   local = backend;
   applyRemote = apply;
   outbox = await lget(OUTBOX_KEY, []);
   setState({ pending: outbox.length });
-  if (!configured) return;
+  if (opts.demo || !configured) return; // demo mode stays local, never syncs
   const shop = await lget(SHOP_KEY, null);
   const {
     data: { session },
