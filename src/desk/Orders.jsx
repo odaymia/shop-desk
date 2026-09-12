@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Modal, Money, fmtDate } from "./ui.jsx";
 import { customerName, vehicleName, searchText, isLive } from "./useShop.js";
-import { orderTotals, statusLabel, owesBalance } from "../lib/invoice.js";
+import { orderTotals, statusLabel, owesBalance, STATUS } from "../lib/invoice.js";
 import { workSummary } from "./Customers.jsx";
 
 const FILTERS = [
@@ -12,45 +12,59 @@ const FILTERS = [
   ["all", "All"],
 ];
 
+const LIMIT = 400; // render a page at a time; the search box reaches the rest
+
 export function Orders({ shop, cfg, nav, onNew, flash }) {
   const [filter, setFilter] = useState("open");
   const [q, setQ] = useState("");
   const [toDelete, setToDelete] = useState(null);
 
-  const LIMIT = 400; // render a page at a time; the search box reaches the rest
+  /* Filter and sort the whole book cheaply — status, search, date — without
+     pricing anything. A shop's history runs to tens of thousands of tickets;
+     totaling every one of them here (and again on every sync tick) is what
+     dragged the counter PC. Totals are computed below, only for the page we
+     actually draw. */
   const matched = useMemo(() => {
-    const all = Object.values(shop.orders).filter(isLive).map((o) => {
-      const c = shop.customers[o.customerId];
-      const v = shop.vehicles[o.vehicleId];
-      return { o, c, v, t: orderTotals(o, cfg, c) };
-    });
+    const live = Object.values(shop.orders).filter(isLive);
     /* A real duplicate number means two devices, offline, both grabbed the
        same next number for a NEW ticket. Imported history doesn't count:
        LubeSoft and Mitchell reused invoice numbers across numbering runs,
        so an old visit and a recent one legitimately share a number. Only
        flag collisions among tickets created on the desk. */
     const numbers = {};
-    for (const r of all) if (!r.o.imported) numbers[r.o.number] = (numbers[r.o.number] || 0) + 1;
-    return all
-      .filter(({ o, t }) => {
+    for (const o of live) if (!o.imported) numbers[o.number] = (numbers[o.number] || 0) + 1;
+    const out = live
+      .filter((o) => {
         if (filter === "all") return true;
-        if (filter === "due") return owesBalance(o, t);
+        /* only real (non-imported) invoices can owe a balance; skip pricing
+           the rest */
+        if (filter === "due") return !o.imported && o.status === STATUS.invoiced && owesBalance(o, orderTotals(o, cfg, shop.customers[o.customerId]));
         return o.status === filter;
       })
+      .map((o) => ({ o, c: shop.customers[o.customerId], v: shop.vehicles[o.vehicleId] }))
       .filter(({ o, c, v }) =>
         searchText(q, `#${o.number}`, String(o.number), customerName(c), c && c.phone, vehicleName(v), v && v.plate, o.concern)
       )
-      .map((r) => ({ ...r, dup: !r.o.imported && numbers[r.o.number] > 1 }))
       .sort((a, b) => (b.o.invoicedAt || b.o.createdAt) - (a.o.invoicedAt || a.o.createdAt));
+    return { out, numbers };
   }, [shop.orders, shop.customers, shop.vehicles, cfg, filter, q]);
-  const rows = matched.slice(0, LIMIT);
+
+  const rows = useMemo(
+    () =>
+      matched.out
+        .slice(0, LIMIT)
+        .map(({ o, c, v }) => ({ o, c, v, t: orderTotals(o, cfg, c), dup: !o.imported && matched.numbers[o.number] > 1 })),
+    [matched, cfg]
+  );
 
   const counts = useMemo(() => {
     const n = { estimate: 0, open: 0, invoiced: 0, due: 0 };
     for (const o of Object.values(shop.orders)) {
       if (!isLive(o)) continue;
       if (n[o.status] != null) n[o.status]++;
-      if (owesBalance(o, orderTotals(o, cfg, shop.customers[o.customerId]))) n.due++;
+      /* pricing is only needed to spot an open balance, and only a real
+         invoice can have one — skip the imported history entirely */
+      if (o.status === STATUS.invoiced && !o.imported && owesBalance(o, orderTotals(o, cfg, shop.customers[o.customerId]))) n.due++;
     }
     return n;
   }, [shop.orders, shop.customers, cfg]);
