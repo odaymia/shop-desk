@@ -1,7 +1,7 @@
 /* What a customer sees in the portal, built from the desk's records.
    Pure — no React, no storage. Prices and internal notes stay out
    except where the shop chose to publish a menu price. */
-import { orderTotals, jobLines, lineAmount, laborQtyText } from "./invoice.js";
+import { orderTotals, jobLines, lineAmount, laborQtyText, owesBalance } from "./invoice.js";
 import { findSpec, oilChangeLines } from "./specs.js";
 import { checklistSummary } from "./checklist.js";
 
@@ -74,6 +74,7 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
                 amount: l.kind === "note" ? null : l.kind === "discount" ? -lineAmount(l) : lineAmount(l),
               })),
             totals: { parts: t.parts, labor: t.labor, sublet: t.sublet, fees: t.fees, supplies: t.supplies, discounts: t.discounts, taxRate: t.taxRate, tax: t.tax, total: t.total, paid: t.paid, balance: t.balance },
+            owed: owesBalance(o, t), // imported history is settled; don't show the customer a phantom balance
             payments: (o.payments || []).map((p) => ({ method: p.method, amount: p.amount, at: p.at })),
           };
         });

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Modal, Money, fmtDate } from "./ui.jsx";
 import { customerName, vehicleName, searchText, isLive } from "./useShop.js";
-import { orderTotals, statusLabel } from "../lib/invoice.js";
+import { orderTotals, statusLabel, owesBalance } from "../lib/invoice.js";
 import { workSummary } from "./Customers.jsx";
 
 const FILTERS = [
@@ -34,7 +34,7 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
     return all
       .filter(({ o, t }) => {
         if (filter === "all") return true;
-        if (filter === "due") return o.status === "invoiced" && t.balance > 0.001;
+        if (filter === "due") return owesBalance(o, t);
         return o.status === filter;
       })
       .filter(({ o, c, v }) =>
@@ -50,7 +50,7 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
     for (const o of Object.values(shop.orders)) {
       if (!isLive(o)) continue;
       if (n[o.status] != null) n[o.status]++;
-      if (o.status === "invoiced" && orderTotals(o, cfg, shop.customers[o.customerId]).balance > 0.001) n.due++;
+      if (owesBalance(o, orderTotals(o, cfg, shop.customers[o.customerId]))) n.due++;
     }
     return n;
   }, [shop.orders, shop.customers, cfg]);
@@ -115,7 +115,7 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
                   <td className="r num">
                     {o.status === "void" ? (
                       "—"
-                    ) : t.balance > 0.001 ? (
+                    ) : owesBalance(o, t) ? (
                       <span className="st due">
                         <Money v={t.balance} />
                       </span>

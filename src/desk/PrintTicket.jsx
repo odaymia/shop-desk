@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel } from "../lib/invoice.js";
+import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel, owesBalance } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -185,7 +185,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
                 <span>-{fmtMoney(p.amount)}</span>
               </div>
             ))}
-            {(o.payments || []).length > 0 && (
+            {owesBalance(o, t) && (
               <div className="grand">
                 <span>Balance due</span>
                 <span>{fmtMoney(t.balance)}</span>

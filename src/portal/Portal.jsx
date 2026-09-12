@@ -500,7 +500,7 @@ function Receipt({ h, v, shop, onBack }) {
         {(h.payments || []).map((p, i) => (
           <div key={i}><span>Paid {p.method} {fmtDate(p.at)}</span><span>-{fmtMoney(p.amount)}</span></div>
         ))}
-        {(h.payments || []).length > 0 && <div className="grand"><span>Balance</span><span>{fmtMoney(t.balance)}</span></div>}
+        {h.owed && <div className="grand"><span>Balance</span><span>{fmtMoney(t.balance)}</span></div>}
       </div>
       {shop && shop.invoiceFooter ? <p className="rcFoot">{shop.invoiceFooter}</p> : null}
     </div>

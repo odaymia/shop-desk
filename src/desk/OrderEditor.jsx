@@ -15,6 +15,7 @@ import {
   rulesFor,
   statusLabel,
   jobLines,
+  owesBalance,
   PART_CONDITIONS,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
@@ -236,7 +237,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         </button>
         <h1>{orderTitle(o)}</h1>
         <span className={`st ${o.status}`}>{statusLabel(o.status)}</span>
-        {o.status === STATUS.invoiced && (t.balance > 0.001 ? <span className="st due">Balance due</span> : <span className="st paid">Paid</span>)}
+        {o.status === STATUS.invoiced && (owesBalance(o, t) ? <span className="st due">Balance due</span> : <span className="st paid">Paid</span>)}
         <div className="grow" />
         <div className="tkActions">
           {!locked && !customer && (
@@ -262,7 +263,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               Post invoice
             </button>
           )}
-          {o.status !== STATUS.void && o.status !== STATUS.estimate && t.balance > 0.001 && (
+          {o.status !== STATUS.void && o.status !== STATUS.estimate && owesBalance(o, t) && (
             <button className="btn primary" onClick={() => setPick("pay")}>
               Take payment
             </button>
@@ -551,9 +552,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 </div>
               )}
               {(t.paid !== 0 || o.status === STATUS.invoiced) && (
-                <div className={`bal ${t.balance <= 0.001 ? "ok" : ""}`}>
+                <div className={`bal ${owesBalance(o, t) ? "" : "ok"}`}>
                   <span>Balance</span>
-                  <Money v={t.balance} />
+                  {owesBalance(o, t) ? <Money v={t.balance} /> : <span>Settled</span>}
                 </div>
               )}
             </div>

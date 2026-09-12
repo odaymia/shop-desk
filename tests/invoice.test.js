@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText, conditionLabel } from "../src/lib/invoice.js";
+import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText, conditionLabel, owesBalance } from "../src/lib/invoice.js";
 
 const cfg = {
   laborRate: 150,
@@ -197,4 +197,19 @@ test("labor details ride along from a canned job", () => {
   const l = jobLines(job, cfg, {}, () => "x")[0];
   assert.equal(l.details, "Includes programming and balancing");
   assert.equal(makeLine("labor", cfg).details, "");
+});
+
+test("imported history never counts as a balance due, but a real posted invoice does", () => {
+  const lines = [{ kind: "labor", description: "Oil change", hours: 1, rate: 54.99, taxable: true }];
+  const t = orderTotals({ lines }, { taxRate: 0 });
+  // a desk invoice with nothing paid owes its balance
+  assert.equal(owesBalance({ status: "invoiced", lines }, t), true);
+  // the same invoice imported from a prior system is treated as settled
+  assert.equal(owesBalance({ status: "invoiced", imported: "ISI LubeSoft", lines }, t), false);
+  // estimates and repair orders are never "balance due"
+  assert.equal(owesBalance({ status: "estimate", lines }, t), false);
+  assert.equal(owesBalance({ status: "open", lines }, t), false);
+  // a fully paid desk invoice owes nothing
+  const paid = { status: "invoiced", lines, payments: [{ amount: 54.99 }] };
+  assert.equal(owesBalance(paid, orderTotals(paid, { taxRate: 0 })), false);
 });

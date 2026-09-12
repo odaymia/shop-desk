@@ -138,6 +138,17 @@ export function orderTotals(order, cfg, customer) {
   };
 }
 
+/* Does this ticket actually owe money the shop should chase? A posted
+   invoice with an open balance does — but an invoice imported from a
+   prior system does not: those were settled at the counter long ago, and
+   any leftover cent is a gap in the old data, not a real receivable. So
+   imported history never counts as a balance due. */
+export function owesBalance(order, totals) {
+  if (!order || order.status !== STATUS.invoiced || order.imported) return false;
+  const bal = totals ? totals.balance : 0;
+  return bal > 0.001;
+}
+
 /* Labor hours on the ticket, for productivity reports. Per-unit labor
    (so much a tire) isn't clock time and is left out. */
 export function laborHours(order) {
