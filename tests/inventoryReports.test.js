@@ -109,3 +109,33 @@ test("the reorder plan carries the pack order text", async () => {
   assert.equal(oil.suggestedOrder, 54);
   assert.equal(oil.orderText, "9 cases (54 qt)");
 });
+
+test("lead time extends the horizon so the order lasts through the wait", async () => {
+  const { reorderPlan } = await import("../src/lib/inventoryReports.js");
+  const DAY = 86400000;
+  const from = Date.parse("2026-09-01T00:00:00Z");
+  const to = from + 10 * DAY;
+  const parts = { f: { id: "f", number: "PH", description: "Oil filter", onHand: 4 } };
+  const orders = { a: { id: "a", status: "invoiced", invoicedAt: from + DAY, lines: [{ kind: "part", partId: "f", qty: 2, price: 10, cost: 4 }] } };
+  // 2 over 10 days = 0.2/day. cover 14, lead 7 → horizon 21 → need 4.2; on hand 4 → order 1
+  const plan = reorderPlan(orders, parts, from, to, 14, 7);
+  const f = plan.find((r) => r.partId === "f");
+  assert.equal(f.horizon, 21);
+  assert.equal(f.need, 4.2);
+  assert.equal(f.suggestedOrder, 1);
+  // with no lead time it's just the 14-day cover
+  assert.equal(reorderPlan(orders, parts, from, to, 14, 0).find((r) => r.partId === "f").need, 2.8);
+});
+
+test("flags an item that runs out before the order arrives", async () => {
+  const { reorderPlan } = await import("../src/lib/inventoryReports.js");
+  const DAY = 86400000;
+  const from = Date.parse("2026-09-01T00:00:00Z");
+  const to = from + 10 * DAY;
+  // sells 20 over 10 days = 2/day; on hand 3 → runs out in 1 day; lead 5 → stocks out first
+  const parts = { f: { id: "f", number: "PH", description: "Oil filter", onHand: 3 } };
+  const orders = { a: { id: "a", status: "invoiced", invoicedAt: from + DAY, lines: [{ kind: "part", partId: "f", qty: 20, price: 10, cost: 4 }] } };
+  const f = reorderPlan(orders, parts, from, to, 14, 5).find((r) => r.partId === "f");
+  assert.equal(f.daysLeft, 1);
+  assert.equal(f.stockOutBeforeArrival, true);
+});

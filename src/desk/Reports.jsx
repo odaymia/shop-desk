@@ -28,6 +28,7 @@ export function Reports({ shop, cfg, employees, nav }) {
   const [from, setFrom] = useState(dayKey(p.month[0]));
   const [to, setTo] = useState(dayKey(p.month[1]));
   const [coverDays, setCoverDays] = useState(14);
+  const [leadDays, setLeadDays] = useState(0);
   const [itemQ, setItemQ] = useState("");
   const [cat, setCat] = useState("all");
   const pick = (k) => {
@@ -92,7 +93,7 @@ export function Reports({ shop, cfg, employees, nav }) {
   }, [shop.orders, shop.customers, cfg, fromTs, toTs]);
 
   const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
-  const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays), [shop.orders, shop.parts, fromTs, toTs, coverDays]);
+  const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays), [shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays]);
   const cats = useMemo(() => [...new Set(items.map((it) => it.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
   const itemRows = useMemo(() => items.filter((it) => (cat === "all" || it.category === cat) && searchText(itemQ, it.number, it.description, it.category)), [items, itemQ, cat]);
   const reorderRows = useMemo(() => reorder.filter((it) => (cat === "all" || it.category === cat) && searchText(itemQ, it.number, it.description, it.category)), [reorder, itemQ, cat]);
@@ -137,7 +138,7 @@ export function Reports({ shop, cfg, employees, nav }) {
       </header>
       <div className="deskBody">
         {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} />}
-        {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} coverDays={coverDays} setCoverDays={setCoverDays} from={from} to={to} />}
+        {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} coverDays={coverDays} setCoverDays={setCoverDays} leadDays={leadDays} setLeadDays={setLeadDays} from={from} to={to} />}
         {view === "sales" && (
         <>
         <div className="statRow">
@@ -394,18 +395,27 @@ function ItemsReport({ rows, q, setQ, cats, cat, setCat }) {
   );
 }
 
-function ReorderReport({ rows, q, setQ, cats, cat, setCat, coverDays, setCoverDays, from, to }) {
+function ReorderReport({ rows, q, setQ, cats, cat, setCat, coverDays, setCoverDays, leadDays, setLeadDays, from, to }) {
   const toOrder = rows.filter((r) => r.suggestedOrder > 0);
   return (
     <>
       <div className="card" style={{ marginBottom: 14 }}>
         <p className="legalNote" style={{ margin: 0 }}>
-          Order enough of each item to last the days you choose, based on how fast it sold from {from} to {to} and what
-          you have on hand. Pick a wider date range for a steadier average.
+          Order enough of each item to last while the order ships plus the days you choose to cover, based on how fast
+          it sold from {from} to {to} and what you have on hand. Pick a wider date range for a steadier average.
         </p>
         <div className="dateRow" style={{ marginTop: 10 }}>
-          <span>Days to cover</span>
-          <input type="number" min="1" className="search" style={{ width: 90 }} value={coverDays} onChange={(e) => setCoverDays(Math.max(1, Number(e.target.value) || 1))} />
+          <span>Days until the order arrives</span>
+          <input type="number" min="0" className="search" style={{ width: 80 }} value={leadDays} onChange={(e) => setLeadDays(Math.max(0, Number(e.target.value) || 0))} />
+          {[0, 2, 5, 7].map((d) => (
+            <button key={d} className={`btn tiny ${Number(leadDays) === d ? "primary" : ""}`} onClick={() => setLeadDays(d)}>
+              {d}d
+            </button>
+          ))}
+        </div>
+        <div className="dateRow" style={{ marginTop: 8 }}>
+          <span>Days to cover after it arrives</span>
+          <input type="number" min="1" className="search" style={{ width: 80 }} value={coverDays} onChange={(e) => setCoverDays(Math.max(1, Number(e.target.value) || 1))} />
           {[7, 14, 30, 60].map((d) => (
             <button key={d} className={`btn tiny ${Number(coverDays) === d ? "primary" : ""}`} onClick={() => setCoverDays(d)}>
               {d} days
@@ -427,7 +437,7 @@ function ReorderReport({ rows, q, setQ, cats, cat, setCat, coverDays, setCoverDa
               <th className="r">Sold</th>
               <th className="r">Per week</th>
               <th className="r">Runs out in</th>
-              <th className="r">Need for {coverDays}d</th>
+              <th className="r">Need</th>
               <th className="r">Order</th>
             </tr>
           </thead>
@@ -448,7 +458,10 @@ function ReorderReport({ rows, q, setQ, cats, cat, setCat, coverDays, setCoverDa
                 <td className="r num">{it.onHand}</td>
                 <td className="r num">{it.sold}</td>
                 <td className="r num">{it.perWeek}</td>
-                <td className="r num muted">{it.daysLeft == null ? "—" : `${it.daysLeft}d`}</td>
+                <td className="r num" style={it.stockOutBeforeArrival ? { color: "var(--warn)", fontWeight: 600 } : { color: "var(--muted)" }} title={it.stockOutBeforeArrival ? "Runs out before the order arrives" : ""}>
+                  {it.daysLeft == null ? "—" : `${it.daysLeft}d`}
+                  {it.stockOutBeforeArrival ? <span className="sub">before it arrives</span> : null}
+                </td>
                 <td className="r num">{it.need}</td>
                 <td className="r num">
                   {it.suggestedOrder > 0 ? (

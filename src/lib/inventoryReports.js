@@ -97,18 +97,21 @@ export function purchaseOrder(quartsNeeded, packType, packQuarts) {
 /* How much of each stocked item to order so on-hand plus the order lasts
    `coverDays`, based on how fast it sold over the window. Only items that
    actually moved and are linked to inventory (you can order those). */
-export function reorderPlan(orders, parts, fromTs, toTs, coverDays) {
+export function reorderPlan(orders, parts, fromTs, toTs, coverDays, leadDays = 0) {
   const days = Math.max(1, (toTs - fromTs) / DAY);
   const cover = Math.max(1, Number(coverDays) || 14);
+  const lead = Math.max(0, Number(leadDays) || 0);
+  const horizon = cover + lead; // stock keeps dropping while the order ships
   return salesByItem(orders, parts, fromTs, toTs)
     .filter((s) => s.partId && (parts || {})[s.partId])
     .map((s) => {
       const part = parts[s.partId];
       const onHand = Number(part.onHand) || 0;
       const perDay = s.qty / days;
-      const need = perDay * cover;
+      const need = perDay * horizon;
       const suggestedOrder = Math.max(0, Math.ceil(round2(need - onHand)));
       const daysLeft = perDay > 0 ? Math.floor(onHand / perDay) : null;
+      const stockOutBeforeArrival = perDay > 0 && lead > 0 && onHand / perDay < lead;
       const po = purchaseOrder(suggestedOrder, part.packType, packQuartsOf(part));
       return {
         partId: s.partId,
@@ -121,9 +124,12 @@ export function reorderPlan(orders, parts, fromTs, toTs, coverDays) {
         perDay: round2(perDay),
         perWeek: round2(perDay * 7),
         cover,
+        lead,
+        horizon,
         need: round2(need),
         suggestedOrder,
         daysLeft,
+        stockOutBeforeArrival,
         packType: part.packType || "",
         orderQuarts: po.quarts,
         orderPacks: po.packs,
