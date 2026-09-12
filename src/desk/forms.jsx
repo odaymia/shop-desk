@@ -2,7 +2,58 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
+import { buildYmme, modelYears } from "../lib/ymme.js";
 import { customerName, vehicleName, activeList, vehiclesOf, searchText } from "./useShop.js";
+
+/* A field that is a dropdown of known values with an escape hatch to type
+   anything not on the list. Used for the Year/Make/Model/Engine cascade
+   in the vehicle form. When the current value isn't one of the options
+   (a VIN decode filled it, or an old record), it shows the text box so
+   the value is always visible and editable. */
+function PickOrType({ label, value, onChange, options, placeholder, numeric }) {
+  const has = options.length > 0;
+  const match = (v) => options.find((o) => String(o).toLowerCase() === String(v).toLowerCase());
+  const inList = value != null && value !== "" && !!match(value);
+  const [typing, setTyping] = useState(!has || (value != null && value !== "" && !inList));
+  useEffect(() => {
+    if (value != null && value !== "" && !inList && has) setTyping(true);
+  }, [value, inList, has]);
+
+  if (!has || typing) {
+    const Input = numeric ? Num : Text;
+    return (
+      <Field label={label}>
+        <Input value={value} onChange={onChange} placeholder={placeholder} />
+        {has && (
+          <button type="button" className="pickInstead" onClick={() => setTyping(false)}>
+            Choose from the list
+          </button>
+        )}
+      </Field>
+    );
+  }
+  return (
+    <Field label={label}>
+      <select
+        value={inList ? match(value) : ""}
+        onChange={(e) => {
+          if (e.target.value === "__type__") {
+            onChange("");
+            setTyping(true);
+          } else onChange(e.target.value);
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value="__type__">Other — type it in…</option>
+      </select>
+    </Field>
+  );
+}
 
 /* Customer and vehicle forms, plus the customer picker a ticket uses.
    Shared by the Customers page and the ticket editor. */
@@ -108,12 +159,21 @@ export const blankVehicle = (customerId) => ({
   active: true,
 });
 
-export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLookup }) {
+export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLookup, shop }) {
   const [d, setD] = useState(() => ({ ...blankVehicle(customerId), ...(initial || {}) }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
+
+  /* Year → Make → Model → Engine choices from the cars this shop has
+     serviced. Choosing a higher level clears the ones below it so the
+     lists stay in step. */
+  const ymme = useMemo(() => buildYmme(shop ? shop.vehicles : {}, shop ? shop.specs : {}), [shop]);
+  const YEARS = useMemo(() => modelYears(), []);
+  const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "" }));
+  const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "" }));
+  const setModel = (v) => setD((x) => (v === x.model ? { ...x, model: v } : { ...x, model: v, engine: "" }));
   const plateKey = cfg && cfg.plateApiKey;
   const applyDecode = (r) =>
     setD((x) => ({
@@ -232,23 +292,15 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
       </div>
       {note && <p className="muted" style={{ margin: "-6px 0 14px", color: "var(--live)" }}>{note}</p>}
       <div className="fldRow">
-        <Field label="Year">
-          <Num value={d.year} onChange={set("year")} placeholder="2019" />
-        </Field>
-        <Field label="Make">
-          <Text value={d.make} onChange={set("make")} placeholder="Toyota" />
-        </Field>
-        <Field label="Model">
-          <Text value={d.model} onChange={set("model")} placeholder="Camry" />
-        </Field>
+        <PickOrType label="Year" value={d.year} onChange={setYear} options={YEARS} placeholder="Year" numeric />
+        <PickOrType label="Make" value={d.make} onChange={setMake} options={ymme.makesFor(d.year)} placeholder="Make" />
+        <PickOrType label="Model" value={d.model} onChange={setModel} options={ymme.modelsFor(d.year, d.make)} placeholder="Model" />
       </div>
       <div className="fldRow">
         <Field label="Trim">
           <Text value={d.submodel} onChange={set("submodel")} placeholder="SE" />
         </Field>
-        <Field label="Engine">
-          <Text value={d.engine} onChange={set("engine")} placeholder="2.5L 4-cyl" />
-        </Field>
+        <PickOrType label="Engine" value={d.engine} onChange={set("engine")} options={ymme.enginesFor(d.year, d.make, d.model)} placeholder="Engine" />
       </div>
       <div className="fldRow">
         <Field label="Color">

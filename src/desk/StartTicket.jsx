@@ -45,6 +45,7 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
     return (
       <VehicleForm
         cfg={cfg}
+        shop={shop}
         customerId={null}
         initial={{ plate: norm(plate), plateState: state }}
         autoLookup
@@ -60,6 +61,7 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
     return (
       <VehicleForm
         cfg={cfg}
+        shop={shop}
         customerId={chosen.customerId || null}
         initial={chosen}
         onClose={() => setStep("confirm")}

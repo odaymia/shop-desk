@@ -267,3 +267,6 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .sheet .shCheck .grid div { display:flex; justify-content:space-between; gap:6px; border-bottom:1px dotted #bbb; padding:1px 0; }
 .sheet .shCheck .grid strong { white-space:nowrap; }
 @media (max-width:760px) { .ckWrap { grid-template-columns:1fr; } .ckList { max-height:30vh; } }
+
+.pickInstead { align-self:flex-start; margin-top:4px; background:none; border:none; padding:0; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; }
+.pickInstead:hover { color:var(--signal); }
