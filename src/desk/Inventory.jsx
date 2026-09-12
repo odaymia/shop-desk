@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Modal, Field, Text, Num, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
+import { OIL_TYPE_OPTIONS } from "../lib/oilchange.js";
 
 const blank = () => ({
   number: "",
@@ -13,6 +14,7 @@ const blank = () => ({
   reorderAt: 0,
   location: "",
   taxable: true,
+  oilType: "", // for motor oils: conventional | blend | synthetic | diesel | euro
   surcharge: "", // extra charge added on top of an oil-change package when this part is used
   surchargeLabel: "",
   active: true,
@@ -153,6 +155,16 @@ export function PartForm({ part, vendors, onClose, onSave }) {
         </Field>
         <Field label="Category">
           <Text value={d.category} onChange={set("category")} placeholder="Oil, Filters, Wipers…" list="partCats" />
+        </Field>
+        <Field label="Oil type (for motor oils)">
+          <select value={d.oilType || ""} onChange={(e) => set("oilType")(e.target.value)}>
+            <option value="">—</option>
+            {OIL_TYPE_OPTIONS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
       <Field label="Description">

@@ -132,15 +132,26 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
    present. */
 export function detectOilType(text) {
   const s = String(text || "").toLowerCase();
+  if (/diesel|\bhdeo\b|\bhdd\b/.test(s)) return "diesel";
+  if (/euro|european/.test(s)) return "euro";
   if (/high.?mileage|max.?life/.test(s)) return "maxlife";
   if (/blend/.test(s)) return "blend";
   if (/full.?synthetic|synthetic|\bsyn\b|\bfs\b/.test(s)) return "synthetic";
   if (/conventional|\bconv\b|\bdino\b/.test(s)) return "conventional";
   return null;
 }
-/* An oil's type for filtering: a plain grade with no type word counts as
-   conventional. */
+/* The oil types the inventory dropdown offers. */
+export const OIL_TYPE_OPTIONS = [
+  ["conventional", "Conventional Oil"],
+  ["blend", "Synthetic Blend"],
+  ["synthetic", "Full Synthetic Oil"],
+  ["diesel", "Diesel Oil"],
+  ["euro", "European Synthetic Oil"],
+];
+/* An oil's type for filtering: the type set on the part wins; otherwise
+   read it from the name, and a plain grade counts as conventional. */
 export function oilTypeOf(part) {
+  if (part && part.oilType) return part.oilType;
   return detectOilType(`${(part && part.description) || ""} ${(part && part.category) || ""}`) || "conventional";
 }
 /* The oil type a package calls for, from its name or id. Null when the
@@ -149,13 +160,25 @@ export function oilTypeOf(part) {
 export function packageOilType(pkg) {
   return detectOilType(`${(pkg && pkg.id) || ""} ${(pkg && pkg.name) || ""}`);
 }
-/* The oils that fit a package: only the matching type. A conventional
+/* Which oil types a package accepts. A European synthetic counts as a
+   full synthetic; a high-mileage (MaxLife) package takes blends and
+   synthetics too, since that oil comes in both. */
+const OIL_COMPAT = {
+  conventional: ["conventional"],
+  blend: ["blend"],
+  synthetic: ["synthetic", "euro"],
+  euro: ["euro"],
+  maxlife: ["maxlife", "blend", "synthetic"],
+  diesel: ["diesel"],
+};
+/* The oils that fit a package: only the matching type(s). A conventional
    package won't list synthetic or blend; a synthetic package won't list
    conventional. */
 export function oilsForPackage(oils, pkg) {
   const want = packageOilType(pkg);
   if (!want) return oils;
-  return (oils || []).filter((p) => oilTypeOf(p) === want);
+  const ok = OIL_COMPAT[want] || [want];
+  return (oils || []).filter((p) => ok.includes(oilTypeOf(p)));
 }
 
 /* Inventory items that are motor oil: category says oil, or the

@@ -158,3 +158,23 @@ test("a bottled/boxed oil surcharge adds on top too, alongside a filter surcharg
   const t = orderTotals({ lines, noSupplies: true }, cfg);
   assert.equal(t.subtotal, 79.99); // 54.99 package + 10 oil + 15 filter
 });
+
+test("the oil type set on the part wins over the name; diesel and euro are recognized", () => {
+  // an oil named 'conventional' but tagged full synthetic reads as synthetic
+  assert.equal(oilTypeOf({ description: "House 5W-30 conventional look-alike", oilType: "synthetic" }), "synthetic");
+  assert.equal(detectOilType("Rotella T6 Diesel 15W-40"), "diesel");
+  assert.equal(detectOilType("Valvoline European Full Synthetic 5W-40"), "euro"); // euro wins over synthetic
+});
+
+test("a full synthetic package also lists a European synthetic; conventional still won't", () => {
+  const synPkg = DEFAULT_OIL_PACKAGES[2];
+  const convPkg = DEFAULT_OIL_PACKAGES[0];
+  const oils = [
+    { id: "s", oilType: "synthetic", description: "Full Synthetic 5W-30" },
+    { id: "e", oilType: "euro", description: "European Synthetic 5W-40" },
+    { id: "c", oilType: "conventional", description: "Conventional 5W-30" },
+    { id: "d", oilType: "diesel", description: "Diesel 15W-40" },
+  ];
+  assert.deepEqual(oilsForPackage(oils, synPkg).map((o) => o.id), ["s", "e"]);
+  assert.deepEqual(oilsForPackage(oils, convPkg).map((o) => o.id), ["c"]);
+});
