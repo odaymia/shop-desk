@@ -25,12 +25,14 @@ const blank = () => ({
 
 const PACK_LABEL = { case: "Quarts per case", box: "Gallons per box", bulk: "Minimum gallons" };
 const PACK_PLACEHOLDER = { case: "6", box: "5", bulk: "110" };
+const PART_CATS = ["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filters", "Brake Pads", "Brake Rotors", "Wipers", "Fluids", "Belts", "Batteries", "Tires", "Parts"];
 
 export function Inventory({ shop, flash }) {
   const [q, setQ] = useState("");
   const [only, setOnly] = useState("all"); // all | low
   const [cat, setCat] = useState("all");
   const [edit, setEdit] = useState(null);
+  const [quick, setQuick] = useState(false);
   const vendors = activeList(shop.vendors).sort((a, b) => a.name.localeCompare(b.name));
 
   const stock = useMemo(
@@ -68,10 +70,14 @@ export function Inventory({ shop, flash }) {
         <span className="muted">
           Stock at cost: <Money v={value} />
         </span>
+        <button className="btn" onClick={() => setQuick(true)}>
+          Quick add
+        </button>
         <button className="btn primary" onClick={() => setEdit(blank())}>
           Add part
         </button>
       </header>
+      {quick && <QuickAdd shop={shop} flash={flash} onClose={() => setQuick(false)} />}
       <div className="deskBody">
         {cats.length > 1 && (
           <div className="catBar" style={{ paddingBottom: 14 }}>
@@ -195,7 +201,7 @@ export function PartForm({ part, vendors, onClose, onSave }) {
         </Field>
       </div>
       <datalist id="partCats">
-        {["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filters", "Brake Pads", "Brake Rotors", "Wipers", "Fluids", "Belts", "Batteries", "Tires", "Parts"].map((c) => (
+        {PART_CATS.map((c) => (
           <option key={c} value={c} />
         ))}
       </datalist>
@@ -279,6 +285,138 @@ export function PartForm({ part, vendors, onClose, onSave }) {
       <button className="btn primary lg full" onClick={save}>
         Save part
       </button>
+    </Modal>
+  );
+}
+
+/* Quick add: a grid to type many parts fast, or paste rows from a
+   spreadsheet or the distributor invoice. A new blank row appears as you
+   fill the last one. New rows inherit the default category you set, so a
+   run of the same kind (20 oil filters) is just number + description. */
+const emptyRow = (category = "") => ({ number: "", description: "", category, cost: "", price: "", onHand: "" });
+const rowHasData = (r) => (r.number || "").trim() || (r.description || "").trim();
+
+function QuickAdd({ shop, flash, onClose }) {
+  const [defCat, setDefCat] = useState("");
+  const [rows, setRows] = useState([emptyRow()]);
+  const [paste, setPaste] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const setCell = (i, field, val) =>
+    setRows((rs) => {
+      const next = rs.map((r, k) => (k === i ? { ...r, [field]: val } : r));
+      if (rowHasData(next[next.length - 1])) next.push(emptyRow(defCat));
+      return next;
+    });
+
+  const addPaste = () => {
+    const parsed = paste
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const c = line.split(/\t|,/).map((s) => s.trim());
+        return { number: c[0] || "", description: c[1] || "", category: c[2] || defCat, cost: c[3] || "", price: c[4] || "", onHand: c[5] || "" };
+      });
+    if (!parsed.length) return;
+    setRows((rs) => [...rs.filter(rowHasData), ...parsed, emptyRow(defCat)]);
+    setPaste("");
+  };
+
+  const filled = rows.filter(rowHasData);
+  const save = async () => {
+    if (!filled.length) return;
+    setBusy(true);
+    for (const r of filled) {
+      await shop.savePart({
+        ...blank(),
+        number: (r.number || "").trim().toUpperCase(),
+        description: (r.description || "").trim(),
+        category: (r.category || "").trim(),
+        cost: toNum(r.cost),
+        price: toNum(r.price),
+        onHand: toNum(r.onHand),
+      });
+    }
+    flash(`${filled.length} part${filled.length === 1 ? "" : "s"} added`);
+    onClose();
+  };
+
+  return (
+    <Modal title="Quick add parts" onClose={onClose} size="xwide">
+      <datalist id="partCats">
+        {PART_CATS.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+      <div className="fldRow" style={{ alignItems: "flex-end" }}>
+        <Field label="New rows default to this category">
+          <Text value={defCat} onChange={setDefCat} placeholder="e.g. Oil Filters" list="partCats" />
+        </Field>
+        <p className="legalNote" style={{ margin: 0, flex: 2 }}>
+          Type down the grid — Tab moves across, a new row appears as you fill the last one. Or paste rows below.
+        </p>
+      </div>
+
+      <div className="qaScroll">
+        <table className="lines qaGrid">
+          <thead>
+            <tr>
+              <th style={{ width: 130 }}>Part #</th>
+              <th>Description</th>
+              <th style={{ width: 150 }}>Category</th>
+              <th style={{ width: 80 }}>Cost</th>
+              <th style={{ width: 80 }}>Price</th>
+              <th style={{ width: 70 }}>On hand</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>
+                  <input value={r.number} onChange={(e) => setCell(i, "number", e.target.value.toUpperCase())} />
+                </td>
+                <td>
+                  <input value={r.description} onChange={(e) => setCell(i, "description", e.target.value)} />
+                </td>
+                <td>
+                  <input value={r.category} onChange={(e) => setCell(i, "category", e.target.value)} list="partCats" />
+                </td>
+                <td>
+                  <input inputMode="decimal" value={r.cost} onChange={(e) => setCell(i, "cost", e.target.value.replace(/[^0-9.]/g, ""))} />
+                </td>
+                <td>
+                  <input inputMode="decimal" value={r.price} onChange={(e) => setCell(i, "price", e.target.value.replace(/[^0-9.]/g, ""))} />
+                </td>
+                <td>
+                  <input inputMode="numeric" value={r.onHand} onChange={(e) => setCell(i, "onHand", e.target.value.replace(/[^0-9.]/g, ""))} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <details style={{ marginTop: 12 }}>
+        <summary className="muted" style={{ cursor: "pointer" }}>Paste from a spreadsheet or invoice</summary>
+        <p className="legalNote" style={{ marginTop: 6 }}>
+          One part per line: part number, description, category, cost, price, on hand — separated by tabs (paste from
+          Excel) or commas. Category, cost, price, and on hand are optional.
+        </p>
+        <textarea className="ta" style={{ minHeight: 90 }} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={"VO106\tValvoline oil filter\tOil Filters\t2.10\t6.99\t24"} />
+        <button className="btn" style={{ marginTop: 8 }} onClick={addPaste} disabled={!paste.trim()}>
+          Add pasted rows to the grid
+        </button>
+      </details>
+
+      <div className="rowBtns" style={{ marginTop: 16 }}>
+        <button className="btn primary lg" onClick={save} disabled={busy || !filled.length}>
+          {busy ? "Adding…" : `Add ${filled.length} part${filled.length === 1 ? "" : "s"}`}
+        </button>
+        <button className="btn lg" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
     </Modal>
   );
 }

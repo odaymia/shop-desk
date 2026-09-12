@@ -272,3 +272,11 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .pickInstead:hover { color:var(--signal); }
 
 .catBar { display:flex; flex-wrap:wrap; gap:6px; padding:0 0 12px; }
+
+/* quick-add parts grid */
+.qaScroll { max-height:48vh; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:10px; }
+.qaGrid { width:100%; border-collapse:collapse; }
+.qaGrid th { position:sticky; top:0; z-index:1; background:var(--panel); text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:8px 8px; border-bottom:1px solid var(--line); }
+.qaGrid td { padding:2px; border-bottom:1px solid var(--line); }
+.qaGrid input { width:100%; min-width:0; border:1px solid transparent; background:transparent; padding:9px 8px; border-radius:6px; font-size:14px; color:var(--ink); }
+.qaGrid input:focus { border-color:var(--signal); background:#fff; outline:none; }
