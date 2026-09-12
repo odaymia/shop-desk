@@ -13,6 +13,8 @@ const blank = () => ({
   reorderAt: 0,
   location: "",
   taxable: true,
+  surcharge: "", // extra charge added on top of an oil-change package when this part is used
+  surchargeLabel: "",
   active: true,
 });
 
@@ -139,6 +141,8 @@ export function PartForm({ part, vendors, onClose, onSave }) {
       price: toNum(d.price),
       onHand: toNum(d.onHand),
       reorderAt: toNum(d.reorderAt),
+      surcharge: toNum(d.surcharge),
+      surchargeLabel: (d.surchargeLabel || "").trim(),
     });
   };
   return (
@@ -183,6 +187,18 @@ export function PartForm({ part, vendors, onClose, onSave }) {
           <Text value={d.location} onChange={set("location")} placeholder="Rack B, shelf 2" />
         </Field>
       </div>
+      <div className="fldRow">
+        <Field label="Oil-change surcharge">
+          <Num value={d.surcharge} onChange={set("surcharge")} placeholder="0.00" />
+        </Field>
+        <Field label="Charge shows as">
+          <Text value={d.surchargeLabel} onChange={set("surchargeLabel")} placeholder="Canister filter charge" />
+        </Field>
+      </div>
+      <p className="legalNote" style={{ marginTop: -6 }}>
+        An extra charge added on top of the oil-change package when this filter is used — for canister or cartridge
+        filters that cost more. Leave the amount blank for none.
+      </p>
       <label className="fld inline">
         <input type="checkbox" checked={d.taxable !== false} onChange={(e) => set("taxable")(e.target.checked)} />
         <span>Taxable</span>

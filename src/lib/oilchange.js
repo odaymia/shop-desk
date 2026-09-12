@@ -101,6 +101,24 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       job,
     });
   }
+  /* a pricier filter (canister/cartridge) can carry a surcharge added on
+     top of the package price — its own taxable line, not folded in */
+  const surcharge = filterPart ? round2(Number(filterPart.surcharge) || 0) : 0;
+  if (surcharge > 0) {
+    lines.push({
+      id: mkId(),
+      kind: "part",
+      partId: null,
+      number: filterPart.number || "",
+      description: (filterPart.surchargeLabel || "").trim() || `${filterPart.description || "Filter"} charge`,
+      qty: 1,
+      price: surcharge,
+      cost: 0,
+      condition: "new",
+      taxable: true,
+      job,
+    });
+  }
   return lines;
 }
 
