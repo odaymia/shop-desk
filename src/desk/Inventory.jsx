@@ -167,6 +167,11 @@ export function PartForm({ part, vendors, onClose, onSave }) {
           </select>
         </Field>
       </div>
+      <datalist id="partCats">
+        {["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filters", "Wipers", "Fluids", "Brakes", "Belts", "Batteries", "Tires", "Parts"].map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
       <Field label="Description">
         <Text value={d.description} onChange={set("description")} placeholder="Engine oil filter" />
       </Field>

@@ -29,6 +29,7 @@ export function Reports({ shop, cfg, employees, nav }) {
   const [to, setTo] = useState(dayKey(p.month[1]));
   const [coverDays, setCoverDays] = useState(14);
   const [itemQ, setItemQ] = useState("");
+  const [cat, setCat] = useState("all");
   const pick = (k) => {
     setRange(k);
     if (p[k]) {
@@ -92,8 +93,9 @@ export function Reports({ shop, cfg, employees, nav }) {
 
   const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
   const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays), [shop.orders, shop.parts, fromTs, toTs, coverDays]);
-  const itemRows = useMemo(() => items.filter((it) => searchText(itemQ, it.number, it.description, it.category)), [items, itemQ]);
-  const reorderRows = useMemo(() => reorder.filter((it) => searchText(itemQ, it.number, it.description, it.category)), [reorder, itemQ]);
+  const cats = useMemo(() => [...new Set(items.map((it) => it.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
+  const itemRows = useMemo(() => items.filter((it) => (cat === "all" || it.category === cat) && searchText(itemQ, it.number, it.description, it.category)), [items, itemQ, cat]);
+  const reorderRows = useMemo(() => reorder.filter((it) => (cat === "all" || it.category === cat) && searchText(itemQ, it.number, it.description, it.category)), [reorder, itemQ, cat]);
 
   const techName = (id) => (id === "none" ? "No tech assigned" : (employees.find((e) => e.id === id) || {}).name || "Unknown");
   const avg = r.count ? round2(r.sales / r.count) : 0;
@@ -134,8 +136,8 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
       </header>
       <div className="deskBody">
-        {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} />}
-        {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} coverDays={coverDays} setCoverDays={setCoverDays} from={from} to={to} />}
+        {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} />}
+        {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} coverDays={coverDays} setCoverDays={setCoverDays} from={from} to={to} />}
         {view === "sales" && (
         <>
         <div className="statRow">
@@ -307,7 +309,23 @@ export function Reports({ shop, cfg, employees, nav }) {
   );
 }
 
-function ItemsReport({ rows, q, setQ }) {
+function CategoryBar({ cats, cat, setCat }) {
+  if (!cats.length) return null;
+  return (
+    <div className="catBar">
+      <button className={`btn tiny ${cat === "all" ? "primary" : ""}`} onClick={() => setCat("all")}>
+        All
+      </button>
+      {cats.map((c) => (
+        <button key={c} className={`btn tiny ${cat === c ? "primary" : ""}`} onClick={() => setCat(c)}>
+          {c}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ItemsReport({ rows, q, setQ, cats, cat, setCat }) {
   const totals = rows.reduce((a, r) => ({ qty: a.qty + r.qty, revenue: a.revenue + r.revenue, profit: a.profit + r.profit }), { qty: 0, revenue: 0, profit: 0 });
   return (
     <div className="card">
@@ -315,6 +333,7 @@ function ItemsReport({ rows, q, setQ }) {
         <h3>Sales by item</h3>
         <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by item, part #, category" />
       </div>
+      <CategoryBar cats={cats} cat={cat} setCat={setCat} />
       <table className="dk">
         <thead>
           <tr>
@@ -375,7 +394,7 @@ function ItemsReport({ rows, q, setQ }) {
   );
 }
 
-function ReorderReport({ rows, q, setQ, coverDays, setCoverDays, from, to }) {
+function ReorderReport({ rows, q, setQ, cats, cat, setCat, coverDays, setCoverDays, from, to }) {
   const toOrder = rows.filter((r) => r.suggestedOrder > 0);
   return (
     <>
@@ -399,6 +418,7 @@ function ReorderReport({ rows, q, setQ, coverDays, setCoverDays, from, to }) {
           <h3>Reorder planner — {toOrder.length} item{toOrder.length === 1 ? "" : "s"} to order</h3>
           <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by item, part #, category" />
         </div>
+        <CategoryBar cats={cats} cat={cat} setCat={setCat} />
         <table className="dk">
           <thead>
             <tr>

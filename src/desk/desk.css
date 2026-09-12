@@ -270,3 +270,5 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 
 .pickInstead { align-self:flex-start; margin-top:4px; background:none; border:none; padding:0; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; }
 .pickInstead:hover { color:var(--signal); }
+
+.catBar { display:flex; flex-wrap:wrap; gap:6px; padding:0 0 12px; }

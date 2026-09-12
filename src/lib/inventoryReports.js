@@ -4,6 +4,19 @@ import { round2, lineAmount, lineCost } from "./invoice.js";
 
 const DAY = 86400000;
 
+/* The category to group an item under. Filters are split into oil,
+   engine air, and cabin air by what the part reads like, so reports show
+   them apart even when they were all imported as one "Filters" category.
+   Anything else keeps its own category. */
+export function itemCategory(item) {
+  const cat = String((item && item.category) || "").trim();
+  const text = `${(item && item.description) || ""} ${cat}`.toLowerCase();
+  if (/cabin/.test(text)) return "Cabin Air Filters";
+  if (/oil ?filter/.test(text)) return "Oil Filters";
+  if (/air ?filter|air element|engine air/.test(text)) return "Engine Air Filters";
+  return cat || "Uncategorized";
+}
+
 /* Units and money per item sold (invoiced) in a window. Parts linked to
    inventory group by their part id; hand-typed parts group by number and
    description so the same thing typed twice still adds up. */
@@ -39,7 +52,7 @@ export function salesByItem(orders, parts, fromTs, toTs) {
     }
   }
   return [...map.values()]
-    .map((r) => ({ ...r, profit: round2(r.revenue - r.cost) }))
+    .map((r) => ({ ...r, category: itemCategory(r), profit: round2(r.revenue - r.cost) }))
     .sort((a, b) => b.revenue - a.revenue);
 }
 

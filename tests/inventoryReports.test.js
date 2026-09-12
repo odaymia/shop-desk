@@ -59,3 +59,12 @@ test("reorder planner suggests an order when on hand won't cover the period", ()
   // hand-typed parts (no inventory link) aren't in the reorder plan
   assert.ok(!plan.some((r) => /Wiper/.test(r.description)));
 });
+
+test("filters split into oil, engine air, and cabin air categories by description", async () => {
+  const { itemCategory } = await import("../src/lib/inventoryReports.js");
+  assert.equal(itemCategory({ category: "Filters", description: "Engine oil filter" }), "Oil Filters");
+  assert.equal(itemCategory({ category: "Filters", description: "Engine air filter element" }), "Engine Air Filters");
+  assert.equal(itemCategory({ category: "Filters", description: "Cabin air filter" }), "Cabin Air Filters");
+  assert.equal(itemCategory({ category: "Oil", description: "Valvoline 5W-30" }), "Oil"); // non-filters keep their category
+  assert.equal(itemCategory({ category: "", description: "Wiper blade" }), "Uncategorized");
+});
