@@ -24,8 +24,13 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
       const v = shop.vehicles[o.vehicleId];
       return { o, c, v, t: orderTotals(o, cfg, c) };
     });
+    /* A real duplicate number means two devices, offline, both grabbed the
+       same next number for a NEW ticket. Imported history doesn't count:
+       LubeSoft and Mitchell reused invoice numbers across numbering runs,
+       so an old visit and a recent one legitimately share a number. Only
+       flag collisions among tickets created on the desk. */
     const numbers = {};
-    for (const r of all) numbers[r.o.number] = (numbers[r.o.number] || 0) + 1;
+    for (const r of all) if (!r.o.imported) numbers[r.o.number] = (numbers[r.o.number] || 0) + 1;
     return all
       .filter(({ o, t }) => {
         if (filter === "all") return true;
@@ -35,7 +40,7 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
       .filter(({ o, c, v }) =>
         searchText(q, `#${o.number}`, String(o.number), customerName(c), c && c.phone, vehicleName(v), v && v.plate, o.concern)
       )
-      .map((r) => ({ ...r, dup: numbers[r.o.number] > 1 }))
+      .map((r) => ({ ...r, dup: !r.o.imported && numbers[r.o.number] > 1 }))
       .sort((a, b) => (b.o.invoicedAt || b.o.createdAt) - (a.o.invoicedAt || a.o.createdAt));
   }, [shop.orders, shop.customers, shop.vehicles, cfg, filter, q]);
   const rows = matched.slice(0, LIMIT);
