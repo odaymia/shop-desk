@@ -205,13 +205,12 @@ export function useShop(cfg) {
   const createOrder = useCallback(
     async ({ customerId = null, vehicleId = null, status = STATUS.estimate, writerId = null } = {}) => {
       const number = await takeNumber();
-      const veh = vehicleId ? ref.current.vehicles[vehicleId] : null;
       return saveOrder({
         number,
         status,
         customerId,
         vehicleId,
-        mileageIn: veh && veh.mileage ? veh.mileage : "",
+        mileageIn: "", // entered fresh at the counter, not prefilled from the car's last visit
         mileageOut: "",
         concern: "",
         notes: "",

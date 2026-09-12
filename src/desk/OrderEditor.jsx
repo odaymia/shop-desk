@@ -174,14 +174,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     }
     const vehs = vehiclesOf(shop.vehicles, c.id);
     const v = vehs.length === 1 ? vehs[0] : null;
-    update({ customerId: c.id, vehicleId: v ? v.id : o.vehicleId || null, mileageIn: v && v.mileage ? v.mileage : o.mileageIn });
+    update({ customerId: c.id, vehicleId: v ? v.id : o.vehicleId || null });
     if (!vehs.length && !vehicle) setVehEdit({});
   };
-  /* `veh` is passed when the vehicle was just saved and isn't in the
-     rendered shop.vehicles yet */
-  const pickVehicle = (id, veh) => {
-    const v = veh || shop.vehicles[id];
-    update((d) => ({ ...d, vehicleId: id || null, mileageIn: !d.mileageIn && v && v.mileage ? v.mileage : d.mileageIn }));
+  /* Mileage is entered fresh at the counter, so choosing a car doesn't
+     prefill it from the car's last visit. */
+  const pickVehicle = (id) => {
+    update((d) => ({ ...d, vehicleId: id || null }));
   };
 
   /* ---------- status ---------- */
