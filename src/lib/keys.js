@@ -28,3 +28,5 @@ export const orderKey = (id) => ORDER_PREFIX + id;
 /* shared with the time clock; see src/storage/cloud.js for how it's pulled */
 export const ROSTER_KEY = "gac:employees";
 export const SHARED_KEYS = [ROSTER_KEY];
+
+export const SIGNREQ_KEY = "sd:signreq"; // the estimate the front desk has sent to the signature tablet

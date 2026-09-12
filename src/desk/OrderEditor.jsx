@@ -27,7 +27,8 @@ import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
-import { CART_PREFIX } from "../lib/keys.js";
+import { CART_PREFIX, SIGNREQ_KEY } from "../lib/keys.js";
+import { OrderSign } from "./Signing.jsx";
 import { tireName } from "../lib/tires.js";
 
 /* One ticket: estimate → repair order → invoice. Edits save themselves a
@@ -44,6 +45,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
   const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
+  const [signing, setSigning] = useState(false);
   const [vehEdit, setVehEdit] = useState(null);
   const [custEdit, setCustEdit] = useState(false);
   const [specEdit, setSpecEdit] = useState(false);
@@ -248,6 +250,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           <button className="btn" onClick={async () => (await flushNow(), nav.print(o.id))}>
             Print
           </button>
+          {(o.status === STATUS.estimate || o.status === STATUS.open || o.status === STATUS.invoiced) && (customer || vehicle) && (
+            <>
+              <button className="btn" onClick={async () => (await flushNow(), setSigning(true))}>
+                Get signature
+              </button>
+              <button
+                className="btn"
+                onClick={async () => {
+                  await flushNow();
+                  await sSet(SIGNREQ_KEY, { orderId: o.id, at: Date.now() });
+                  flash("Sent to the signature pad");
+                }}
+                title="Show this on a tablet running the Signature pad"
+              >
+                Send to pad
+              </button>
+            </>
+          )}
           {o.status === STATUS.estimate && (
             <button className="btn" onClick={() => moveTo(STATUS.open)}>
               Approve → Repair order
@@ -649,6 +669,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       </div>
 
       {pick === "customer" && <CustomerPicker shop={shop} onPick={pickCustomer} onClose={() => setPick(null)} />}
+      {signing && <OrderSign order={o} shop={shop} cfg={cfg} flash={flash} onDone={() => setSigning(false)} />}
       {specEdit && vehicle && (
         <SpecForm
           vehicle={vehicle}

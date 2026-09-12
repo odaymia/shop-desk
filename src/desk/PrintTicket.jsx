@@ -164,22 +164,42 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
           {isInvoice ? (
             <>
               {cfg.invoiceFooter && <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>{cfg.invoiceFooter}</p>}
-              <div className="shSign">
-                <div>Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty</div>
-                <div>Date</div>
-              </div>
+              <SignBlock sig={(o.signatures || {}).delivery} label="Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty" />
             </>
           ) : (
             <>
               {cfg.authorizationText && <p className="shNote" style={{ whiteSpace: "pre-wrap" }}>{cfg.authorizationText}</p>}
-              <div className="shSign">
-                <div>Customer signature</div>
-                <div>Date</div>
-              </div>
+              <SignBlock sig={(o.signatures || {}).authorization} label="Customer signature" />
             </>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* The signature line, with the captured e-signature drawn on it when the
+   customer has signed. */
+function SignBlock({ sig, label }) {
+  if (sig && sig.img)
+    return (
+      <div className="shSign signed">
+        <div>
+          <img className="shSigImg" src={sig.img} alt="" />
+          <div>
+            {label} {sig.name ? `— ${sig.name}` : ""}
+          </div>
+        </div>
+        <div>
+          {fmtDate(sig.at)}
+          <div>Date</div>
+        </div>
+      </div>
+    );
+  return (
+    <div className="shSign">
+      <div>{label}</div>
+      <div>Date</div>
     </div>
   );
 }

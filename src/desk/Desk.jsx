@@ -13,6 +13,7 @@ import { Reports } from "./Reports.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
 import { PrintTicket } from "./PrintTicket.jsx";
 import { StartTicket } from "./StartTicket.jsx";
+import { SignatureStation } from "./Signing.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
@@ -26,6 +27,7 @@ const PAGES = [
   ["vendors", "Vendors"],
   ["staff", "Staff"],
   ["reports", "Reports"],
+  ["signpad", "Signature pad"],
   ["settings", "Settings"],
 ];
 
@@ -115,6 +117,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}
+          {page === "signpad" && <SignatureStation shop={shop} cfg={cfg} flash={flash} />}
           {page === "settings" && (
             <DeskSettings
               cfg={cfg}
