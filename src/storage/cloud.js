@@ -129,15 +129,49 @@ async function lget(key, fallback) {
 const lset = (key, v) => local.set(key, JSON.stringify(v));
 
 /* ---------- outbox ---------- */
+/* The queue lives in memory; persisting it to IndexedDB only guards
+   against losing unsent writes on a reload. Writing the whole array on
+   every enqueue makes a bulk import O(n^2) on the main thread — a 40k
+   import would re-serialize a growing 40k-item array 40k times, which is
+   what dragged the import to a crawl. So the persist is coalesced onto a
+   short timer, and forced when the tab is hidden. */
 let outbox = [];
-let chain = Promise.resolve();
-const withOutbox = (fn) => (chain = chain.then(fn, fn));
-async function enqueue(item, quiet) {
-  await withOutbox(async () => {
-    outbox.push({ ...item, at: Date.now() });
+let outboxTimer = null;
+let outboxDirty = false;
+function persistOutboxSoon() {
+  outboxDirty = true;
+  if (outboxTimer) return;
+  outboxTimer = setTimeout(() => {
+    outboxTimer = null;
+    if (!outboxDirty) return;
+    outboxDirty = false;
+    lset(OUTBOX_KEY, outbox).catch(() => {});
+  }, 500);
+}
+async function persistOutboxNow() {
+  if (outboxTimer) {
+    clearTimeout(outboxTimer);
+    outboxTimer = null;
+  }
+  outboxDirty = false;
+  try {
     await lset(OUTBOX_KEY, outbox);
+  } catch {
+    /* best effort */
+  }
+}
+let pendingTimer = null;
+function emitPendingSoon() {
+  if (pendingTimer) return;
+  pendingTimer = setTimeout(() => {
+    pendingTimer = null;
     setState({ pending: outbox.length });
-  });
+  }, 250);
+}
+function enqueue(item, quiet) {
+  outbox.push({ ...item, at: Date.now() });
+  persistOutboxSoon();
+  emitPendingSoon();
   if (!quiet) flush();
 }
 function pendingKvKeys() {
@@ -215,16 +249,15 @@ async function flush() {
         console.error("cloud rejected a change, dropping it", item, e);
         setState({ error: `Cloud rejected a change: ${e.message || e}` });
       }
-      await withOutbox(async () => {
-        outbox.splice(0, n);
-        await lset(OUTBOX_KEY, outbox);
-        setState({ pending: outbox.length });
-      });
+      outbox.splice(0, n);
+      persistOutboxSoon();
+      emitPendingSoon();
     }
     if (/Offline/.test(state.error)) setState({ error: "" });
   } finally {
     flushing = false;
-    setState({ syncing: false });
+    persistOutboxSoon();
+    setState({ syncing: false, pending: outbox.length });
   }
 }
 
@@ -330,7 +363,12 @@ if (typeof window !== "undefined") {
     if (document.visibilityState === "visible") {
       flush();
       pull();
+    } else {
+      persistOutboxNow();
     }
+  });
+  window.addEventListener("pagehide", () => {
+    persistOutboxNow();
   });
 }
 

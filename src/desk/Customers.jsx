@@ -15,21 +15,42 @@ export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
   const [editing, setEditing] = useState(null); // customer draft
   const [showInactive, setShowInactive] = useState(false);
 
-  const rows = useMemo(() => {
-    const list = Object.values(shop.customers).filter((c) => showInactive || c.active !== false);
-    return list
-      .map((c) => {
-        const vehs = vehiclesOf(shop.vehicles, c.id);
-        const orders = ordersOf(shop.orders, { customerId: c.id }).filter((o) => o.status === "invoiced");
-        const lifetime = orders.reduce((a, o) => a + orderTotals(o, cfg, c).total, 0);
-        const last = orders[0] ? orders[0].invoicedAt : null;
-        return { c, vehs, lifetime, last, visits: orders.length };
-      })
-      .filter(({ c, vehs }) =>
-        searchText(q, c.first, c.last, c.company, c.phone, c.phone2, c.email, ...vehs.map((v) => `${vehicleName(v)} ${v.plate || ""}`))
-      )
-      .sort((a, b) => customerName(a.c).localeCompare(customerName(b.c)));
-  }, [shop.customers, shop.vehicles, shop.orders, cfg, q, showInactive]);
+  /* Aggregate each customer's cars and invoiced history in ONE pass over
+     vehicles and orders (indexed by owner), instead of scanning every
+     order for every customer — that was O(customers x orders) and made
+     this page crawl once a full history was imported. Recomputed only
+     when the underlying records change, not on every keystroke. */
+  const base = useMemo(() => {
+    const vehsBy = {};
+    for (const v of Object.values(shop.vehicles)) (vehsBy[v.customerId] = vehsBy[v.customerId] || []).push(v);
+    const invBy = {};
+    for (const o of Object.values(shop.orders)) {
+      if (o.status !== "invoiced") continue;
+      (invBy[o.customerId] = invBy[o.customerId] || []).push(o);
+    }
+    return Object.values(shop.customers).map((c) => {
+      const vehs = vehsBy[c.id] || [];
+      const orders = invBy[c.id] || [];
+      let lifetime = 0;
+      let last = null;
+      for (const o of orders) {
+        lifetime += orderTotals(o, cfg, c).total;
+        if ((o.invoicedAt || 0) > (last || 0)) last = o.invoicedAt || null;
+      }
+      const hay = [c.first, c.last, c.company, c.phone, c.phone2, c.email, ...vehs.map((v) => `${vehicleName(v)} ${v.plate || ""}`)].join(" ");
+      return { c, vehs, lifetime, last, visits: orders.length, hay };
+    });
+  }, [shop.customers, shop.vehicles, shop.orders, cfg]);
+
+  const LIMIT = 400; // render a page at a time; search narrows the rest
+  const matched = useMemo(
+    () =>
+      base
+        .filter((r) => (showInactive || r.c.active !== false) && searchText(q, r.hay))
+        .sort((a, b) => customerName(a.c).localeCompare(customerName(b.c))),
+    [base, q, showInactive]
+  );
+  const rows = matched.slice(0, LIMIT);
 
   if (customerId && shop.customers[customerId])
     return <CustomerDetail shop={shop} cfg={cfg} nav={nav} flash={flash} customer={shop.customers[customerId]} onNew={onNew} />;
@@ -121,6 +142,13 @@ export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
                   </td>
                 </tr>
               ))}
+              {matched.length > LIMIT && (
+                <tr>
+                  <td colSpan={6} className="emptyNote">
+                    Showing the first {LIMIT.toLocaleString()} of {matched.length.toLocaleString()}. Type a name, phone, or plate to find the rest.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -88,12 +88,16 @@ export function useShop(cfg) {
       cloud.subscribe(async (e) => {
         if (e.type !== "data") return;
         let next = null;
+        const cloned = {}; // clone each table map once per batch, not once per key
         for (const key of e.keys || []) {
           for (const [name, prefix] of TABLES) {
             if (!key.startsWith(prefix)) continue;
             const v = await sGet(key, null);
             next = next || { ...ref.current };
-            next[name] = { ...next[name] };
+            if (!cloned[name]) {
+              next[name] = { ...next[name] };
+              cloned[name] = true;
+            }
             const id = key.slice(prefix.length);
             if (v) next[name][id] = v;
             else delete next[name][id];

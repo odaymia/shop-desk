@@ -17,7 +17,8 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
   const [q, setQ] = useState("");
   const [toDelete, setToDelete] = useState(null);
 
-  const rows = useMemo(() => {
+  const LIMIT = 400; // render a page at a time; the search box reaches the rest
+  const matched = useMemo(() => {
     const all = Object.values(shop.orders).filter(isLive).map((o) => {
       const c = shop.customers[o.customerId];
       const v = shop.vehicles[o.vehicleId];
@@ -37,6 +38,7 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
       .map((r) => ({ ...r, dup: numbers[r.o.number] > 1 }))
       .sort((a, b) => (b.o.invoicedAt || b.o.createdAt) - (a.o.invoicedAt || a.o.createdAt));
   }, [shop.orders, shop.customers, shop.vehicles, cfg, filter, q]);
+  const rows = matched.slice(0, LIMIT);
 
   const counts = useMemo(() => {
     const n = { estimate: 0, open: 0, invoiced: 0, due: 0 };
@@ -133,6 +135,13 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
                   </td>
                 </tr>
               ))}
+              {matched.length > LIMIT && (
+                <tr>
+                  <td colSpan={8} className="emptyNote">
+                    Showing the most recent {LIMIT.toLocaleString()} of {matched.length.toLocaleString()}. Search by ticket number, name, or plate to find older ones.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
