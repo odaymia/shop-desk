@@ -9,6 +9,7 @@ import { CATALOGS } from "../lib/parts.js";
 import { NAME_MODES } from "../lib/names.js";
 import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
 import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
+import { sGetAll, sSet } from "../storage/index.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -424,6 +425,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Cloud account
           </h3>
           <CloudSync />
+          <BackupPanel flash={flash} />
           <ImportPanel roster={roster} saveRoster={saveRoster} flash={flash} shop={shop} />
           <p className="legalNote">
             Posting an invoice freezes the tax rate and supplies rule on that ticket. Changing them here affects new
@@ -431,6 +433,106 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </p>
         </div>
       </div>
+    </>
+  );
+}
+
+/* Download a full backup of the desk's data (everything under sd:*) as a
+   JSON file, and restore it. This is the copy you control, on top of the
+   live copy in the cloud. */
+function BackupPanel({ flash }) {
+  const [busy, setBusy] = useState(false);
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [count, setCount] = useState(null);
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      const all = await sGetAll("sd:"); // [[key, value]]
+      const backup = { format: "shop-desk-backup", version: 1, exportedAt: Date.now(), records: Object.fromEntries(all) };
+      const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `shop-desk-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      flash(`Backed up ${all.length.toLocaleString()} records`);
+    } catch (e) {
+      flash(`Backup failed: ${e.message}`, "out");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pick = async (file) => {
+    try {
+      const j = JSON.parse(await file.text());
+      if (j.format !== "shop-desk-backup") throw new Error("That isn't a Shop Desk backup file.");
+      setRestoreFile(j);
+      setCount(Object.keys(j.records || {}).length);
+    } catch (e) {
+      flash(e.message, "out");
+    }
+  };
+
+  const restore = async () => {
+    if (!restoreFile) return;
+    setBusy(true);
+    try {
+      const entries = Object.entries(restoreFile.records || {});
+      for (const [k, v] of entries) await sSet(k, v);
+      flash(`Restored ${entries.length.toLocaleString()} records`);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e) {
+      flash(`Restore failed: ${e.message}`, "out");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <h3 className="subhead" style={{ marginTop: 36 }}>
+        Backup
+      </h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Your data lives on this computer and, when signed in above, in the shop's cloud account (synced across every
+        device). Download a copy you keep — a single file with every customer, vehicle, ticket, part, and setting. Keep
+        it somewhere safe; a weekly one is plenty.
+      </p>
+      <div className="rowBtns">
+        <button className="btn primary" onClick={download} disabled={busy}>
+          {busy ? "Working…" : "Download a backup"}
+        </button>
+        <label className="btn">
+          Restore from a backup…
+          <input
+            type="file"
+            accept=".json,application/json"
+            style={{ display: "none" }}
+            onChange={(e) => e.target.files && e.target.files[0] && pick(e.target.files[0])}
+          />
+        </label>
+      </div>
+      {restoreFile && (
+        <div className="warnBox" style={{ marginTop: 12 }}>
+          <p style={{ margin: "0 0 10px" }}>
+            Restore {count?.toLocaleString()} records from {new Date(restoreFile.exportedAt).toLocaleString()}? This
+            writes them over what's here now and syncs to the cloud. Records added since the backup stay.
+          </p>
+          <div className="rowBtns">
+            <button className="btn danger" onClick={restore} disabled={busy}>
+              {busy ? "Restoring…" : "Yes, restore"}
+            </button>
+            <button className="btn" onClick={() => setRestoreFile(null)} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
