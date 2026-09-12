@@ -10,10 +10,14 @@ const DAY = 86400000;
    Anything else keeps its own category. */
 export function itemCategory(item) {
   const cat = String((item && item.category) || "").trim();
+  const num = String((item && item.number) || "").trim().toUpperCase();
   const text = `${(item && item.description) || ""} ${cat}`.toLowerCase();
   if (/cabin/.test(text)) return "Cabin Air Filters";
   if (/oil ?filter/.test(text)) return "Oil Filters";
   if (/air ?filter|air element|engine air/.test(text)) return "Engine Air Filters";
+  /* brake pads number like SC…, rotors end in RGS (the shop's numbering) */
+  if (num.length >= 4 && num.startsWith("SC")) return "Brake Pads";
+  if (num.endsWith("RGS")) return "Brake Rotors";
   return cat || "Uncategorized";
 }
 

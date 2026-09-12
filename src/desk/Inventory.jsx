@@ -168,7 +168,7 @@ export function PartForm({ part, vendors, onClose, onSave }) {
         </Field>
       </div>
       <datalist id="partCats">
-        {["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filters", "Wipers", "Fluids", "Brakes", "Belts", "Batteries", "Tires", "Parts"].map((c) => (
+        {["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filters", "Brake Pads", "Brake Rotors", "Wipers", "Fluids", "Belts", "Batteries", "Tires", "Parts"].map((c) => (
           <option key={c} value={c} />
         ))}
       </datalist>

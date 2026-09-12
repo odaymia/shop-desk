@@ -68,3 +68,13 @@ test("filters split into oil, engine air, and cabin air categories by descriptio
   assert.equal(itemCategory({ category: "Oil", description: "Valvoline 5W-30" }), "Oil"); // non-filters keep their category
   assert.equal(itemCategory({ category: "", description: "Wiper blade" }), "Uncategorized");
 });
+
+test("brake pads and rotors are categorized by part number", async () => {
+  const { itemCategory } = await import("../src/lib/inventoryReports.js");
+  assert.equal(itemCategory({ number: "SCD914", description: "Front brake pads" }), "Brake Pads");
+  assert.equal(itemCategory({ number: "sc1399", description: "" }), "Brake Pads"); // case-insensitive
+  assert.equal(itemCategory({ number: "BR55012RGS", description: "Front rotor" }), "Brake Rotors");
+  assert.equal(itemCategory({ number: "SC", description: "too short to be a pad #" }), "Uncategorized");
+  // a filter still wins by description even with a brakey number
+  assert.equal(itemCategory({ number: "SC12345", description: "Oil filter" }), "Oil Filters");
+});
