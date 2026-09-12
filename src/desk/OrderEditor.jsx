@@ -190,7 +190,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       const saved = await shop.setStatus(latest, to, customer);
       draftRef.current = saved;
       setDraft(saved);
-      setPick(null);
+      /* on approval to a repair order, run the service checklist if the
+         ticket has an oil change and one hasn't been done yet */
+      const hasOilChange = (saved.lines || []).some((l) => l.packaged);
+      setPick(to === STATUS.open && hasOilChange && !saved.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
       flash(
         to === STATUS.invoiced ? `Invoice #${saved.number} posted` : to === STATUS.open ? `RO #${saved.number} approved` : to === STATUS.void ? `Invoice #${saved.number} voided` : `Back to estimate`,
         to === STATUS.void ? "out" : "in"
@@ -734,7 +737,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           onClose={() => setPick(null)}
           onAdd={(lines, pkg) => {
             addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
-            setPick(!o.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
+            /* on a repair order, run the checklist right away; on an estimate it waits until the RO is approved */
+            setPick(o.status === STATUS.open && !o.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
             flash(`${pkg.name} added`);
           }}
         />

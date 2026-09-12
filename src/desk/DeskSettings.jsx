@@ -276,13 +276,13 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
 
           <h3 className="subhead">Service checklist</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
-            The walk-around that prints on the invoice. It opens on its own when an oil change goes on a ticket and runs
+            The walk-around that prints on the invoice. It opens on its own when an oil-change estimate is approved to a repair order (or when an oil change goes straight onto a repair order) and runs
             from the keyboard: Enter takes the answer, Space picks a different one. An item whose part or service is on
             the ticket starts at Replaced; the words that mean that go in the last box ("oil filter", or "air filter
             -cabin" to leave the cabin filter out, alternatives split with |).
           </p>
-          <Field label="When an oil change goes on a ticket">
-            {onOff("checklistOnOil", "Open the checklist right away", "Wait for the Checklist button")}
+          <Field label="When an oil-change ticket becomes a repair order">
+            {onOff("checklistOnOil", "Open the checklist automatically", "Wait for the Checklist button")}
           </Field>
           <div className="miniLines">
             {(d.checklist || []).map((it, i) => (

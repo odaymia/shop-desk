@@ -151,7 +151,7 @@ export function ChecklistCard({ order, locked, onOpen }) {
         </div>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          Not done yet. It opens on its own when an oil change goes on the ticket.
+          Not done yet. It opens on its own when the ticket is approved to a repair order, or tap Start.
         </p>
       )}
     </div>
