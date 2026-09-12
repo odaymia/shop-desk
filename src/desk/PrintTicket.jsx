@@ -228,26 +228,53 @@ function staffLine(o, cfg, techName) {
   return bits.length ? ` · ${bits.join(" · ")}` : "";
 }
 
+function LineRow({ l }) {
+  return (
+    <tr>
+      <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>
+      <td>
+        {l.description}
+        {l.kind === "part" ? <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span> : null}
+        {l.kind === "labor" && l.details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{l.details}</div> : null}
+      </td>
+      <td className="r">{l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : l.qty}</td>
+      <td className="r">{l.kind === "labor" ? fmtMoney(l.rate) : l.kind === "note" ? "" : fmtMoney(l.price)}</td>
+      <td className="r">{l.kind === "note" ? "" : l.kind === "discount" ? `-${fmtMoney(lineAmount(l))}` : fmtMoney(lineAmount(l))}</td>
+    </tr>
+  );
+}
+
+/* A package (an oil change) folds its service/oil/filter lines into one
+   line at the package price. The parts-vs-labor split still shows in the
+   totals below. Anything else in the group (extra quarts) prints as its
+   own line. */
 function GroupRows({ g }) {
+  const packaged = g.lines.filter((l) => l.packaged);
+  const rest = g.lines.filter((l) => !l.packaged);
+  const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
+  const details = (packaged.find((l) => l.details) || {}).details;
   return (
     <>
-      {g.job && (
-        <tr className="job">
-          <td colSpan={5}>{g.job}</td>
-        </tr>
-      )}
-      {g.lines.map((l) => (
-        <tr key={l.id}>
-          <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>
+      {packaged.length > 0 ? (
+        <tr>
+          <td>Service</td>
           <td>
-            {l.description}
-            {l.kind === "part" ? <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span> : null}
-            {l.kind === "labor" && l.details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{l.details}</div> : null}
+            {g.job}
+            {details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{details}</div> : null}
           </td>
-          <td className="r">{l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : l.qty}</td>
-          <td className="r">{l.kind === "labor" ? fmtMoney(l.rate) : l.kind === "note" ? "" : fmtMoney(l.price)}</td>
-          <td className="r">{l.kind === "note" ? "" : l.kind === "discount" ? `-${fmtMoney(lineAmount(l))}` : fmtMoney(lineAmount(l))}</td>
+          <td className="r">1</td>
+          <td className="r">{fmtMoney(pkgAmt)}</td>
+          <td className="r">{fmtMoney(pkgAmt)}</td>
         </tr>
+      ) : (
+        g.job && (
+          <tr className="job">
+            <td colSpan={5}>{g.job}</td>
+          </tr>
+        )
+      )}
+      {rest.map((l) => (
+        <LineRow key={l.id} l={l} />
       ))}
     </>
   );

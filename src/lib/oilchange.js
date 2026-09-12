@@ -53,6 +53,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       rate: laborAmt,
       unit: "service",
       taxable: false,
+      packaged: true, // fold into one package line on the printed receipt
       job,
     },
     {
@@ -66,6 +67,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       cost: oilPart ? Number(oilPart.cost) || 0 : 0,
       condition: "new",
       taxable: true,
+      packaged: true,
       job,
     },
     {
@@ -79,6 +81,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       cost: filterPart ? Number(filterPart.cost) || 0 : 0,
       condition: "new",
       taxable: true,
+      packaged: true,
       job,
     },
   ];

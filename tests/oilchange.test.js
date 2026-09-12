@@ -71,3 +71,17 @@ test("oil items are found by category or grade", () => {
   const parts = { a: { id: "a", category: "Oil", description: "Bulk conventional" }, b: { id: "b", category: "", description: "Mobil 1 0W-20 quart" }, c: { id: "c", category: "Filters", description: "Oil filter" } };
   assert.deepEqual(oilItems(parts).map((p) => p.id), ["a", "b"]);
 });
+
+test("the package's service, oil, and filter lines are marked to fold into one receipt line at the package price; extra quarts aren't", () => {
+  const oil = { id: "o1", description: "oil qt", price: 6.99, cost: 3.1 };
+  const filt = { id: "f1", description: "filter", price: 9.99, cost: 4 };
+  let n = 0;
+  const lines = oilPackageLines(conv, 6.5, oil, filt, () => `L${++n}`); // 6.5 qt → an extra-quart line
+  const packaged = lines.filter((l) => l.packaged);
+  const rest = lines.filter((l) => !l.packaged);
+  assert.equal(packaged.length, 3); // service labor + oil + filter
+  assert.equal(rest.length, 1); // the extra half-quart
+  assert.match(rest[0].description, /Extra oil/);
+  const pkgAmt = Math.round(packaged.reduce((a, l) => a + (l.kind === "labor" ? l.hours * l.rate : l.qty * l.price), 0) * 100) / 100;
+  assert.equal(pkgAmt, 54.99); // the folded line shows the package price
+});

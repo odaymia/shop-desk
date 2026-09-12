@@ -508,14 +508,27 @@ function Receipt({ h, v, shop, onBack }) {
 }
 
 function GroupRows({ g, cond }) {
+  const packaged = g.lines.filter((l) => l.packaged);
+  const rest = g.lines.filter((l) => !l.packaged);
+  const pkgAmt = packaged.reduce((a, l) => a + (Number(l.amount) || 0), 0);
+  const details = (packaged.find((l) => l.details) || {}).details;
   return (
     <>
-      {g.job ? (
+      {packaged.length > 0 ? (
+        <tr className="rc-labor">
+          <td>
+            <div>{g.job}</div>
+            {details ? <div className="rcMeta">{details}</div> : null}
+          </td>
+          <td className="r rcMeta"></td>
+          <td className="r">{fmtMoney(pkgAmt)}</td>
+        </tr>
+      ) : g.job ? (
         <tr className="rcJob">
           <td colSpan={3}>{g.job}</td>
         </tr>
       ) : null}
-      {g.lines.map((l, i) => (
+      {rest.map((l, i) => (
         <tr key={i} className={`rc-${l.kind}`}>
           <td>
             <div>

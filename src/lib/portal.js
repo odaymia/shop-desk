@@ -65,6 +65,7 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
               .map((l) => ({
                 kind: l.kind,
                 job: l.job || "",
+                packaged: !!l.packaged,
                 number: l.kind === "part" ? l.number || "" : "",
                 text: l.description || "",
                 details: l.kind === "labor" ? l.details || "" : "",
