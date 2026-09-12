@@ -66,5 +66,25 @@ export function createIndexedDbStorage() {
         const filtered = prefix ? all.filter((k) => String(k).indexOf(prefix) === 0) : all;
         return { keys: filtered, prefix, shared: false };
       }),
+    /* Read one page of keys+values under a prefix, starting after `afterKey`.
+       A shop's history runs to tens of thousands of records; reading them
+       all in a single getAll blocks the tab for many seconds at startup, so
+       the caller pages through and yields between pages. Keys are returned
+       sorted, so `afterKey` (exclusive) is a stable cursor. */
+    getAllPage: (prefix, afterKey, limit) =>
+      open().then(
+        (db) =>
+          new Promise((res, rej) => {
+            const t = db.transaction(STORE, "readonly");
+            const s = t.objectStore(STORE);
+            const lower = afterKey != null ? afterKey : prefix;
+            const range = IDBKeyRange.bound(lower, prefix + "￿", afterKey != null, false);
+            const kr = s.getAllKeys(range, limit);
+            const vr = s.getAll(range, limit);
+            t.oncomplete = () => res({ keys: kr.result || [], values: vr.result || [], shared: false });
+            t.onerror = () => rej(t.error);
+            t.onabort = () => rej(t.error);
+          })
+      ),
   };
 }

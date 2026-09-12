@@ -62,20 +62,35 @@ export function useShop(cfg) {
     setData(next);
   }, []);
 
-  /* first load */
+  /* First load. A full shop is tens of thousands of records; reading them
+     all before showing anything froze the tab for many seconds. So load a
+     table at a time, in pages that yield between them (sGetAll does the
+     yielding), and commit as each table lands — the lookup tables come
+     first so names resolve, then the big orders table streams in with the
+     ticket counts climbing as it goes. The tab stays responsive throughout. */
   useEffect(() => {
     let alive = true;
     (async () => {
-      const next = empty();
+      const acc = empty();
+      const snapshot = () => ({ ...acc });
       for (const [name, prefix] of TABLES) {
-        const rows = await sGetAll(prefix);
         const map = {};
-        for (const [, v] of rows) if (v && v.id) map[v.id] = v;
-        next[name] = map;
+        acc[name] = map;
+        let sinceCommit = 0;
+        await sGetAll(prefix, (chunk) => {
+          for (const [, v] of chunk) if (v && v.id) map[v.id] = v;
+          sinceCommit += chunk.length;
+          if (alive && sinceCommit >= 20000) {
+            sinceCommit = 0;
+            commit(snapshot()); // show progress on a huge table without spamming renders
+          }
+        });
+        if (!alive) return;
+        commit(snapshot());
       }
-      next.counters = (await sGet(COUNTERS_KEY, null)) || {};
-      next.loaded = true;
-      if (alive) commit(next);
+      acc.counters = (await sGet(COUNTERS_KEY, null)) || {};
+      acc.loaded = true;
+      if (alive) commit(snapshot());
     })();
     return () => {
       alive = false;

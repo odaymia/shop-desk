@@ -83,12 +83,49 @@ export async function sList(prefix) {
    The desk keeps one key per customer, vehicle, part, and order. IndexedDB
    reads are local and quick; a few thousand records take well under a
    second. */
-export async function sGetAll(prefix) {
+const GETALL_PAGE = 4000;
+/* Read everything under a prefix, a page at a time, yielding between pages.
+   A full shop's history is tens of thousands of records; reading it in one
+   shot froze the tab for many seconds at startup. Paging keeps each read
+   short and lets the browser paint and handle input in between, so the
+   machine stays responsive while the data loads. Set `onChunk` to consume
+   pages as they arrive instead of buffering the whole thing. */
+export async function sGetAll(prefix, onChunk) {
+  if (storage.getAllPage) {
+    try {
+      const out = onChunk ? null : [];
+      let after = null;
+      for (;;) {
+        const r = await storage.getAllPage(prefix, after, GETALL_PAGE);
+        const keys = (r && r.keys) || [];
+        const values = (r && r.values) || [];
+        const chunk = [];
+        for (let i = 0; i < values.length; i++) {
+          let v = null;
+          try {
+            v = values[i] != null ? JSON.parse(values[i]) : null;
+          } catch {
+            v = null;
+          }
+          if (v != null) chunk.push([keys[i], v]);
+        }
+        if (onChunk) onChunk(chunk);
+        else for (const pair of chunk) out.push(pair);
+        if (keys.length < GETALL_PAGE) break;
+        after = keys[keys.length - 1];
+        await new Promise((res) => setTimeout(res)); // yield between pages
+      }
+      return out;
+    } catch {
+      /* fall back to the per-key path below */
+    }
+  }
   const keys = await sList(prefix);
-  const out = [];
+  const out = onChunk ? null : [];
+  const push = onChunk ? (k, v) => onChunk([[k, v]]) : (k, v) => out.push([k, v]);
   for (const k of keys) {
     const v = await readLocal(k, null);
-    if (v != null) out.push([k, v]);
+    if (v != null) push(k, v);
   }
   return out;
 }
