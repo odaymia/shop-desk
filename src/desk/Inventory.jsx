@@ -15,10 +15,15 @@ const blank = () => ({
   location: "",
   taxable: true,
   oilType: "", // for motor oils: conventional | blend | synthetic | diesel | euro
+  packType: "", // how it's bought, for reordering: "" (each) | case | box | bulk. Sold by the quart regardless.
+  packSize: "", // case=quarts, box=gallons, bulk=minimum gallons
   surcharge: "", // extra charge added on top of an oil-change package when this part is used
   surchargeLabel: "",
   active: true,
 });
+
+const PACK_LABEL = { case: "Quarts per case", box: "Gallons per box", bulk: "Minimum gallons" };
+const PACK_PLACEHOLDER = { case: "6", box: "5", bulk: "110" };
 
 export function Inventory({ shop, flash }) {
   const [q, setQ] = useState("");
@@ -143,6 +148,8 @@ export function PartForm({ part, vendors, onClose, onSave }) {
       price: toNum(d.price),
       onHand: toNum(d.onHand),
       reorderAt: toNum(d.reorderAt),
+      packType: d.packType || "",
+      packSize: d.packType ? toNum(d.packSize) : "",
       surcharge: toNum(d.surcharge),
       surchargeLabel: (d.surchargeLabel || "").trim(),
     });
@@ -204,6 +211,28 @@ export function PartForm({ part, vendors, onClose, onSave }) {
           <Text value={d.location} onChange={set("location")} placeholder="Rack B, shelf 2" />
         </Field>
       </div>
+      <div className="fldRow">
+        <Field label="Bought as (for reordering)">
+          <select value={d.packType || ""} onChange={(e) => set("packType")(e.target.value)}>
+            <option value="">Each — sold and bought by the unit</option>
+            <option value="case">Quart case</option>
+            <option value="box">Gallon box</option>
+            <option value="bulk">Bulk — minimum order</option>
+          </select>
+        </Field>
+        {d.packType ? (
+          <Field label={PACK_LABEL[d.packType]}>
+            <Num value={d.packSize} onChange={set("packSize")} placeholder={PACK_PLACEHOLDER[d.packType]} />
+          </Field>
+        ) : (
+          <div className="fld" />
+        )}
+      </div>
+      {d.packType && (
+        <p className="legalNote" style={{ marginTop: -6 }}>
+          The reorder planner suggests orders in whole {d.packType === "case" ? "cases" : d.packType === "box" ? "boxes" : "bulk gallons"}. Oil is still counted and sold by the quart.
+        </p>
+      )}
       <div className="fldRow">
         <Field label="Oil-change surcharge">
           <Num value={d.surcharge} onChange={set("surcharge")} placeholder="0.00" />

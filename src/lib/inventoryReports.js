@@ -60,6 +60,40 @@ export function salesByItem(orders, parts, fromTs, toTs) {
     .sort((a, b) => b.revenue - a.revenue);
 }
 
+/* Quarts in one purchase unit, from how the part is bought. Everything is
+   still counted and sold by the quart; this is only for reordering.
+   - case: the entered size is quarts (a 6-quart case)
+   - box:  the entered size is gallons (a 5-gallon box = 20 qt)
+   - bulk: the entered size is the minimum-order gallons (110 gal = 440 qt) */
+export function packQuartsOf(part) {
+  const size = Number((part && part.packSize) || 0);
+  if (!size) return 0;
+  if (part.packType === "case") return size;
+  if (part.packType === "box" || part.packType === "bulk") return size * 4;
+  return 0;
+}
+
+/* Turn a quart shortfall into a purchase order: whole cases/boxes rounded
+   up, or a bulk order at or above the minimum. Returns the count, the
+   quarts that actually buys, and a label for the receipt of the order. */
+export function purchaseOrder(quartsNeeded, packType, packQuarts) {
+  const need = Math.max(0, Math.ceil(Number(quartsNeeded) || 0));
+  const pk = Number(packQuarts) || 0;
+  if (need <= 0) return { quarts: 0, packs: 0, text: "—" };
+  if ((packType === "case" || packType === "box") && pk > 0) {
+    const packs = Math.ceil(need / pk);
+    const quarts = packs * pk;
+    const unit = packType === "case" ? "case" : "box";
+    return { quarts, packs, text: `${packs} ${unit}${packs === 1 ? "" : "s"} (${quarts} qt)` };
+  }
+  if (packType === "bulk" && pk > 0) {
+    const quarts = Math.max(need, pk);
+    const gal = Math.round((quarts / 4) * 10) / 10;
+    return { quarts, packs: null, text: `${gal} gal bulk${quarts === pk ? " (min)" : ""}` };
+  }
+  return { quarts: need, packs: null, text: String(need) };
+}
+
 /* How much of each stocked item to order so on-hand plus the order lasts
    `coverDays`, based on how fast it sold over the window. Only items that
    actually moved and are linked to inventory (you can order those). */
@@ -75,6 +109,7 @@ export function reorderPlan(orders, parts, fromTs, toTs, coverDays) {
       const need = perDay * cover;
       const suggestedOrder = Math.max(0, Math.ceil(round2(need - onHand)));
       const daysLeft = perDay > 0 ? Math.floor(onHand / perDay) : null;
+      const po = purchaseOrder(suggestedOrder, part.packType, packQuartsOf(part));
       return {
         partId: s.partId,
         number: s.number,
@@ -89,6 +124,10 @@ export function reorderPlan(orders, parts, fromTs, toTs, coverDays) {
         need: round2(need),
         suggestedOrder,
         daysLeft,
+        packType: part.packType || "",
+        orderQuarts: po.quarts,
+        orderPacks: po.packs,
+        orderText: po.text,
       };
     })
     .sort((a, b) => b.suggestedOrder - a.suggestedOrder || b.sold - a.sold);

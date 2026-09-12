@@ -78,3 +78,34 @@ test("brake pads and rotors are categorized by part number", async () => {
   // a filter still wins by description even with a brakey number
   assert.equal(itemCategory({ number: "SC12345", description: "Oil filter" }), "Oil Filters");
 });
+
+test("purchase order rounds to whole cases/boxes and respects a bulk minimum", async () => {
+  const { purchaseOrder, packQuartsOf } = await import("../src/lib/inventoryReports.js");
+  // 6-quart case: need 8 qt → 2 cases (12 qt)
+  assert.deepEqual(purchaseOrder(8, "case", 6), { quarts: 12, packs: 2, text: "2 cases (12 qt)" });
+  // 5-gallon box = 20 qt: need 5 qt → 1 box (20 qt)
+  assert.equal(packQuartsOf({ packType: "box", packSize: 5 }), 20);
+  assert.equal(purchaseOrder(5, "box", 20).text, "1 box (20 qt)");
+  // bulk 110 gal min = 440 qt: need 30 qt → 110 gal (min)
+  assert.equal(packQuartsOf({ packType: "bulk", packSize: 110 }), 440);
+  assert.equal(purchaseOrder(30, "bulk", 440).text, "110 gal bulk (min)");
+  // bulk when the need is above the minimum: 500 qt → 125 gal
+  assert.equal(purchaseOrder(500, "bulk", 440).text, "125 gal bulk");
+  // no pack set: just the quart count
+  assert.equal(purchaseOrder(8, "", 0).text, "8");
+  // nothing needed
+  assert.equal(purchaseOrder(0, "case", 6).text, "—");
+});
+
+test("the reorder plan carries the pack order text", async () => {
+  const { reorderPlan } = await import("../src/lib/inventoryReports.js");
+  const DAY = 86400000;
+  const from = Date.parse("2026-09-01T00:00:00Z");
+  const to = from + 10 * DAY;
+  const parts = { oil: { id: "oil", number: "VAL", description: "Valvoline 5W-30", category: "Oil", onHand: 2, packType: "case", packSize: 6 } };
+  const orders = { a: { id: "a", status: "invoiced", invoicedAt: from + DAY, lines: [{ kind: "part", partId: "oil", qty: 40, price: 7, cost: 3 }] } };
+  const plan = reorderPlan(orders, parts, from, to, 14); // 4/day × 14 = 56 need, on hand 2 → 54 qt → 9 cases
+  const oil = plan.find((r) => r.partId === "oil");
+  assert.equal(oil.suggestedOrder, 54);
+  assert.equal(oil.orderText, "9 cases (54 qt)");
+});

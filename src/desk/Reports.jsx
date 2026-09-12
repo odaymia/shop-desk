@@ -451,7 +451,11 @@ function ReorderReport({ rows, q, setQ, cats, cat, setCat, coverDays, setCoverDa
                 <td className="r num muted">{it.daysLeft == null ? "—" : `${it.daysLeft}d`}</td>
                 <td className="r num">{it.need}</td>
                 <td className="r num">
-                  {it.suggestedOrder > 0 ? <strong style={{ color: "var(--signal)" }}>{it.suggestedOrder}</strong> : "—"}
+                  {it.suggestedOrder > 0 ? (
+                    <strong style={{ color: "var(--signal)" }}>{it.orderText}</strong>
+                  ) : (
+                    "—"
+                  )}
                 </td>
               </tr>
             ))}
