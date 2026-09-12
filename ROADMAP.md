@@ -26,6 +26,7 @@ What a shop uses Manager SE for every day, in a browser:
 - [x] VIN decode (free NHTSA vPIC service)
 - [x] Printable estimate and invoice with shop header and disclaimer
 - [x] Sales and tax report by date range
+- [x] Inventory reports: sales by item over a custom range, and a usage-based reorder planner (pick a period and days to cover; it sizes the order from sales pace and on-hand)
 - [ ] Deferred work: recommendations carried to the next visit
 - [ ] Customer authorization signature on the estimate (reuse the timecard signature pad)
 - [ ] Appointments board

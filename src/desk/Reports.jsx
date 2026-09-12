@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { Money, fmtDate } from "./ui.jsx";
 import { customerName, vehicleName } from "./useShop.js";
 import { orderTotals, laborHours, lineAmount, round2 } from "../lib/invoice.js";
+import { salesByItem, reorderPlan } from "../lib/inventoryReports.js";
+import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
 
 const presets = (weekStart) => {
@@ -21,9 +23,12 @@ const presets = (weekStart) => {
 
 export function Reports({ shop, cfg, employees, nav }) {
   const p = useMemo(() => presets(cfg.weekStart), [cfg.weekStart]);
+  const [view, setView] = useState("sales"); // sales | items | reorder
   const [range, setRange] = useState("month");
   const [from, setFrom] = useState(dayKey(p.month[0]));
   const [to, setTo] = useState(dayKey(p.month[1]));
+  const [coverDays, setCoverDays] = useState(14);
+  const [itemQ, setItemQ] = useState("");
   const pick = (k) => {
     setRange(k);
     if (p[k]) {
@@ -85,6 +90,11 @@ export function Reports({ shop, cfg, employees, nav }) {
     };
   }, [shop.orders, shop.customers, cfg, fromTs, toTs]);
 
+  const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
+  const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays), [shop.orders, shop.parts, fromTs, toTs, coverDays]);
+  const itemRows = useMemo(() => items.filter((it) => searchText(itemQ, it.number, it.description, it.category)), [items, itemQ]);
+  const reorderRows = useMemo(() => reorder.filter((it) => searchText(itemQ, it.number, it.description, it.category)), [reorder, itemQ]);
+
   const techName = (id) => (id === "none" ? "No tech assigned" : (employees.find((e) => e.id === id) || {}).name || "Unknown");
   const avg = r.count ? round2(r.sales / r.count) : 0;
 
@@ -92,6 +102,18 @@ export function Reports({ shop, cfg, employees, nav }) {
     <>
       <header className="deskHead">
         <h1>Reports</h1>
+        <div className="seg">
+          {[
+            ["sales", "Sales summary"],
+            ["items", "Sales by item"],
+            ["reorder", "Reorder planner"],
+          ].map(([k, label]) => (
+            <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="grow" />
         <div className="seg">
           {[
             ["today", "Today"],
@@ -112,6 +134,10 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
       </header>
       <div className="deskBody">
+        {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} />}
+        {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} coverDays={coverDays} setCoverDays={setCoverDays} from={from} to={to} />}
+        {view === "sales" && (
+        <>
         <div className="statRow">
           <div className="stat">
             <span>Sales</span>
@@ -274,6 +300,143 @@ export function Reports({ shop, cfg, employees, nav }) {
             </div>
           </div>
         </div>
+        </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ItemsReport({ rows, q, setQ }) {
+  const totals = rows.reduce((a, r) => ({ qty: a.qty + r.qty, revenue: a.revenue + r.revenue, profit: a.profit + r.profit }), { qty: 0, revenue: 0, profit: 0 });
+  return (
+    <div className="card">
+      <div className="cardHead">
+        <h3>Sales by item</h3>
+        <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by item, part #, category" />
+      </div>
+      <table className="dk">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Category</th>
+            <th className="r">Qty sold</th>
+            <th className="r">Revenue</th>
+            <th className="r">Cost</th>
+            <th className="r">Profit</th>
+            <th className="r">On hand</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={7} className="emptyNote">
+                Nothing sold in this range.
+              </td>
+            </tr>
+          )}
+          {rows.map((it) => (
+            <tr key={it.key}>
+              <td>
+                {it.number ? <span className="num muted">{it.number} </span> : null}
+                {it.description || "—"}
+              </td>
+              <td className="muted">{it.category || "—"}</td>
+              <td className="r num">{it.qty}</td>
+              <td className="r num">
+                <Money v={it.revenue} />
+              </td>
+              <td className="r num muted">
+                <Money v={it.cost} />
+              </td>
+              <td className="r num">
+                <Money v={it.profit} />
+              </td>
+              <td className="r num muted">{it.onHand == null ? "—" : it.onHand}</td>
+            </tr>
+          ))}
+          {rows.length > 0 && (
+            <tr className="job">
+              <td colSpan={2}>Total</td>
+              <td className="r num">{round2(totals.qty)}</td>
+              <td className="r num">
+                <Money v={round2(totals.revenue)} />
+              </td>
+              <td></td>
+              <td className="r num">
+                <Money v={round2(totals.profit)} />
+              </td>
+              <td></td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ReorderReport({ rows, q, setQ, coverDays, setCoverDays, from, to }) {
+  const toOrder = rows.filter((r) => r.suggestedOrder > 0);
+  return (
+    <>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <p className="legalNote" style={{ margin: 0 }}>
+          Order enough of each item to last the days you choose, based on how fast it sold from {from} to {to} and what
+          you have on hand. Pick a wider date range for a steadier average.
+        </p>
+        <div className="dateRow" style={{ marginTop: 10 }}>
+          <span>Days to cover</span>
+          <input type="number" min="1" className="search" style={{ width: 90 }} value={coverDays} onChange={(e) => setCoverDays(Math.max(1, Number(e.target.value) || 1))} />
+          {[7, 14, 30, 60].map((d) => (
+            <button key={d} className={`btn tiny ${Number(coverDays) === d ? "primary" : ""}`} onClick={() => setCoverDays(d)}>
+              {d} days
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <div className="cardHead">
+          <h3>Reorder planner — {toOrder.length} item{toOrder.length === 1 ? "" : "s"} to order</h3>
+          <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by item, part #, category" />
+        </div>
+        <table className="dk">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th className="r">On hand</th>
+              <th className="r">Sold</th>
+              <th className="r">Per week</th>
+              <th className="r">Runs out in</th>
+              <th className="r">Need for {coverDays}d</th>
+              <th className="r">Order</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="emptyNote">
+                  Nothing sold in this range to base an order on.
+                </td>
+              </tr>
+            )}
+            {rows.map((it) => (
+              <tr key={it.partId} className={it.suggestedOrder > 0 ? "" : "off"}>
+                <td>
+                  {it.number ? <span className="num muted">{it.number} </span> : null}
+                  {it.description || "—"}
+                </td>
+                <td className="r num">{it.onHand}</td>
+                <td className="r num">{it.sold}</td>
+                <td className="r num">{it.perWeek}</td>
+                <td className="r num muted">{it.daysLeft == null ? "—" : `${it.daysLeft}d`}</td>
+                <td className="r num">{it.need}</td>
+                <td className="r num">
+                  {it.suggestedOrder > 0 ? <strong style={{ color: "var(--signal)" }}>{it.suggestedOrder}</strong> : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </>
   );
