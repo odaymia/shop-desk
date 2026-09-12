@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Modal, Field, Text, Num, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
 import { OIL_TYPE_OPTIONS } from "../lib/oilchange.js";
-import { itemCategory } from "../lib/inventoryReports.js";
+import { itemCategory, packQuartsOf } from "../lib/inventoryReports.js";
 
 const blank = () => ({
   number: "",
@@ -33,6 +33,7 @@ export function Inventory({ shop, flash }) {
   const [cat, setCat] = useState("all");
   const [edit, setEdit] = useState(null);
   const [quick, setQuick] = useState(false);
+  const [receive, setReceive] = useState(false);
   const vendors = activeList(shop.vendors).sort((a, b) => a.name.localeCompare(b.name));
 
   const stock = useMemo(
@@ -70,6 +71,9 @@ export function Inventory({ shop, flash }) {
         <span className="muted">
           Stock at cost: <Money v={value} />
         </span>
+        <button className="btn" onClick={() => setReceive(true)}>
+          Receive order
+        </button>
         <button className="btn" onClick={() => setQuick(true)}>
           Quick add
         </button>
@@ -78,6 +82,7 @@ export function Inventory({ shop, flash }) {
         </button>
       </header>
       {quick && <QuickAdd shop={shop} flash={flash} onClose={() => setQuick(false)} />}
+      {receive && <ReceiveOrder shop={shop} flash={flash} onClose={() => setReceive(false)} />}
       <div className="deskBody">
         {cats.length > 1 && (
           <div className="catBar" style={{ paddingBottom: 14 }}>
@@ -412,6 +417,167 @@ function QuickAdd({ shop, flash, onClose }) {
       <div className="rowBtns" style={{ marginTop: 16 }}>
         <button className="btn primary lg" onClick={save} disabled={busy || !filled.length}>
           {busy ? "Adding…" : `Add ${filled.length} part${filled.length === 1 ? "" : "s"}`}
+        </button>
+        <button className="btn lg" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* Receive order: bump the on-hand of existing parts after a shipment
+   arrives. Type or paste part numbers and how many came in; oils bought
+   in cases/boxes/bulk take the pack count and convert to quarts. Cost can
+   be updated if it changed. Nothing is created — unmatched numbers are
+   flagged so you can add them first. */
+const RECV_UNIT = { case: "cases", box: "boxes", bulk: "gallons" };
+function receivedUnits(part, entered) {
+  const n = toNum(entered);
+  if (!part || !part.packType) return n;
+  if (part.packType === "case" || part.packType === "box") return n * (packQuartsOf(part) || 1);
+  if (part.packType === "bulk") return n * 4; // gallons → quarts
+  return n;
+}
+const recvRow = () => ({ number: "", entered: "", cost: "" });
+const recvHasData = (r) => (r.number || "").trim();
+
+function ReceiveOrder({ shop, flash, onClose }) {
+  const [rows, setRows] = useState([recvRow()]);
+  const [paste, setPaste] = useState("");
+  const [busy, setBusy] = useState(false);
+  const byNumber = useMemo(() => {
+    const m = {};
+    for (const p of Object.values(shop.parts)) if (p.active !== false && p.number) m[String(p.number).trim().toUpperCase()] = p;
+    return m;
+  }, [shop.parts]);
+  const partFor = (num) => byNumber[String(num || "").trim().toUpperCase()] || null;
+
+  const setCell = (i, field, val) =>
+    setRows((rs) => {
+      const next = rs.map((r, k) => (k === i ? { ...r, [field]: val } : r));
+      if (recvHasData(next[next.length - 1])) next.push(recvRow());
+      return next;
+    });
+  const addPaste = () => {
+    const parsed = paste
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const c = line.split(/\t|,/).map((s) => s.trim());
+        return { number: c[0] || "", entered: c[1] || "", cost: c[2] || "" };
+      });
+    if (!parsed.length) return;
+    setRows((rs) => [...rs.filter(recvHasData), ...parsed, recvRow()]);
+    setPaste("");
+  };
+
+  const filled = rows.filter(recvHasData);
+  const matched = filled.filter((r) => partFor(r.number) && toNum(r.entered) > 0);
+  const missing = filled.filter((r) => !partFor(r.number));
+  const save = async () => {
+    if (!matched.length) return;
+    setBusy(true);
+    for (const r of matched) {
+      const part = partFor(r.number);
+      const added = receivedUnits(part, r.entered);
+      await shop.savePart({
+        ...part,
+        onHand: toNum(part.onHand) + added,
+        cost: (r.cost || "").trim() ? toNum(r.cost) : part.cost,
+      });
+    }
+    flash(`Received into ${matched.length} part${matched.length === 1 ? "" : "s"}`);
+    onClose();
+  };
+
+  return (
+    <Modal title="Receive an order" onClose={onClose} size="xwide">
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Enter each part number and how many came in — it adds to what's on hand. Oils bought in cases, boxes, or bulk
+        take the pack count and convert to quarts. Update the cost only if it changed.
+      </p>
+      <div className="qaScroll">
+        <table className="lines qaGrid">
+          <thead>
+            <tr>
+              <th style={{ width: 140 }}>Part #</th>
+              <th>Item</th>
+              <th className="r" style={{ width: 90 }}>On hand</th>
+              <th style={{ width: 150 }}>Received</th>
+              <th className="r" style={{ width: 100 }}>New on hand</th>
+              <th style={{ width: 90 }}>New cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const part = partFor(r.number);
+              const unit = part && part.packType ? RECV_UNIT[part.packType] : "";
+              const added = receivedUnits(part, r.entered);
+              const notFound = recvHasData(r) && !part;
+              return (
+                <tr key={i}>
+                  <td>
+                    <input value={r.number} onChange={(e) => setCell(i, "number", e.target.value.toUpperCase())} />
+                  </td>
+                  <td className={notFound ? "" : "muted"}>
+                    {part ? (
+                      <>
+                        {part.description}
+                        {itemCategory(part) ? <span className="sub">{itemCategory(part)}</span> : null}
+                      </>
+                    ) : notFound ? (
+                      <span style={{ color: "var(--warn)" }}>Not in inventory — add it first</span>
+                    ) : (
+                      ""
+                    )}
+                  </td>
+                  <td className="r num muted">{part ? toNum(part.onHand) : "—"}</td>
+                  <td>
+                    <span className="rcvIn">
+                      <input inputMode="decimal" value={r.entered} onChange={(e) => setCell(i, "entered", e.target.value.replace(/[^0-9.]/g, ""))} />
+                      {unit ? <span className="muted">{unit}</span> : null}
+                    </span>
+                  </td>
+                  <td className="r num">
+                    {part && toNum(r.entered) > 0 ? (
+                      <strong style={{ color: "var(--live)" }}>{toNum(part.onHand) + added}</strong>
+                    ) : (
+                      "—"
+                    )}
+                    {unit && toNum(r.entered) > 0 ? <span className="sub">+{added} qt</span> : null}
+                  </td>
+                  <td>
+                    <input inputMode="decimal" value={r.cost} onChange={(e) => setCell(i, "cost", e.target.value.replace(/[^0-9.]/g, ""))} placeholder={part ? String(toNum(part.cost)) : ""} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <details style={{ marginTop: 12 }}>
+        <summary className="muted" style={{ cursor: "pointer" }}>Paste from a packing list</summary>
+        <p className="legalNote" style={{ marginTop: 6 }}>
+          One part per line: part number, quantity received, new cost — tabs or commas. Quantity is packs for
+          case/box/bulk oils, units otherwise. Cost is optional.
+        </p>
+        <textarea className="ta" style={{ minHeight: 80 }} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={"VO106\t24\nVS5/30\t10"} />
+        <button className="btn" style={{ marginTop: 8 }} onClick={addPaste} disabled={!paste.trim()}>
+          Add pasted rows to the grid
+        </button>
+      </details>
+
+      {missing.length > 0 && (
+        <p className="fldErr" style={{ marginTop: 12 }}>
+          {missing.length} number{missing.length === 1 ? "" : "s"} not in inventory — add {missing.length === 1 ? "it" : "them"} with Quick add first, or fix the number.
+        </p>
+      )}
+      <div className="rowBtns" style={{ marginTop: 12 }}>
+        <button className="btn primary lg" onClick={save} disabled={busy || !matched.length}>
+          {busy ? "Receiving…" : `Receive into ${matched.length} part${matched.length === 1 ? "" : "s"}`}
         </button>
         <button className="btn lg" onClick={onClose}>
           Cancel

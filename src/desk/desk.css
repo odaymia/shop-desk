@@ -280,3 +280,6 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .qaGrid td { padding:2px; border-bottom:1px solid var(--line); }
 .qaGrid input { width:100%; min-width:0; border:1px solid transparent; background:transparent; padding:9px 8px; border-radius:6px; font-size:14px; color:var(--ink); }
 .qaGrid input:focus { border-color:var(--signal); background:#fff; outline:none; }
+
+.rcvIn { display:flex; align-items:center; gap:6px; }
+.rcvIn input { flex:1; }
