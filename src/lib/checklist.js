@@ -2,7 +2,7 @@
    from the keyboard on the ticket, printed on the invoice, shown in the
    portal. Pure functions only.
 
-   A config item: { id, label, kind: "choice" | "text" | "depth", options,
+   A config item: { id, label, kind: "choice" | "text" | "depth" | "pressure", options,
    value (the default), auto, remember }.
    - auto: words on a ticket line that mean the item was replaced, e.g.
      "oil filter". Alternatives split on "|"; every word must appear;
@@ -26,7 +26,7 @@ export const DEFAULT_CHECKLIST = [
   { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush" },
   { id: "coolant", label: "Radiator fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Can't check", "At your request"], value: "Level OK", auto: "coolant flush | radiator flush | coolant service | antifreeze" },
   { id: "washer", label: "Windshield wash fluid", kind: "choice", options: ["Added", "Full", "Can't check"], value: "Added", auto: "" },
-  { id: "tirePsi", label: "Tire pressure", kind: "text", value: "F35 R35", auto: "", remember: true },
+  { id: "tirePsi", label: "Tire pressure", kind: "pressure", value: "F35 R35", auto: "", remember: true },
   { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case" },
   { id: "lfDepth", label: "Front driver side tire depth", kind: "depth", value: "", auto: "" },
   { id: "rfDepth", label: "Front passenger side tire depth", kind: "depth", value: "", auto: "" },
@@ -74,7 +74,9 @@ export function startChecklist(cfgItems, lines, prior) {
   return src
     .filter((it) => it && it.label && it.active !== false)
     .map((it) => {
-      const kind = it.kind || "choice";
+      /* older configs saved tire pressure as free text; show it as the
+         front/rear number pair now */
+      const kind = it.id === "tirePsi" && (it.kind || "text") === "text" ? "pressure" : it.kind || "choice";
       const auto = kind === "choice" && replacedOnTicket(it, lines);
       let value = auto ? REPLACED : it.value || "";
       if (!auto && it.remember && prior) {
@@ -105,6 +107,22 @@ export function withDepthDefault(items, n) {
   return items.map((x, i) => (i === n ? { ...x, value: prev.value } : x));
 }
 
+/* Tire pressure is stored as a single string ("F35 R35") so it prints and
+   syncs like any other item, but it's entered as two numbers, front and
+   rear. These parse and rebuild that string. */
+export function parsePressure(value) {
+  const s = String(value || "");
+  const f = (s.match(/F\s*(\d+)/i) || [])[1] || "";
+  const r = (s.match(/R\s*(\d+)/i) || [])[1] || "";
+  return { f, r };
+}
+export function formatPressure(f, r) {
+  const ff = String(f || "").replace(/\D/g, "").slice(0, 3);
+  const rr = String(r || "").replace(/\D/g, "").slice(0, 3);
+  if (!ff && !rr) return "";
+  return `F${ff} R${rr}`.trim();
+}
+
 export function displayValue(item) {
   if (!item) return "";
   if (item.kind === "depth") return item.value ? `${item.value}/32nds` : "";
@@ -130,7 +148,7 @@ export function normalizeChecklist(rows) {
   return (rows || [])
     .filter((r) => r && String(r.label || "").trim())
     .map((r, i) => {
-      const kind = r.kind === "text" || r.kind === "depth" ? r.kind : "choice";
+      const kind = r.kind === "text" || r.kind === "depth" || r.kind === "pressure" ? r.kind : "choice";
       const options = Array.isArray(r.options)
         ? r.options
         : String(r.options || "")

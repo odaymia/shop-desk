@@ -292,6 +292,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
                   <option value="choice">Choices</option>
                   <option value="text">Typed</option>
                   <option value="depth">Tire depth</option>
+                  <option value="pressure">Tire pressure (F/R)</option>
                 </select>
                 <input
                   value={Array.isArray(it.options) ? it.options.join(", ") : it.options || ""}

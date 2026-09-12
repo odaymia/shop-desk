@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal } from "./ui.jsx";
-import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue } from "../lib/checklist.js";
+import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parsePressure, formatPressure } from "../lib/checklist.js";
 
 /* The service checklist, driven from the keyboard: Enter takes the
    answer and moves on, Space (or the arrows) picks a different one,
@@ -30,7 +30,7 @@ export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
   useEffect(() => {
     if (cur && cur.kind !== "choice" && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      if (inputRef.current.select) inputRef.current.select();
     }
   }, [idx, cur]);
 
@@ -97,6 +97,35 @@ export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
                 </button>
               ))}
             </div>
+          ) : cur.kind === "pressure" ? (
+            (() => {
+              const { f, r } = parsePressure(cur.value);
+              return (
+                <div className="ckPsi">
+                  <label>
+                    <span>Front</span>
+                    <input
+                      ref={inputRef}
+                      inputMode="numeric"
+                      value={f}
+                      onChange={(e) => setVal(formatPressure(e.target.value, r))}
+                      placeholder="35"
+                    />
+                    <span className="muted">psi</span>
+                  </label>
+                  <label>
+                    <span>Rear</span>
+                    <input
+                      inputMode="numeric"
+                      value={r}
+                      onChange={(e) => setVal(formatPressure(f, e.target.value))}
+                      placeholder="35"
+                    />
+                    <span className="muted">psi</span>
+                  </label>
+                </div>
+              );
+            })()
           ) : (
             <div className="ckText">
               <input
