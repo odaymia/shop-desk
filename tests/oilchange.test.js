@@ -85,3 +85,38 @@ test("the package's service, oil, and filter lines are marked to fold into one r
   const pkgAmt = Math.round(packaged.reduce((a, l) => a + (l.kind === "labor" ? l.hours * l.rate : l.qty * l.price), 0) * 100) / 100;
   assert.equal(pkgAmt, 54.99); // the folded line shows the package price
 });
+
+import { detectOilType, oilTypeOf, packageOilType, oilsForPackage } from "../src/lib/oilchange.js";
+
+test("oil type is read from the name; a plain grade counts as conventional", () => {
+  assert.equal(detectOilType("Valvoline Conventional 5W-30"), "conventional");
+  assert.equal(detectOilType("Valvoline Full Synthetic 5W-30"), "synthetic");
+  assert.equal(detectOilType("Valvoline Synthetic Blend 5W-20"), "blend");
+  assert.equal(detectOilType("Valvoline MaxLife 5W-30"), "maxlife");
+  assert.equal(detectOilType("High Mileage 10W-30"), "maxlife");
+  assert.equal(detectOilType("VALV ADVANCED SYN 5W-30"), "synthetic");
+  assert.equal(detectOilType("5W-30"), null); // no type word
+  assert.equal(oilTypeOf({ description: "5W-30" }), "conventional"); // defaulted for filtering
+});
+
+test("a conventional package offers only conventional oils, never synthetic or blend", () => {
+  const convPkg = DEFAULT_OIL_PACKAGES[0];
+  const synPkg = DEFAULT_OIL_PACKAGES[2];
+  const oils = [
+    { id: "c", description: "Valvoline Conventional 5W-30" },
+    { id: "p", description: "5W-30 (store brand)" }, // plain → conventional
+    { id: "b", description: "Valvoline Synthetic Blend 5W-20" },
+    { id: "s", description: "Valvoline Full Synthetic 5W-30" },
+    { id: "m", description: "Valvoline MaxLife 5W-30" },
+  ];
+  assert.equal(packageOilType(convPkg), "conventional");
+  assert.deepEqual(oilsForPackage(oils, convPkg).map((o) => o.id), ["c", "p"]);
+  assert.deepEqual(oilsForPackage(oils, synPkg).map((o) => o.id), ["s"]);
+});
+
+test("a package with no type word in its name filters nothing", () => {
+  const generic = { id: "x", name: "Oil Change", quarts: 5, price: 40, extraQuart: 5 };
+  const oils = [{ id: "s", description: "Full Synthetic 0W-20" }, { id: "c", description: "Conventional 5W-30" }];
+  assert.equal(packageOilType(generic), null);
+  assert.deepEqual(oilsForPackage(oils, generic).map((o) => o.id), ["s", "c"]);
+});

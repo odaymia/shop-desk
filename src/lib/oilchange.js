@@ -104,6 +104,38 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
   return lines;
 }
 
+/* What kind of oil a name reads like: conventional, blend, synthetic, or
+   maxlife (high-mileage). Order matters — "synthetic blend" is a blend,
+   "high mileage" wins over the rest. Returns null when no type word is
+   present. */
+export function detectOilType(text) {
+  const s = String(text || "").toLowerCase();
+  if (/high.?mileage|max.?life/.test(s)) return "maxlife";
+  if (/blend/.test(s)) return "blend";
+  if (/full.?synthetic|synthetic|\bsyn\b|\bfs\b/.test(s)) return "synthetic";
+  if (/conventional|\bconv\b|\bdino\b/.test(s)) return "conventional";
+  return null;
+}
+/* An oil's type for filtering: a plain grade with no type word counts as
+   conventional. */
+export function oilTypeOf(part) {
+  return detectOilType(`${(part && part.description) || ""} ${(part && part.category) || ""}`) || "conventional";
+}
+/* The oil type a package calls for, from its name or id. Null when the
+   package name says nothing about the oil (a generic package), so its
+   oil list isn't filtered. */
+export function packageOilType(pkg) {
+  return detectOilType(`${(pkg && pkg.id) || ""} ${(pkg && pkg.name) || ""}`);
+}
+/* The oils that fit a package: only the matching type. A conventional
+   package won't list synthetic or blend; a synthetic package won't list
+   conventional. */
+export function oilsForPackage(oils, pkg) {
+  const want = packageOilType(pkg);
+  if (!want) return oils;
+  return (oils || []).filter((p) => oilTypeOf(p) === want);
+}
+
 /* Inventory items that are motor oil: category says oil, or the
    description reads like a grade. */
 export function oilItems(parts) {

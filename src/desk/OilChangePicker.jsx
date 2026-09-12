@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal, Money, toNum } from "./ui.jsx";
-import { oilPackageLines, oilItems, filterItems } from "../lib/oilchange.js";
+import { oilPackageLines, oilItems, filterItems, oilsForPackage, packageOilType } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
 import { uid } from "../lib/ids.js";
 
@@ -13,12 +13,14 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const [quarts, setQuarts] = useState(spec && spec.oilCapacityQt ? spec.oilCapacityQt : "");
   const [oil, setOil] = useState(null);
   const [step, setStep] = useState("package"); // package | quarts | oil | filter
+  const [allOils, setAllOils] = useState(false); // show every oil, past the package's type
   const oils = oilItems(shop.parts);
   const filters = filterItems(shop.parts);
   const grade = spec ? spec.oilViscosity : "";
   const suggestedOils = grade ? matchOil(shop.parts, grade) : [];
   const suggestedFilters = spec ? matchFilter(shop.parts, spec.oilFilters) : [];
   const q = toNum(quarts) || (pkg ? pkg.quarts : 5);
+  const wantType = pkg ? packageOilType(pkg) : null; // the oil type this package calls for, or null
 
   const finish = (filt) => onAdd(oilPackageLines(pkg, q, oil, filt, uid), pkg);
 
@@ -108,16 +110,26 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
 
   if (step === "oil")
     return (
-      <Modal title={`Which oil?${grade ? ` (spec: ${grade})` : ""}`} onClose={onClose} size="wide">
+      <Modal title={`Which ${wantType && !allOils ? `${wantType} ` : ""}oil?${grade ? ` (spec: ${grade})` : ""}`} onClose={onClose} size="wide">
         <div className="rowBtns">
           <button className="btn" onClick={() => setStep("filter")}>
             Choose later
           </button>
+          {wantType && (
+            <button className="btn ghost" onClick={() => setAllOils((x) => !x)}>
+              {allOils ? `Only ${wantType} oils` : "Show all oils"}
+            </button>
+          )}
         </div>
+        {wantType && !allOils && (
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            Showing {wantType} oils to match the {pkg.name}.
+          </p>
+        )}
         <PickList
-          items={oils}
-          suggested={suggestedOils}
-          kind="motor oil"
+          items={allOils ? oils : oilsForPackage(oils, pkg)}
+          suggested={allOils ? suggestedOils : oilsForPackage(suggestedOils, pkg)}
+          kind={`${wantType && !allOils ? `${wantType} ` : ""}motor oil`}
           onPick={(p) => {
             setOil(p);
             setStep("filter");
