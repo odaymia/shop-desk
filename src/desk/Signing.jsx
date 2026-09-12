@@ -216,13 +216,13 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
             tk.type === "text" ? (
               <span key={idx}>{tk.text}</span>
             ) : tk.type === "check" ? (
-              <button
+              <input
                 key={idx}
-                type="button"
-                className={`authChk ${checks[tk.i] ? "on" : ""}`}
-                onClick={() => setChecks((c) => ({ ...c, [tk.i]: !c[tk.i] }))}
+                type="checkbox"
+                className="authChk"
+                checked={!!checks[tk.i]}
+                onChange={(e) => setChecks((c) => ({ ...c, [tk.i]: e.target.checked }))}
                 aria-label="checkbox"
-                aria-pressed={!!checks[tk.i]}
               />
             ) : (
               <input key={idx} className="authBlank" value={blanks[tk.i] || ""} onChange={(e) => setBlanks((b) => ({ ...b, [tk.i]: e.target.value }))} />

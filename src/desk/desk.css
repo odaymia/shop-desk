@@ -326,9 +326,6 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 @media print { .sheet .shSigImg { max-height:46px; } }
 
 /* fill-in fields in the authorization text */
-.authChk { display:inline-block; width:26px; height:26px; border:2px solid var(--ink); border-radius:6px; background:#fff; padding:0; margin:0 5px; vertical-align:-7px; cursor:pointer; position:relative; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-.authChk:active { transform:scale(.94); }
-.authChk.on { background:var(--live); border-color:var(--live); }
-.authChk.on::after { content:"\2713"; color:#fff; font-weight:800; font-size:17px; line-height:1; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+.authChk { width:26px; height:26px; margin:0 5px; vertical-align:-6px; accent-color:var(--live); cursor:pointer; touch-action:manipulation; }
 .authBlank { display:inline-block; width:64px; min-width:0; border:none; border-bottom:2px solid var(--ink); background:transparent; font:inherit; text-align:center; padding:6px 4px; margin:0 3px; touch-action:manipulation; }
 .authBlank:focus { outline:none; border-bottom-color:var(--signal); }
