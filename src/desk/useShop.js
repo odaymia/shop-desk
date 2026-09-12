@@ -87,12 +87,18 @@ export function useShop(cfg) {
     () =>
       cloud.subscribe(async (e) => {
         if (e.type !== "data") return;
+        /* Pull carries the new values on the event; fall back to a read
+           only if they aren't there. On a shop's first sync this batch can
+           be a thousand keys, so re-reading each one would double the work
+           that already just landed in IndexedDB. */
+        const vals = e.values || null;
+        const valueFor = async (key) => (vals && key in vals ? vals[key] : await sGet(key, null));
         let next = null;
         const cloned = {}; // clone each table map once per batch, not once per key
         for (const key of e.keys || []) {
           for (const [name, prefix] of TABLES) {
             if (!key.startsWith(prefix)) continue;
-            const v = await sGet(key, null);
+            const v = await valueFor(key);
             next = next || { ...ref.current };
             if (!cloned[name]) {
               next[name] = { ...next[name] };
@@ -104,7 +110,7 @@ export function useShop(cfg) {
           }
           if (key === COUNTERS_KEY) {
             next = next || { ...ref.current };
-            next.counters = (await sGet(COUNTERS_KEY, null)) || {};
+            next.counters = (await valueFor(COUNTERS_KEY)) || {};
           }
         }
         if (next) commit(next);

@@ -278,7 +278,6 @@ async function pull() {
     return;
   }
   pulling = true;
-  const changed = new Set();
   try {
     const sync = await lget(SYNC_KEY, { kv: EPOCH });
     const skipKv = pendingKvKeys();
@@ -293,16 +292,29 @@ async function pull() {
         .order("updated_at")
         .limit(PAGE);
       if (error) throw error;
+      /* Carry the values on the event so listeners don't have to read each
+         key back out of IndexedDB — on a shop's first sync this page could
+         hold a thousand records. */
+      const keys = [];
+      const values = {};
       for (const r of data) {
         since = r.updated_at;
         if (skipKv.has(r.key)) continue;
         await applyRemote(r.key, r.value);
-        changed.add(r.key);
+        keys.push(r.key);
+        values[r.key] = r.value ?? null;
       }
+      /* Save progress after every page. A shop's first sync is tens of
+         thousands of rows; persisting only at the end meant a reload
+         partway through re-downloaded the whole shop from scratch, which
+         is what dragged the counter PC to a crawl. Now an interrupted
+         sync resumes where it left off. */
+      sync.kv = since;
+      await lset(SYNC_KEY, sync);
+      if (keys.length) emit("data", { keys, values });
       if (data.length < PAGE) break;
+      await new Promise((r) => setTimeout(r)); // yield so a big first sync never freezes the tab
     }
-    sync.kv = since;
-    await lset(SYNC_KEY, sync);
     setState({ lastSync: Date.now(), error: /Offline|Sync error/.test(state.error) ? "" : state.error });
   } catch (e) {
     if (isAuthError(e)) {
@@ -313,7 +325,6 @@ async function pull() {
     }
   } finally {
     pulling = false;
-    if (changed.size) emit("data", { keys: [...changed] });
     if (pullAgain) {
       pullAgain = false;
       schedulePull(100);
