@@ -31,6 +31,28 @@ const PAGES = [
   ["settings", "Settings"],
 ];
 
+const lsGet = (k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* private mode */
+  }
+};
+const lsDel = (k) => {
+  try {
+    localStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+};
+
 export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const shop = useShop(cfg);
   const [page, setPage] = useState("orders");
@@ -38,7 +60,35 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const [customerId, setCustomerId] = useState(null);
   const [printId, setPrintId] = useState(null);
   const [starting, setStarting] = useState(false);
+  /* Kiosk lock: on the signature tablet, hide the whole desk behind the
+     signature pad so customers and unauthorized staff can't wander into the
+     program. Per-device (localStorage) with a code to get back out. */
+  const [locked, setLocked] = useState(() => lsGet("sd:kioskLock") === "1");
+  const [unlocking, setUnlocking] = useState(false);
   const employees = roster.filter((e) => e.active !== false);
+
+  const lockKiosk = () => {
+    let code = lsGet("sd:kioskCode") || "";
+    if (!code) {
+      const set = window.prompt("Set a code to unlock the signature pad later (4–8 digits):");
+      if (set == null) return;
+      if (!/^\d{4,8}$/.test(set.trim())) return flash("Enter 4 to 8 digits.", "out");
+      code = set.trim();
+      lsSet("sd:kioskCode", code);
+    }
+    lsSet("sd:kioskLock", "1");
+    setPage("signpad");
+    setLocked(true);
+  };
+  const tryUnlock = (entered) => {
+    if (String(entered).trim() === (lsGet("sd:kioskCode") || "")) {
+      lsDel("sd:kioskLock");
+      setLocked(false);
+      setUnlocking(false);
+      return true;
+    }
+    return false;
+  };
 
   const nav = {
     page,
@@ -75,6 +125,18 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       <div className="bootWrap">
         <div className="bootPulse" />
         <p className="bootTxt">Opening the front desk…</p>
+      </div>
+    );
+  }
+
+  if (locked) {
+    return (
+      <div className="kiosk">
+        <SignatureStation shop={shop} cfg={cfg} flash={flash} />
+        <button className="kioskExit" onClick={() => setUnlocking(true)} title="Staff: unlock">
+          🔒
+        </button>
+        {unlocking && <KioskUnlock onClose={() => setUnlocking(false)} onTry={tryUnlock} />}
       </div>
     );
   }
@@ -117,7 +179,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}
-          {page === "signpad" && <SignatureStation shop={shop} cfg={cfg} flash={flash} />}
+          {page === "signpad" && <SignatureStation shop={shop} cfg={cfg} flash={flash} onLock={lockKiosk} />}
           {page === "settings" && (
             <DeskSettings
               cfg={cfg}
@@ -143,5 +205,45 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       )}
       {printOrder && <PrintTicket order={printOrder} shop={shop} cfg={cfg} employees={roster} onClose={() => setPrintId(null)} />}
     </>
+  );
+}
+
+/* The code prompt to leave kiosk mode. */
+function KioskUnlock({ onClose, onTry }) {
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState(false);
+  const submit = () => {
+    if (!onTry(code)) {
+      setErr(true);
+      setCode("");
+    }
+  };
+  return (
+    <div className="kioskGate" onClick={onClose}>
+      <div className="kioskGateCard" onClick={(e) => e.stopPropagation()}>
+        <h3>Staff code</h3>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoFocus
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value.replace(/\D/g, "").slice(0, 8));
+            setErr(false);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="Enter code"
+        />
+        {err && <p className="fldErr" style={{ margin: "6px 0 0" }}>Wrong code.</p>}
+        <div className="rowBtns" style={{ marginTop: 12 }}>
+          <button className="btn primary" onClick={submit} disabled={!code}>
+            Unlock
+          </button>
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

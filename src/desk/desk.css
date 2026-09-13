@@ -265,6 +265,14 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .specGrid strong { font-size:20px; }
 .prodList { margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
 .prodList li { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--asphalt); font-weight:600; }
+.kiosk { position:fixed; inset:0; overflow:auto; background:var(--asphalt); z-index:60; }
+.kiosk .deskBody { min-height:100vh; box-sizing:border-box; }
+.kioskExit { position:fixed; bottom:12px; right:12px; z-index:61; width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:18px; opacity:.25; cursor:pointer; }
+.kioskExit:hover, .kioskExit:active { opacity:1; }
+.kioskGate { position:fixed; inset:0; z-index:80; background:rgba(20,24,33,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+.kioskGateCard { background:#fff; border-radius:14px; padding:20px; width:100%; max-width:300px; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+.kioskGateCard h3 { margin:0 0 12px; }
+.kioskGateCard input { width:100%; box-sizing:border-box; font-size:22px; text-align:center; letter-spacing:6px; padding:10px; border:1px solid var(--line); border-radius:9px; background:var(--asphalt); color:var(--ink); }
 .qr { margin:0 auto; background:#fff; padding:10px; border-radius:10px; }
 .qr svg { width:100%; height:100%; display:block; }
 .fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }

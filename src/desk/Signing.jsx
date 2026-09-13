@@ -286,7 +286,7 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
 /* The signature station: leave this open on a tablet signed in to the
    shop. When the front desk sends a ticket, it appears here for the
    customer to sign; signing clears the request. */
-export function SignatureStation({ shop, cfg, flash }) {
+export function SignatureStation({ shop, cfg, flash, onLock }) {
   const [reqId, setReqId] = useState(null);
   const [thanks, setThanks] = useState(null); // customer to show a receipts QR to after signing
   const load = () => sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
@@ -338,6 +338,11 @@ export function SignatureStation({ shop, cfg, flash }) {
           <img src={cfg.logo || defaultLogo} alt="" />
           <h1>{cfg.shopName}</h1>
           <p className="muted">Ready to sign. When the front desk sends your estimate, it will appear here.</p>
+          {onLock && (
+            <button className="btn" style={{ marginTop: 18 }} onClick={onLock} title="Hide the rest of the program behind this screen; a code gets you back">
+              Lock to this screen
+            </button>
+          )}
         </div>
       </div>
     );
