@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { Modal } from "./ui.jsx";
-import { loadValvolineSpecs, specMakes, specModels, specEngines, qtText } from "../lib/valvolineSpecs.js";
+import { loadValvolineSpecs, specMakes, specModels, specEngines, enginesProducts, engineFluids, qtText } from "../lib/valvolineSpecs.js";
+
+/* "Extended Protection Full Synthetic SAE 5W-30 Motor Oil" -> the short way
+   a counter person would say it. */
+const shortProduct = (name) =>
+  String(name || "")
+    .replace(/\s*Motor Oil\s*$/i, "")
+    .replace(/\bSAE\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+const productLabel = (name) => "Valvoline " + shortProduct(name);
 
 /* Look up a vehicle's engine-oil grade and capacity from Valvoline's data,
    Make -> Model -> Engine, all searchable. When `onApply` is given (opened
@@ -119,6 +129,46 @@ export function OilSpecLookup({ start, onApply, onClose }) {
               <span>Oil capacity</span>
               <strong>{engine.q ? `${engine.q} quarts` : "not listed"}</strong>
             </div>
+            {(() => {
+              const all = enginesProducts(data, engine);
+              /* Valvoline lists every oil that will physically work, including
+                 off-grade ones (10W-30, diesel) — the shop wants the ones in
+                 the car's grade. Fall back to the full list if none match. */
+              const g = String(engine.g || "").trim();
+              const gradeRe = g && new RegExp("(^|[^0-9])" + g.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&") + "([^0-9]|$)", "i");
+              const matched = gradeRe ? all.filter((n) => gradeRe.test(n)) : all;
+              const products = matched.length ? matched : all;
+              if (!products.length) return null;
+              return (
+                <div style={{ marginTop: 14 }}>
+                  <div className="muted" style={{ marginBottom: 6 }}>
+                    {products.length === 1 ? "The only Valvoline oil that works:" : `Valvoline oils that work (${products.length}):`}
+                  </div>
+                  <ul className="prodList">
+                    {products.map((p) => (
+                      <li key={p}>{productLabel(p)}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+            {(() => {
+              const fluids = engineFluids(data, engine);
+              if (!fluids.length) return null;
+              return (
+                <div style={{ marginTop: 14 }}>
+                  <div className="muted" style={{ marginBottom: 6 }}>Other fluids Valvoline recommends</div>
+                  <div className="fluidGrid">
+                    {fluids.map((f) => (
+                      <div key={f.system} className="fluidRow">
+                        <div className="fSys">{f.system}</div>
+                        <div className="fProd">{f.products.map(shortProduct).join(" · ")}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <p className="legalNote" style={{ marginTop: 10 }}>
               From Valvoline's published product finder. Capacity is a guide — confirm on the dipstick.
             </p>

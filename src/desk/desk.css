@@ -263,6 +263,11 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .specGrid { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; align-items:baseline; }
 .specGrid span { color:var(--muted); }
 .specGrid strong { font-size:20px; }
+.prodList { margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
+.prodList li { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--asphalt); font-weight:600; }
+.fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }
+.fluidGrid .fSys { color:var(--muted); }
+.fluidGrid .fProd { font-weight:600; }
 .ckKeys { margin:16px 0 12px; font-size:12px; color:var(--muted); }
 .ckKeys b { color:var(--ink); font-weight:600; }
 .ckGrid { display:grid; grid-template-columns:1fr auto; gap:3px 12px; font-size:13px; }
