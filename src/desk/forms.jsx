@@ -3,7 +3,21 @@ import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
+import { loadValvolineSpecs, vvMakeList, vvModelList } from "../lib/valvolineSpecs.js";
 import { customerName, vehicleName, activeList, vehiclesOf, searchText } from "./useShop.js";
+
+/* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
+function mergeOpts(a, b) {
+  const seen = new Set();
+  const out = [];
+  for (const v of [...(a || []), ...(b || [])]) {
+    const k = String(v).toLowerCase();
+    if (!v || seen.has(k)) continue;
+    seen.add(k);
+    out.push(v);
+  }
+  return out;
+}
 
 /* A field that is a dropdown of known values with an escape hatch to type
    anything not on the list. Used for the Year/Make/Model/Engine cascade
@@ -15,8 +29,13 @@ function PickOrType({ label, value, onChange, options, placeholder, numeric }) {
   const match = (v) => options.find((o) => String(o).toLowerCase() === String(v).toLowerCase());
   const inList = value != null && value !== "" && !!match(value);
   const [typing, setTyping] = useState(!has || (value != null && value !== "" && !inList));
+  const hadOptions = useRef(has);
   useEffect(() => {
     if (value != null && value !== "" && !inList && has) setTyping(true);
+    /* options just appeared (e.g. a make was picked, so models loaded) and
+       the field is still blank — show the dropdown, not the text box */
+    else if (!hadOptions.current && has && (value == null || value === "")) setTyping(false);
+    hadOptions.current = has;
   }, [value, inList, has]);
 
   if (!has || typing) {
@@ -171,6 +190,17 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
      lists stay in step. */
   const ymme = useMemo(() => buildYmme(shop ? shop.vehicles : {}, shop ? shop.specs : {}), [shop]);
   const YEARS = useMemo(() => modelYears(), []);
+  /* The full make/model list from Valvoline's data, loaded on demand so a
+     make you've never serviced still shows up. Falls back to just the
+     shop's own cars until it arrives. */
+  const [vv, setVv] = useState(null);
+  useEffect(() => {
+    let ok = true;
+    loadValvolineSpecs().then((d) => ok && setVv(d)).catch(() => {});
+    return () => { ok = false; };
+  }, []);
+  const makeOptions = useMemo(() => mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []), [ymme, d.year, vv]);
+  const modelOptions = useMemo(() => mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : []), [ymme, d.year, d.make, vv]);
   const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "" }));
   const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "" }));
   const setModel = (v) => setD((x) => (v === x.model ? { ...x, model: v } : { ...x, model: v, engine: "" }));
@@ -293,8 +323,8 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
       {note && <p className="muted" style={{ margin: "-6px 0 14px", color: "var(--live)" }}>{note}</p>}
       <div className="fldRow">
         <PickOrType label="Year" value={d.year} onChange={setYear} options={YEARS} placeholder="Year" numeric />
-        <PickOrType label="Make" value={d.make} onChange={setMake} options={ymme.makesFor(d.year)} placeholder="Make" />
-        <PickOrType label="Model" value={d.model} onChange={setModel} options={ymme.modelsFor(d.year, d.make)} placeholder="Model" />
+        <PickOrType label="Make" value={d.make} onChange={setMake} options={makeOptions} placeholder="Make" />
+        <PickOrType label="Model" value={d.model} onChange={setModel} options={modelOptions} placeholder="Model" />
       </div>
       <div className="fldRow">
         <Field label="Trim">
