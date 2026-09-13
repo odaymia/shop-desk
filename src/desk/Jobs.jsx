@@ -189,6 +189,9 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
           <Field label="Priced per (leave blank for a fixed job)">
             <Text value={d.unit || ""} onChange={(v) => setD({ ...d, unit: v.trim().toLowerCase() })} placeholder="tire, wheel, quart" />
           </Field>
+          <Field label="Commission $ (per sale)">
+            <Text value={d.commission == null ? "" : d.commission} onChange={(v) => setD({ ...d, commission: clean(v) })} inputMode="decimal" placeholder="0.00" />
+          </Field>
         </div>
         {d.unit && (
           <p className="noteBox">
@@ -312,7 +315,7 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                 ? { ...l, qty: toNum(l.qty) || 1, price: toNum(l.price) }
                 : { ...l, qty: toNum(l.qty) || 1, price: numOrNull(l.price), cost: numOrNull(l.cost) }
             );
-            onSave({ ...d, name: d.name.trim(), lines });
+            onSave({ ...d, name: d.name.trim(), commission: numOrNull(d.commission), lines });
           }}
         >
           Save job

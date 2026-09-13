@@ -36,6 +36,7 @@ export const DEFAULT_CFG = {
   portalEnabled: false, // customer portal: publish customer records for sign-in at /portal/
   hours: "", // free text for the portal card: "Mon–Fri 8–6, Sat 8–2"
   nextOrderNumber: 1001, // first estimate/RO/invoice number; the live counter is in sd:counters
+  commission: { split: { advisor: 40, top: 30, pit: 30 } }, // how a service's flat spiff is split among the three on the ticket; amounts live on each job/package
   invoiceFooter:
     "Thank you for your business. Parts and labor are warranted for 12 months or 12,000 miles, whichever comes first. Returned parts are subject to a restocking fee.",
   authorizationText:

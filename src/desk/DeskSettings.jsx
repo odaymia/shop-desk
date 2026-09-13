@@ -50,6 +50,8 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
     });
   const setCk = (i, patch) => setD((x) => ({ ...x, checklist: (x.checklist || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const setPkg = (i, patch) => setD((x) => ({ ...x, oilPackages: (x.oilPackages || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
+  const split = (d.commission && d.commission.split) || { advisor: 40, top: 30, pit: 30 };
+  const setSplit = (role, v) => setD((x) => ({ ...x, commission: { ...(x.commission || {}), split: { ...split, [role]: v } } }));
   const onOff = (k, onText, offText) => (
     <select value={d[k] ? "on" : "off"} onChange={(e) => set(k)(e.target.value === "on")}>
       <option value="on">{onText}</option>
@@ -67,10 +69,11 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       oilChangeLaborPrice: toNum(d.oilChangeLaborPrice),
       oilPackages: (d.oilPackages || [])
         .filter((p) => String(p.name || "").trim())
-        .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart) })),
+        .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart), commission: toNum(p.commission) })),
       checklist: normalizeChecklist(d.checklist),
       serviceMenu: normalizeMenu(d.serviceMenu),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
+      commission: { ...(d.commission || {}), split: { advisor: toNum(split.advisor), top: toNum(split.top), pit: toNum(split.pit) } },
     });
     flash("Settings saved");
   };
@@ -250,11 +253,12 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </p>
           <div className="miniLines">
             {(d.oilPackages || []).map((p, i) => (
-              <div key={p.id || i} className="miniLine" style={{ gridTemplateColumns: "2fr 90px 70px 90px 36px" }}>
+              <div key={p.id || i} className="miniLine" style={{ gridTemplateColumns: "2fr 84px 56px 84px 84px 36px" }}>
                 <input value={p.name} onChange={(e) => setPkg(i, { name: e.target.value })} placeholder="Valvoline Full Synthetic Oil Change" />
                 <input inputMode="decimal" value={p.price} onChange={(e) => setPkg(i, { price: e.target.value })} placeholder="Price" title="Package price" />
                 <input inputMode="decimal" value={p.quarts} onChange={(e) => setPkg(i, { quarts: e.target.value })} placeholder="Qt" title="Quarts included" />
                 <input inputMode="decimal" value={p.extraQuart} onChange={(e) => setPkg(i, { extraQuart: e.target.value })} placeholder="$/qt over" title="Per quart past the included amount" />
+                <input inputMode="decimal" value={p.commission == null ? "" : p.commission} onChange={(e) => setPkg(i, { commission: e.target.value })} placeholder="Comm $" title="Commission paid when this package sells" />
                 <button className="lineX" onClick={() => set("oilPackages")(d.oilPackages.filter((_, k) => k !== i))} aria-label="Remove">
                   ✕
                 </button>
@@ -273,6 +277,30 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
               + Package
             </button>
           </div>
+
+          <h3 className="subhead">Commissions</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Set a commission amount on each oil package above and on each canned job (under Canned jobs). When a ticket
+            sells one of those services, that amount is split among the three people on the ticket by the shares below —
+            the advisor on the computer, the top tech over the hood, and the pit tech under the car. Leave a service's
+            amount blank to pay nothing on it (so the base oil change can pay $0). See who earned what under Reports →
+            Commissions.
+          </p>
+          <div className="fldRow">
+            <Field label="Advisor share %">
+              <input inputMode="decimal" value={split.advisor} onChange={(e) => setSplit("advisor", e.target.value)} />
+            </Field>
+            <Field label="Top tech share %">
+              <input inputMode="decimal" value={split.top} onChange={(e) => setSplit("top", e.target.value)} />
+            </Field>
+            <Field label="Pit tech share %">
+              <input inputMode="decimal" value={split.pit} onChange={(e) => setSplit("pit", e.target.value)} />
+            </Field>
+          </div>
+          <p className="legalNote" style={{ marginTop: 4 }}>
+            Shares are proportions — they don't have to add to 100. Right now:{" "}
+            {toNum(split.advisor)} / {toNum(split.top)} / {toNum(split.pit)} (advisor / top / pit).
+          </p>
 
           <h3 className="subhead">Service checklist</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>

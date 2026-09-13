@@ -3,6 +3,7 @@ import { Money, fmtDate } from "./ui.jsx";
 import { customerName, vehicleName } from "./useShop.js";
 import { orderTotals, laborHours, lineAmount, round2 } from "../lib/invoice.js";
 import { salesByItem, reorderPlan } from "../lib/inventoryReports.js";
+import { commissionByEmployee, commissionForOrder, orderPayout } from "../lib/commission.js";
 import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
 
@@ -92,6 +93,16 @@ export function Reports({ shop, cfg, employees, nav }) {
     };
   }, [shop.orders, shop.customers, cfg, fromTs, toTs]);
 
+  const commission = useMemo(() => {
+    const orders = r.inv.map((x) => x.o);
+    const { by, grand, paid } = commissionByEmployee(orders, shop.jobs, cfg.oilPackages, cfg.commission && cfg.commission.split);
+    const rows = Object.entries(by)
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => b.total - a.total);
+    const tickets = orders.filter((o) => commissionForOrder(o, shop.jobs, cfg.oilPackages).total > 0);
+    return { rows, grand, paid, tickets };
+  }, [r.inv, shop.jobs, cfg.oilPackages, cfg.commission]);
+
   const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
   const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays), [shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays]);
   const cats = useMemo(() => [...new Set(items.map((it) => it.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
@@ -108,6 +119,7 @@ export function Reports({ shop, cfg, employees, nav }) {
         <div className="seg">
           {[
             ["sales", "Sales summary"],
+            ["commission", "Commissions"],
             ["items", "Sales by item"],
             ["reorder", "Reorder planner"],
           ].map(([k, label]) => (
@@ -137,6 +149,7 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
       </header>
       <div className="deskBody">
+        {view === "commission" && <CommissionReport data={commission} shop={shop} cfg={cfg} techName={techName} nav={nav} />}
         {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} />}
         {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} coverDays={coverDays} setCoverDays={setCoverDays} leadDays={leadDays} setLeadDays={setLeadDays} from={from} to={to} />}
         {view === "sales" && (
@@ -305,6 +318,128 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
         </>
         )}
+      </div>
+    </>
+  );
+}
+
+function CommissionReport({ data, shop, cfg, techName, nav }) {
+  const { rows, grand, paid, tickets } = data;
+  const split = (cfg.commission && cfg.commission.split) || {};
+  const crewName = (id) => (id ? techName(id) : "—");
+  return (
+    <>
+      <div className="statRow">
+        <div className="stat">
+          <span>Commission earned</span>
+          <strong>
+            <Money v={grand} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Paid to staff</span>
+          <strong>
+            <Money v={paid} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Commissionable tickets</span>
+          <strong>{tickets.length}</strong>
+        </div>
+        <div className="stat">
+          <span>Split (advisor/top/pit)</span>
+          <strong>
+            {round2(split.advisor)}/{round2(split.top)}/{round2(split.pit)}
+          </strong>
+        </div>
+      </div>
+      <div className="card">
+        <div className="cardHead">
+          <h3>Commission by employee</h3>
+        </div>
+        <table className="dk">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th className="r">As advisor</th>
+              <th className="r">As top tech</th>
+              <th className="r">As pit tech</th>
+              <th className="r">Tickets</th>
+              <th className="r">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="emptyNote">
+                  No commission earned in this range. Set a commission amount on your oil packages and canned jobs, then it shows up here.
+                </td>
+              </tr>
+            )}
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <strong>{techName(r.id)}</strong>
+                </td>
+                <td className="r num muted">{r.advisor ? <Money v={r.advisor} /> : "—"}</td>
+                <td className="r num muted">{r.top ? <Money v={r.top} /> : "—"}</td>
+                <td className="r num muted">{r.pit ? <Money v={r.pit} /> : "—"}</td>
+                <td className="r num muted">{r.tickets.size}</td>
+                <td className="r num">
+                  <strong>
+                    <Money v={r.total} />
+                  </strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="card">
+        <div className="cardHead">
+          <h3>Commissionable tickets</h3>
+        </div>
+        <table className="dk">
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Date</th>
+              <th>Services</th>
+              <th>Advisor</th>
+              <th>Top</th>
+              <th>Pit</th>
+              <th className="r">Commission</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tickets.length === 0 && (
+              <tr>
+                <td colSpan={7} className="emptyNote">
+                  No commissionable tickets in this range.
+                </td>
+              </tr>
+            )}
+            {tickets.map((o) => {
+              const { items } = commissionForOrder(o, shop.jobs, cfg.oilPackages);
+              const pay = orderPayout(o, shop.jobs, cfg.oilPackages, split);
+              return (
+                <tr key={o.id} className="row" onClick={() => nav.openOrder(o.id)}>
+                  <td>
+                    <strong>#{o.number}</strong>
+                  </td>
+                  <td className="muted">{fmtDate(o.invoicedAt)}</td>
+                  <td className="muted">{items.map((it) => `${it.service} ($${it.amount.toFixed(2)})`).join(", ")}</td>
+                  <td className="muted">{crewName(pay.crew.advisorId)}</td>
+                  <td className="muted">{crewName(pay.crew.topId)}</td>
+                  <td className="muted">{crewName(pay.crew.pitId)}</td>
+                  <td className="r num">
+                    <Money v={pay.total} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </>
   );

@@ -5,6 +5,7 @@ import { PartPicker, JobPicker } from "./pickers.jsx";
 import { ConfirmDelete } from "./Orders.jsx";
 import { customerName, vehicleName, vehiclesOf, ordersOf } from "./useShop.js";
 import { serviceCodes } from "../lib/serviceCodes.js";
+import { orderPayout } from "../lib/commission.js";
 import {
   STATUS,
   PAY_METHODS,
@@ -17,6 +18,7 @@ import {
   statusLabel,
   jobLines,
   owesBalance,
+  fmtMoney,
   PART_CONDITIONS,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
@@ -184,6 +186,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const rules = rulesFor(o, cfg, customer);
   const locked = o.status === STATUS.invoiced || o.status === STATUS.void || o.status === STATUS.deleted;
   const techs = employees.filter((e) => e.active !== false);
+  const payout = orderPayout(o, shop.jobs, cfg.oilPackages, cfg.commission && cfg.commission.split);
   /* the tire size this car was last sold, so the rack opens on it */
   const lastTireSize = (() => {
     if (!o.vehicleId) return "";
@@ -575,7 +578,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   >
                     + Part
                   </button>
-                  <button className="btn tiny" onClick={() => addLine("labor", { techId: o.techId || null })}>
+                  <button className="btn tiny" onClick={() => addLine("labor", { techId: o.topTechId || o.techId || null })}>
                     + Labor
                   </button>
                   <button className="btn tiny" onClick={() => addLine("sublet")}>
@@ -690,8 +693,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               <h3>Details</h3>
             </div>
             <div className="fldRow">
-              <Field label="Written by">
-                <select value={o.writerId || ""} onChange={(e) => update({ writerId: e.target.value || null })} disabled={locked}>
+              <Field label="Advisor (computer, upsell)">
+                <select value={o.advisorId || o.writerId || ""} onChange={(e) => update({ advisorId: e.target.value || null, writerId: e.target.value || null })} disabled={locked}>
                   <option value="">—</option>
                   {techs.map((e) => (
                     <option key={e.id} value={e.id}>
@@ -700,8 +703,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   ))}
                 </select>
               </Field>
-              <Field label="Technician">
-                <select value={o.techId || ""} onChange={(e) => update({ techId: e.target.value || null })} disabled={locked}>
+              <Field label="Top tech (hood)">
+                <select value={o.topTechId || o.techId || ""} onChange={(e) => update({ topTechId: e.target.value || null, techId: e.target.value || null })} disabled={locked}>
+                  <option value="">—</option>
+                  {techs.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Pit tech (under car)">
+                <select value={o.pitTechId || ""} onChange={(e) => update({ pitTechId: e.target.value || null })} disabled={locked}>
                   <option value="">—</option>
                   {techs.map((e) => (
                     <option key={e.id} value={e.id}>
@@ -711,6 +724,15 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 </select>
               </Field>
             </div>
+            {payout.total > 0 && (
+              <p className="commReadout">
+                Commission on this ticket: <strong>{fmtMoney(payout.total)}</strong>
+                <span className="muted">
+                  {" "}
+                  — Advisor {fmtMoney(payout.advisor)} · Top {fmtMoney(payout.top)} · Pit {fmtMoney(payout.pit)}
+                </span>
+              </p>
+            )}
             <div className="fldRow">
               <Field label="Mileage in">
                 <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} readOnly={locked} />
@@ -814,7 +836,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           spec={effSpec}
           onClose={() => setPick(null)}
           onAdd={(lines, pkg) => {
-            addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
+            addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.topTechId || o.techId || null } : l)));
             /* on a repair order, run the checklist right away; on an estimate it waits until the RO is approved */
             setPick(o.status === STATUS.open && !o.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
             flash(`${pkg.name} added`);
@@ -829,7 +851,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           lastTireSize={lastTireSize}
           onClose={() => setPick(null)}
           onPick={(j, count, tire) => {
-            let lines = jobLines(j, cfg, shop.parts, uid, count).map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l));
+            let lines = jobLines(j, cfg, shop.parts, uid, count).map((l) => (l.kind === "labor" ? { ...l, techId: o.topTechId || o.techId || null } : l));
             if (tire) {
               /* the chosen tire becomes the job's tire line: replaces a
                  placeholder "Tire" part with no inventory link, else is added */

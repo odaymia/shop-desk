@@ -58,7 +58,6 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               </div>
               <div className="shMeta">
                 {fmtDate(o.invoicedAt || o.createdAt)}
-                {staffLine(o, cfg, techName)}
                 {o.status === "void" ? " · VOID" : ""}
               </div>
             </div>
@@ -92,6 +91,8 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               ) : null}
             </div>
           </div>
+
+          <CrewLine o={o} cfg={cfg} name={techName} />
 
           {o.concern && (
             <p className="shConcern">
@@ -230,16 +231,28 @@ function SignBlock({ sig, label }) {
   );
 }
 
-/* " · Writer: Sam G. · Tech: M.S." per the shop's setting */
-function staffLine(o, cfg, techName) {
+/* The three people who ran the ticket, named per the shop's setting: the
+   advisor on the computer, the top tech over the hood, the pit tech under
+   the car. Falls back to the older writer/tech fields on old tickets. */
+function CrewLine({ o, cfg, name }) {
   const mode = cfg.printStaffNames || "full";
-  if (mode === "off") return "";
-  const bits = [];
-  const w = o.writerId ? staffLabel(techName(o.writerId), mode) : "";
-  const t = o.techId ? staffLabel(techName(o.techId), mode) : "";
-  if (w) bits.push(`Writer: ${w}`);
-  if (t) bits.push(`Tech: ${t}`);
-  return bits.length ? ` · ${bits.join(" · ")}` : "";
+  if (mode === "off") return null;
+  const roles = [
+    ["Advisor", o.advisorId || o.writerId],
+    ["Top tech", o.topTechId || o.techId],
+    ["Pit tech", o.pitTechId],
+  ].filter(([, id]) => id && name(id));
+  if (!roles.length) return null;
+  return (
+    <div className="shCrew">
+      <span className="shCrewLabel">Serviced by</span>
+      {roles.map(([label, id]) => (
+        <span key={label}>
+          <strong>{label}:</strong> {staffLabel(name(id), mode)}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function LineRow({ l }) {
