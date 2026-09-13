@@ -163,17 +163,23 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
   const [img, setImg] = useState(existing.img || "");
   const [name, setName] = useState(existing.name || customerName(c) || "");
   const [checks, setChecks] = useState((order.authFill && order.authFill.checks) || {});
-  const [blanks, setBlanks] = useState((order.authFill && order.authFill.blanks) || {});
+  const blanks = (order.authFill && order.authFill.blanks) || {}; // shown on the form, filled on the desk, not the pad
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     if (!img) return flash("Please sign in the box first.", "out");
     setBusy(true);
-    const at = Date.now();
-    const signatures = { ...(order.signatures || {}), [slot]: { img, name: name.trim(), at } };
-    await shop.saveOrder({ ...order, signatures, authFill: { checks, blanks }, history: [...(order.history || []), { at, what: `signed: ${slot === "delivery" ? "vehicle received" : "estimate approved"}` }] });
-    flash("Signature saved");
-    onDone(true);
+    try {
+      const at = Date.now();
+      const signatures = { ...(order.signatures || {}), [slot]: { img, name: name.trim(), at } };
+      await shop.saveOrder({ ...order, signatures, authFill: { checks, blanks }, history: [...(order.history || []), { at, what: `signed: ${slot === "delivery" ? "vehicle received" : "estimate approved"}` }] });
+      flash("Signature saved");
+      onDone(true);
+    } catch (e) {
+      setBusy(false);
+      flash("Couldn't save the signature — try again.", "out");
+      console.error("signature save failed", e);
+    }
   };
 
   return (
@@ -234,16 +240,22 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
             tk.type === "text" ? (
               <span key={idx}>{tk.text}</span>
             ) : tk.type === "check" ? (
-              <input
+              /* a big tap target, not a native checkbox — those miss taps on
+                 some tablets and the checked state doesn't always show */
+              <button
                 key={idx}
-                type="checkbox"
-                className="authChk"
-                checked={!!checks[tk.i]}
-                onChange={(e) => setChecks((c) => ({ ...c, [tk.i]: e.target.checked }))}
+                type="button"
+                className={`authChk ${checks[tk.i] ? "on" : ""}`}
+                onClick={() => setChecks((c) => ({ ...c, [tk.i]: !c[tk.i] }))}
+                aria-pressed={!!checks[tk.i]}
                 aria-label="checkbox"
-              />
+              >
+                {checks[tk.i] ? "✓" : ""}
+              </button>
             ) : (
-              <input key={idx} className="authBlank" value={blanks[tk.i] || ""} onChange={(e) => setBlanks((b) => ({ ...b, [tk.i]: e.target.value }))} />
+              /* the "____" lines (date, signature) are just the printed form —
+                 the customer signs in the box below, so these aren't tappable */
+              <span key={idx} className="authBlank">{blanks[tk.i] || " "}</span>
             )
           )}
         </div>
@@ -304,7 +316,10 @@ export function SignatureStation({ shop, cfg, flash }) {
       cfg={cfg}
       flash={flash}
       onDone={() => {
+        /* clear the request AND drop back to the waiting screen — the local
+           delete doesn't fire the sync subscription, so reset it here */
         clearReq();
+        setReqId(null);
       }}
     />
   );
