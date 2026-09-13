@@ -517,6 +517,16 @@ async function fetchMedia(key) {
   return blobToDataUrl(data);
 }
 
+/* The shop's public card as last published (name, phone, address, hours,
+   tax rate, invoice footer, logo…). It lives in its own table, so it
+   survives even if the settings row is overwritten — a recovery source. */
+async function readShopPublic() {
+  if (!supabase || !state.shopId) return null;
+  const { data, error } = await supabase.from("shop_public").select("data").eq("shop_id", state.shopId).maybeSingle();
+  if (error) throw error;
+  return data ? data.data : null;
+}
+
 export const cloud = {
   configured,
   init,
@@ -536,6 +546,7 @@ export const cloud = {
   recordWrite,
   recordDelete,
   fetchMedia,
+  readShopPublic,
   publishPortal,
   publishShop,
   listPortalRequests,

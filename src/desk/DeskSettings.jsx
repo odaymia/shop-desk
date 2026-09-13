@@ -9,7 +9,7 @@ import { CATALOGS } from "../lib/parts.js";
 import { NAME_MODES } from "../lib/names.js";
 import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
 import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
-import { sGetAll, sSet } from "../storage/index.js";
+import { sGetAll, sSet, cloud } from "../storage/index.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -426,7 +426,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Cloud account
           </h3>
           <CloudSync />
-          <BackupPanel flash={flash} />
+          <BackupPanel flash={flash} cfg={cfg} saveCfg={saveCfg} />
           <ImportPanel roster={roster} saveRoster={saveRoster} flash={flash} shop={shop} />
           <p className="legalNote">
             Posting an invoice freezes the tax rate and supplies rule on that ticket. Changing them here affects new
@@ -441,10 +441,46 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
 /* Download a full backup of the desk's data (everything under sd:*) as a
    JSON file, and restore it. This is the copy you control, on top of the
    live copy in the cloud. */
-function BackupPanel({ flash }) {
+function BackupPanel({ flash, cfg, saveCfg }) {
   const [busy, setBusy] = useState(false);
   const [restoreFile, setRestoreFile] = useState(null);
   const [count, setCount] = useState(null);
+  const [recovered, setRecovered] = useState(null);
+
+  /* Pull the shop's public card back out of the cloud (it lives in its own
+     table, so it survives a settings overwrite) and fill the shop-info
+     fields from it. Doesn't touch anything the card doesn't cover. */
+  const recoverShopInfo = async () => {
+    setBusy(true);
+    try {
+      const p = await cloud.readShopPublic();
+      if (!p) {
+        flash("Nothing found in the cloud to recover.", "out");
+        return;
+      }
+      const next = {
+        ...cfg,
+        shopName: p.name || cfg.shopName,
+        shopPhone: p.phone || cfg.shopPhone,
+        shopAddress: p.address || cfg.shopAddress,
+        shopEmail: p.email || cfg.shopEmail,
+        shopWebsite: p.website || cfg.shopWebsite,
+        hours: p.hours || cfg.hours,
+        ardNumber: p.ardNumber || cfg.ardNumber,
+        invoiceFooter: p.invoiceFooter || cfg.invoiceFooter,
+        logo: p.logo || cfg.logo,
+        taxRate: p.taxRate != null && p.taxRate !== "" ? p.taxRate : cfg.taxRate,
+      };
+      await saveCfg(next);
+      const got = ["name", "phone", "address", "email", "website", "hours", "ardNumber", "invoiceFooter"].filter((k) => p[k]);
+      setRecovered(got);
+      flash(`Recovered shop info from the cloud (${got.length} field${got.length === 1 ? "" : "s"})`);
+    } catch (e) {
+      flash(`Couldn't recover: ${e.message}`, "out");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const download = async () => {
     setBusy(true);
@@ -517,7 +553,15 @@ function BackupPanel({ flash }) {
             onChange={(e) => e.target.files && e.target.files[0] && pick(e.target.files[0])}
           />
         </label>
+        <button className="btn" onClick={recoverShopInfo} disabled={busy} title="Pull the shop name, phone, address, hours, tax rate and footer back from the cloud's published card">
+          Recover shop info from cloud
+        </button>
       </div>
+      {recovered && (
+        <p className="setupNote" style={{ marginTop: 10 }}>
+          Recovered from the cloud: {recovered.join(", ")}. Check the fields above and Save settings.
+        </p>
+      )}
       {restoreFile && (
         <div className="warnBox" style={{ marginTop: 12 }}>
           <p style={{ margin: "0 0 10px" }}>
