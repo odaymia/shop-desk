@@ -73,6 +73,39 @@ export function vvMakeList(data) {
   return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 
+/* "G90 3.5 T-GDI AWD (2022- )" -> "3.5 T-GDI AWD": drop the year span and
+   the leading model token, keep the engine from its displacement on. */
+export const cleanEngineName = (n) => {
+  const s = String(n || "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const m = s.match(/\d[.,]\d.*/);
+  return (m ? m[0] : s).replace(/\s+/g, " ").trim();
+};
+
+/* Clean, de-duplicated engine names for a make + model, narrowed to the
+   year. Falls back to all years if the exact year has nothing. */
+export function vvEngineList(data, make, model, year) {
+  const mk = rows(data).find((x) => x.m.toLowerCase() === String(make || "").toLowerCase());
+  if (!mk) return [];
+  const wantModel = String(model || "").toLowerCase();
+  const y = Number(year) || 0;
+  const gather = (useYear) => {
+    const seen = new Map();
+    for (const md of mk.mo) {
+      if (cleanModelName(md.n).toLowerCase() !== wantModel) continue;
+      for (const e of md.e) {
+        const rng = yearRange(e.e);
+        if (useYear && y && rng && !(y >= rng[0] && y <= rng[1])) continue;
+        const ce = cleanEngineName(e.e);
+        if (ce) seen.set(ce.toLowerCase(), ce);
+      }
+    }
+    return seen;
+  };
+  let seen = gather(true);
+  if (!seen.size) seen = gather(false);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
 /* Clean, de-duplicated model names for a make, narrowed to the year when
    one is given (each generation carries its own year span). */
 export function vvModelList(data, make, year) {

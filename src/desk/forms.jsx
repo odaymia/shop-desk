@@ -3,7 +3,7 @@ import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
-import { loadValvolineSpecs, vvMakeList, vvModelList } from "../lib/valvolineSpecs.js";
+import { loadValvolineSpecs, vvMakeList, vvModelList, vvEngineList } from "../lib/valvolineSpecs.js";
 import { customerName, vehicleName, activeList, vehiclesOf, searchText } from "./useShop.js";
 
 /* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
@@ -201,6 +201,12 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
   }, []);
   const makeOptions = useMemo(() => mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []), [ymme, d.year, vv]);
   const modelOptions = useMemo(() => mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : []), [ymme, d.year, d.make, vv]);
+  /* Valvoline's year-accurate engines lead, then the shop's own — so a
+     2027 G90 shows its real 3.5L, not a stray engine from an old ticket. */
+  const engineOptions = useMemo(
+    () => mergeOpts(vv && d.make && d.model ? vvEngineList(vv, d.make, d.model, d.year) : [], ymme.enginesFor(d.year, d.make, d.model)),
+    [ymme, d.year, d.make, d.model, vv]
+  );
   const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "" }));
   const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "" }));
   const setModel = (v) => setD((x) => (v === x.model ? { ...x, model: v } : { ...x, model: v, engine: "" }));
@@ -330,7 +336,7 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
         <Field label="Trim">
           <Text value={d.submodel} onChange={set("submodel")} placeholder="SE" />
         </Field>
-        <PickOrType label="Engine" value={d.engine} onChange={set("engine")} options={ymme.enginesFor(d.year, d.make, d.model)} placeholder="Engine" />
+        <PickOrType label="Engine" value={d.engine} onChange={set("engine")} options={engineOptions} placeholder="Engine" />
       </div>
       <div className="fldRow">
         <Field label="Color">
