@@ -477,6 +477,12 @@ async function signOut() {
 /* ---------- called by the storage module ---------- */
 async function recordWrite(key, value) {
   if (!state.linked || isLocalOnly(key) || !isOurs(key)) return;
+  /* Never push an uninitialized settings row to the cloud. An established
+     shop always has a name; a nameless config is the fresh-install default,
+     and pushing it would flatten the real settings for every device. This
+     is the guard against a new browser / tablet / incognito sign-in wiping
+     the shop's settings before its first sync finishes. */
+  if (key === "sd:config" && !String((value && value.shopName) || "").trim()) return;
   return enqueue({ kind: keyKind(key), op: "put", key, value });
 }
 async function recordDelete(key) {
