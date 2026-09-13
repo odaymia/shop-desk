@@ -7,6 +7,12 @@ import { CFG_KEY, ROSTER_KEY } from "./lib/keys.js";
 import { cloud, sGet, sSet, sList, sDel, storageReady } from "./storage/index.js";
 import { DEMO, seedDemoIfEmpty, resetDemo } from "./lib/demo.js";
 
+/* Saved settings over the defaults. `catalogs` is merged key by key, not
+   replaced, so a catalog added to the defaults later (e.g. Valvoline) shows
+   up for shops that saved their settings before it existed, without
+   overriding any catalog they turned on or off. */
+const mergeCfg = (c) => ({ ...DEFAULT_CFG, ...c, catalogs: { ...DEFAULT_CFG.catalogs, ...(c && c.catalogs) } });
+
 /* Root: loads settings and the shared staff list, then shows the desk.
    No PIN — this runs on the counter PC signed in with the shop account.
    Roles (who can see reports, who can void) are on the roadmap. */
@@ -26,7 +32,7 @@ export default function App() {
          (or a big post-import outbox) leaves the counter PC spinning. */
       if (DEMO) await seedDemoIfEmpty(sGet, sSet);
       const c = await sGet(CFG_KEY, null);
-      if (c) setCfg({ ...DEFAULT_CFG, ...c });
+      if (c) setCfg(mergeCfg(c));
       setRoster((await sGet(ROSTER_KEY, [])) || []);
       setReady(true);
       storageReady().catch((e) => console.error("cloud init failed", e));
@@ -41,7 +47,7 @@ export default function App() {
         const keys = e.keys || [];
         if (keys.includes(CFG_KEY)) {
           const c = await sGet(CFG_KEY, null);
-          if (c) setCfg({ ...DEFAULT_CFG, ...c });
+          if (c) setCfg(mergeCfg(c));
         }
         if (keys.includes(ROSTER_KEY)) setRoster((await sGet(ROSTER_KEY, [])) || []);
       }),
