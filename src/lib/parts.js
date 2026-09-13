@@ -11,6 +11,10 @@ export const CATALOGS = [
   ["nexpart", "Nexpart", "https://www.nexpart.com"],
   ["autozone", "AutoZone Pro", "https://www.autozonepro.com"],
   ["napa", "NAPA PROLink", "https://www.napaprolink.com"],
+  /* Valvoline's own catalog: look up the recommended oil and filter for the
+     car on the ticket. Open it and use the VIN Search tab — the ticket's VIN
+     is copied to the clipboard, ready to paste. */
+  ["valvoline", "Valvoline catalog", "https://valvolinecatalog.com"],
 ];
 
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;

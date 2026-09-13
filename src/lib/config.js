@@ -10,7 +10,7 @@ export const DEFAULT_CFG = {
   shopEmail: "",
   shopWebsite: "",
   carfaxLocationId: "", // assigned by CARFAX when the shop joins the Service Network
-  catalogs: { oreilly: true, partstech: true }, // which parts catalogs get a button on the ticket
+  catalogs: { oreilly: true, partstech: true, valvoline: true }, // which parts catalogs get a button on the ticket
   partsMarkupPct: 35, // sell price = catalog cost + this percent, unless list is higher
   partsPriceEnding99: false,
   partsTechUser: "", // the shop's PartsTech login (email) and API key, from PartsTech → My Account → API
