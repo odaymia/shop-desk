@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Modal, Field, Text, Num, Money, fmtDateTime, fmtPhone, toNum } from "./ui.jsx";
+import { Modal, Field, Text, Num, Money, fmtDate, fmtDateTime, fmtPhone, toNum } from "./ui.jsx";
 import { CustomerForm, CustomerPicker, VehicleForm } from "./forms.jsx";
 import { PartPicker, JobPicker } from "./pickers.jsx";
 import { ConfirmDelete } from "./Orders.jsx";
-import { customerName, vehicleName, vehiclesOf } from "./useShop.js";
+import { customerName, vehicleName, vehiclesOf, ordersOf } from "./useShop.js";
+import { serviceCodes } from "../lib/serviceCodes.js";
 import {
   STATUS,
   PAY_METHODS,
@@ -596,6 +597,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               )}
             </div>
           </div>
+          <VisitHistory shop={shop} order={o} vehicle={vehicle} customer={customer} nav={nav} />
         </div>
 
         <div className="stack">
@@ -1193,6 +1195,53 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
         <p className="muted" style={{ margin: "10px 0 0", fontSize: 13, whiteSpace: "pre-wrap" }}>
           {[sp.otherFluids, sp.notes].filter(Boolean).join("\n")}
         </p>
+      )}
+    </div>
+  );
+}
+
+/* The car's (or, with no car yet, the customer's) last few completed visits:
+   date, mileage, and short service codes. A quick read of what's been done
+   before, so the desk isn't guessing at service intervals. */
+function VisitHistory({ shop, order, vehicle, customer, nav }) {
+  const visits = useMemo(() => {
+    if (!vehicle && !customer) return [];
+    const src = vehicle ? ordersOf(shop.orders, { vehicleId: vehicle.id }) : ordersOf(shop.orders, { customerId: customer.id });
+    return src.filter((o) => o.id !== order.id && o.status === STATUS.invoiced).slice(0, 5);
+  }, [shop.orders, vehicle, customer, order.id]);
+
+  if (!vehicle && !customer) return null;
+
+  return (
+    <div className="card visitHist" style={{ marginTop: 14 }}>
+      <div className="cardHead">
+        <h3>Recent visits{vehicle ? ` · ${vehicleName(vehicle)}` : ""}</h3>
+      </div>
+      {visits.length === 0 ? (
+        <p className="muted" style={{ margin: 0 }}>No prior visits on file.</p>
+      ) : (
+        <table className="visitTbl">
+          <thead>
+            <tr>
+              <th style={{ width: 110 }}>Date</th>
+              <th className="r" style={{ width: 90 }}>Mileage</th>
+              <th>Service</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visits.map((o) => {
+              const miles = o.mileageIn || o.mileageOut;
+              const codes = serviceCodes(o);
+              return (
+                <tr key={o.id} className="visitRow" onClick={() => nav.openOrder(o.id)} title={`Open ticket #${o.number}`}>
+                  <td>{fmtDate(o.invoicedAt || o.createdAt)}</td>
+                  <td className="r tnum">{miles ? Number(miles).toLocaleString() : "—"}</td>
+                  <td className="visitCodes">{codes.length ? codes.join(", ") : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   );

@@ -286,6 +286,16 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .checkIn .fld.zip { flex:0 0 120px; }
 .checkIn .fld.grow { flex:1; }
 .checkIn .signBtns { margin-top:22px; }
+
+.visitTbl { width:100%; border-collapse:collapse; font-size:14px; }
+.visitTbl th { text-align:left; font-weight:600; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.03em; padding:0 8px 6px; border-bottom:1px solid var(--line); }
+.visitTbl td { padding:8px; border-bottom:1px solid var(--line); }
+.visitTbl tr:last-child td { border-bottom:none; }
+.visitTbl th.r, .visitTbl td.r { text-align:right; }
+.visitTbl .tnum { font-variant-numeric:tabular-nums; }
+.visitRow { cursor:pointer; }
+.visitRow:hover { background:var(--asphalt); }
+.visitCodes { font-weight:600; letter-spacing:.02em; }
 .fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }
 .fluidGrid .fSys { color:var(--muted); }
 .fluidGrid .fProd { font-weight:600; }
