@@ -4,8 +4,9 @@ import { fmtMoney, orderTotals, lineAmount, laborQtyText, conditionLabel, status
 import { customerName, vehicleName } from "./useShop.js";
 import { parseAuthText } from "../lib/authForm.js";
 import { cloud, sGet, sDel } from "../storage/index.js";
-import { SIGNREQ_KEY } from "../lib/keys.js";
+import { SIGNREQ_KEY, INFOREQ_KEY } from "../lib/keys.js";
 import { QR, portalUrl } from "./QR.jsx";
+import { matchExistingCustomer, customerToForm } from "../lib/checkin.js";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* Electronic signatures. A signing view shows the whole estimate or
@@ -291,16 +292,22 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
   const [thanks, setThanks] = useState(null); // customer to show a receipts QR to after signing
   const [checkin, setCheckin] = useState(false); // customer is filling in their own info
   const [checkedIn, setCheckedIn] = useState(false); // just-saved confirmation
-  const load = () => sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
+  const [infoReqId, setInfoReqId] = useState(null); // customer the desk sent to verify their info
+  const load = () => {
+    sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
+    sGet(INFOREQ_KEY, null).then((r) => setInfoReqId(r && r.customerId ? r.customerId : null));
+  };
   useEffect(() => {
     load();
     return cloud.subscribe((e) => {
-      if (e.type === "data" && (e.keys || []).includes(SIGNREQ_KEY)) load();
+      if (e.type === "data" && (e.keys || []).some((k) => k === SIGNREQ_KEY || k === INFOREQ_KEY)) load();
     });
   }, []);
 
   const order = reqId ? shop.orders[reqId] : null;
+  const infoCust = infoReqId ? shop.customers[infoReqId] : null;
   const clearReq = () => sDel(SIGNREQ_KEY);
+  const clearInfo = () => sDel(INFOREQ_KEY);
 
   /* Right after they sign, the tablet shows a QR to the portal so the
      customer can pull up all their receipts before handing it back. */
@@ -346,6 +353,30 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
           </button>
         </div>
       </div>
+    );
+  }
+
+  /* The desk sent this specific customer to the tablet to check their info.
+     Pre-filled, and always saved back onto that same record. */
+  if (infoCust) {
+    return (
+      <CheckInForm
+        shop={shop}
+        cfg={cfg}
+        flash={flash}
+        verify
+        lockToId={infoCust.id}
+        initial={customerToForm(infoCust)}
+        onCancel={() => {
+          clearInfo();
+          setInfoReqId(null);
+        }}
+        onDone={() => {
+          clearInfo();
+          setInfoReqId(null);
+          setCheckedIn(true);
+        }}
+      />
     );
   }
 
@@ -404,10 +435,13 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
 }
 
 /* A tablet-friendly form the customer fills in themselves while they wait.
-   Write-only: it saves a new customer record and never shows anything back,
-   so nothing about other customers is exposed on the kiosk. */
-function CheckInForm({ shop, cfg, flash, onCancel, onDone }) {
-  const [d, setD] = useState({ first: "", last: "", phone: "", email: "", street: "", city: "", state: "CA", zip: "" });
+   Write-only: it never shows anything about other customers, so it's safe on
+   the kiosk. Blank (self-serve) it collects a new customer and matches a
+   returning one by phone + name. With `initial`/`lockToId` the desk has sent a
+   known customer to verify, so it starts pre-filled and always saves back onto
+   that same record. */
+function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, onCancel, onDone }) {
+  const [d, setD] = useState(() => initial || { first: "", last: "", phone: "", email: "", street: "", city: "", state: "CA", zip: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const set = (k) => (e) => {
@@ -421,23 +455,41 @@ function CheckInForm({ shop, cfg, flash, onCancel, onDone }) {
     if (!d.phone.trim()) return setErr("Please enter a phone number so we can reach you.");
     setBusy(true);
     try {
-      await shop.saveCustomer({
+      const now = Date.now();
+      /* Only the fields the customer actually typed; a blank never wipes
+         out something we already have on a returning customer. */
+      const entered = {
         first: d.first.trim(),
         last: d.last.trim(),
-        company: "",
         phone: d.phone.trim(),
-        phone2: "",
         email: d.email.trim(),
         street: d.street.trim(),
         city: d.city.trim(),
-        state: d.state.trim() || "CA",
+        state: d.state.trim(),
         zip: d.zip.trim(),
-        notes: "Checked in on the tablet",
-        taxExempt: false,
-        active: true,
-        selfCheckIn: true,
-        checkedInAt: Date.now(),
-      });
+      };
+      /* When the desk sent a specific customer to verify, always save back
+         onto that record. Otherwise (self-serve) match a returning customer
+         on phone AND name so we update instead of duplicating — and don't
+         merge two people who share a phone (a household). */
+      const existing = (lockToId && shop.customers[lockToId]) || matchExistingCustomer(shop.customers, entered);
+      if (existing) {
+        const merged = { ...existing };
+        for (const [k, v] of Object.entries(entered)) if (v) merged[k] = v;
+        await shop.saveCustomer({ ...merged, active: true, selfCheckIn: true, checkedInAt: now });
+      } else {
+        await shop.saveCustomer({
+          ...entered,
+          state: entered.state || "CA",
+          company: "",
+          phone2: "",
+          notes: "Checked in on the tablet",
+          taxExempt: false,
+          active: true,
+          selfCheckIn: true,
+          checkedInAt: now,
+        });
+      }
       onDone();
     } catch (e) {
       setBusy(false);
@@ -450,8 +502,10 @@ function CheckInForm({ shop, cfg, flash, onCancel, onDone }) {
     <div className="deskBody">
       <div className="checkIn">
         <img src={cfg.logo || defaultLogo} alt="" className="checkInLogo" />
-        <h1>Welcome — please check in</h1>
-        <p className="muted">Fill in your details and hand the tablet back to our team.</p>
+        <h1>{verify ? "Please check your details" : "Welcome — please check in"}</h1>
+        <p className="muted">
+          {verify ? "Update anything that's changed, then tap Save and hand the tablet back." : "Fill in your details and hand the tablet back to our team."}
+        </p>
         <div className="fldRow">
           <label className="fld">
             <span>First name</span>
@@ -493,7 +547,7 @@ function CheckInForm({ shop, cfg, flash, onCancel, onDone }) {
         {err && <p className="fldErr">{err}</p>}
         <div className="signBtns">
           <button className="btn primary lg" onClick={save} disabled={busy}>
-            {busy ? "Saving…" : "Submit"}
+            {busy ? "Saving…" : verify ? "Save" : "Submit"}
           </button>
           <button className="btn lg" onClick={onCancel} disabled={busy}>
             Cancel

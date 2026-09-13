@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { cloud } from "../storage/index.js";
+import { cloud, sSet } from "../storage/index.js";
+import { INFOREQ_KEY } from "../lib/keys.js";
 import { Money, fmtDate, fmtPhone } from "./ui.jsx";
 import { CustomerForm, VehicleForm } from "./forms.jsx";
 import { customerName, vehicleName, vehiclesOf, ordersOf, searchText } from "./useShop.js";
@@ -188,6 +189,16 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
         <div className="grow" />
         <button className="btn" onClick={() => setEditing(true)}>
           Edit
+        </button>
+        <button
+          className="btn"
+          onClick={async () => {
+            await sSet(INFOREQ_KEY, { customerId: c.id, at: Date.now() });
+            flash("Sent the info form to the tablet");
+          }}
+          title="Ask the customer to verify or update their contact info on the tablet"
+        >
+          Verify info
         </button>
         <button className="btn primary" onClick={() => onNew({ customerId: c.id, vehicleId: vehs[0] ? vehs[0].id : null })}>
           New ticket

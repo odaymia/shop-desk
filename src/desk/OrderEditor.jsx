@@ -28,7 +28,7 @@ import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
-import { CART_PREFIX, SIGNREQ_KEY } from "../lib/keys.js";
+import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY } from "../lib/keys.js";
 import { OrderSign } from "./Signing.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
@@ -313,6 +313,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               >
                 Send to pad
               </button>
+              {customer && (
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    await sSet(INFOREQ_KEY, { customerId: customer.id, at: Date.now() });
+                    flash("Sent the info form to the tablet");
+                  }}
+                  title="Ask the customer to verify or update their contact info on the tablet"
+                >
+                  Verify info
+                </button>
+              )}
               {customer && (
                 <button className="btn" onClick={() => setShowQR(true)} title="Show the customer a QR to their receipts in the portal">
                   Receipt QR

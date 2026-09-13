@@ -30,3 +30,4 @@ export const ROSTER_KEY = "gac:employees";
 export const SHARED_KEYS = [ROSTER_KEY];
 
 export const SIGNREQ_KEY = "sd:signreq"; // the estimate the front desk has sent to the signature tablet
+export const INFOREQ_KEY = "sd:inforeq"; // a customer the front desk has sent to the tablet to verify/update their info
