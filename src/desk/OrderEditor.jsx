@@ -30,6 +30,7 @@ import { priorChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY } from "../lib/keys.js";
 import { OrderSign } from "./Signing.jsx";
+import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
 
 /* Service-menu buttons whose job is really "put a part on the ticket" open
@@ -68,6 +69,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const [vehEdit, setVehEdit] = useState(null);
   const [custEdit, setCustEdit] = useState(false);
   const [specEdit, setSpecEdit] = useState(false);
+  const [showQR, setShowQR] = useState(false);
 
   /* When the car has no oil spec on file, pull Valvoline's for its exact
      engine so the ticket shows grade + capacity + fluids automatically —
@@ -311,6 +313,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               >
                 Send to pad
               </button>
+              {customer && (
+                <button className="btn" onClick={() => setShowQR(true)} title="Show the customer a QR to their receipts in the portal">
+                  Receipt QR
+                </button>
+              )}
             </>
           )}
           {o.status === STATUS.estimate && (
@@ -727,6 +734,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
 
       {pick === "customer" && <CustomerPicker shop={shop} onPick={pickCustomer} onClose={() => setPick(null)} />}
       {signing && <OrderSign order={o} shop={shop} cfg={cfg} flash={flash} onDone={() => setSigning(false)} />}
+      {showQR && <PortalQR customer={customer} onClose={() => setShowQR(false)} />}
       {specEdit && vehicle && (
         <SpecForm
           vehicle={vehicle}

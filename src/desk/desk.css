@@ -265,6 +265,8 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .specGrid strong { font-size:20px; }
 .prodList { margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
 .prodList li { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--asphalt); font-weight:600; }
+.qr { margin:0 auto; background:#fff; padding:10px; border-radius:10px; }
+.qr svg { width:100%; height:100%; display:block; }
 .fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }
 .fluidGrid .fSys { color:var(--muted); }
 .fluidGrid .fProd { font-weight:600; }
