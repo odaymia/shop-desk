@@ -27,6 +27,10 @@ const PACK_LABEL = { case: "Quarts per case", box: "Gallons per box", bulk: "Min
 const PACK_PLACEHOLDER = { case: "6", box: "5", bulk: "110" };
 const PART_CATS = ["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filters", "Brake Pads", "Brake Rotors", "Wipers", "Fluids", "Belts", "Batteries", "Tires", "Parts"];
 
+/* Motor oil (sold by the quart) vs everything else. A case of oil is
+   measured in quarts; a case of filters in units. */
+const isOilPart = (p) => !!(p && p.oilType) || (/\boil\b/i.test(String((p && p.category) || "")) && !/filter/i.test(String((p && p.category) || "")));
+
 export function Inventory({ shop, flash }) {
   const [q, setQ] = useState("");
   const [only, setOnly] = useState("all"); // all | low
@@ -251,14 +255,14 @@ export function PartForm({ part, vendors, onClose, onSave }) {
         <Field label="Bought as (for reordering)">
           <select value={d.packType || ""} onChange={(e) => set("packType")(e.target.value)}>
             <option value="">Each — sold and bought by the unit</option>
-            <option value="case">Quart case</option>
+            <option value="case">Case</option>
             <option value="box">Gallon box</option>
             <option value="bulk">Bulk — minimum order</option>
           </select>
         </Field>
         {d.packType ? (
-          <Field label={PACK_LABEL[d.packType]}>
-            <Num value={d.packSize} onChange={set("packSize")} placeholder={PACK_PLACEHOLDER[d.packType]} />
+          <Field label={d.packType === "case" && !isOilPart(d) ? "Units per case" : PACK_LABEL[d.packType]}>
+            <Num value={d.packSize} onChange={set("packSize")} placeholder={d.packType === "case" && !isOilPart(d) ? "12" : PACK_PLACEHOLDER[d.packType]} />
           </Field>
         ) : (
           <div className="fld" />
@@ -266,7 +270,8 @@ export function PartForm({ part, vendors, onClose, onSave }) {
       </div>
       {d.packType && (
         <p className="legalNote" style={{ marginTop: -6 }}>
-          The reorder planner suggests orders in whole {d.packType === "case" ? "cases" : d.packType === "box" ? "boxes" : "bulk gallons"}. Oil is still counted and sold by the quart.
+          The reorder planner suggests orders in whole {d.packType === "case" ? "cases" : d.packType === "box" ? "boxes" : "bulk gallons"}.
+          {isOilPart(d) ? " Oil is still counted and sold by the quart." : ""}
         </p>
       )}
       <div className="fldRow">
@@ -323,6 +328,7 @@ function parseImport(text) {
       cost: c[3] || "",
       price: c[4] || "",
       onHand: c[5] || "",
+      casePack: c[6] || "", // units per case, when bought by the case
     });
   }
   return out;
@@ -360,7 +366,7 @@ function ImportParts({ shop, flash, onClose }) {
     if (!parsed.length) return;
     setBusy(true);
     let add = 0, update = 0;
-    for (const r of parsed) {
+    const recs = parsed.map((r) => {
       const existing = byNumber[r.number];
       const rec = {
         ...(existing || blank()),
@@ -371,9 +377,15 @@ function ImportParts({ shop, flash, onClose }) {
         price: r.price !== "" ? toNum(r.price) : existing ? toNum(existing.price) : "",
       };
       if (r.onHand !== "") rec.onHand = toNum(r.onHand); // else keep existing / default 0
-      await shop.savePart(rec);
+      const pack = toNum(r.casePack);
+      if (pack > 1) {
+        rec.packType = "case"; // bought by the case of this many units
+        rec.packSize = pack;
+      }
       existing ? update++ : add++;
-    }
+      return rec;
+    });
+    await shop.savePartsBulk(recs); // one commit, not one render per part
     flash(`Imported: ${add} added, ${update} updated`);
     setBusy(false);
     onClose();

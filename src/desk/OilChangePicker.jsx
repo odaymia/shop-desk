@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal, Money, toNum } from "./ui.jsx";
-import { oilPackageLines, oilItems, filterItems, oilsForPackage, packageOilType } from "../lib/oilchange.js";
+import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
 import { uid } from "../lib/ids.js";
 
@@ -15,7 +15,7 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const [step, setStep] = useState("package"); // package | quarts | oil | filter
   const [allOils, setAllOils] = useState(false); // show every oil, past the package's type
   const oils = oilItems(shop.parts);
-  const filters = filterItems(shop.parts);
+  const filters = oilFilterItems(shop.parts);
   const grade = spec ? spec.oilViscosity : "";
   const suggestedOils = grade ? matchOil(shop.parts, grade) : [];
   const suggestedFilters = spec ? matchFilter(shop.parts, spec.oilFilters) : [];

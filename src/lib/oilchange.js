@@ -184,12 +184,26 @@ export function oilsForPackage(oils, pkg) {
 }
 
 /* Inventory items that are motor oil: category says oil, or the
-   description reads like a grade. */
+   description reads like a grade — but never a filter ("Oil Filters"
+   category contains the word "oil", so guard against it). */
 export function oilItems(parts) {
-  return Object.values(parts || {}).filter(
-    (p) => p.active !== false && !p.tire && (/\boil\b/i.test(String(p.category || "")) || /\b\d{1,2}W-?\d{2}\b/i.test(String(p.description || "")))
-  );
+  return Object.values(parts || {}).filter((p) => {
+    if (p.active === false || p.tire) return false;
+    const cat = String(p.category || "");
+    const desc = String(p.description || "");
+    if (/filter/i.test(cat) || /filter/i.test(desc)) return false;
+    return /\boil\b/i.test(cat) || /\b\d{1,2}W-?\d{2}\b/i.test(desc);
+  });
 }
+/* Every filter, any kind. */
 export function filterItems(parts) {
   return Object.values(parts || {}).filter((p) => p.active !== false && !p.tire && /filter/i.test(`${p.category || ""} ${p.description || ""}`));
+}
+/* Just oil filters — the engine oil filter picker, not air/cabin/fuel. */
+export function oilFilterItems(parts) {
+  return filterItems(parts).filter((p) => {
+    const text = `${p.category || ""} ${p.description || ""}`;
+    if (/\b(air|cabin|fuel|transmission)\b/i.test(text)) return false;
+    return /oil\s*filter/i.test(text) || /\boil\b/i.test(String(p.category || ""));
+  });
 }

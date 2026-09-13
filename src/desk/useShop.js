@@ -146,6 +146,22 @@ export function useShop(cfg) {
     [commit]
   );
 
+  /* Save many records into one table in a single state commit (one render),
+     then persist each. Used by bulk import — saving hundreds of parts one at
+     a time re-renders the whole list on every save and crawls. */
+  const putMany = useCallback(
+    async (table, keyFn, recs) => {
+      const now = Date.now();
+      const saved = recs.map((r) => ({ ...r, id: r.id || uid(), updatedAt: now, createdAt: r.createdAt || now }));
+      const map = { ...ref.current[table] };
+      for (const s of saved) map[s.id] = s;
+      commit({ ...ref.current, [table]: map });
+      for (const s of saved) await sSet(keyFn(s.id), s);
+      return saved;
+    },
+    [commit]
+  );
+
   /* Starter jobs the shop doesn't have yet are added once the data is in.
      If this computer is signed in, wait for the first pull so jobs another
      computer already made aren't doubled up. Jobs are never deleted (only
@@ -199,6 +215,7 @@ export function useShop(cfg) {
     return saved;
   }, [put, publishCustomer]);
   const savePart = useCallback((p) => put("parts", partKey, p), [put]);
+  const savePartsBulk = useCallback((list) => putMany("parts", partKey, list), [putMany]);
   const saveVendor = useCallback((v) => put("vendors", vendorKey, v), [put]);
   const saveJob = useCallback(async (j) => {
     const saved = await put("jobs", jobKey, j);
@@ -316,6 +333,7 @@ export function useShop(cfg) {
     saveCustomer,
     saveVehicle,
     savePart,
+    savePartsBulk,
     saveVendor,
     saveJob,
     saveOrder,
