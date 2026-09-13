@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Modal, Field, Text, Num, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
 import { normalizeTireSize, isTireSize, tireSizeKey, tireBrandModel, tireName } from "../lib/tires.js";
+import { searchDistributorTires, tireBestStock } from "../lib/distributor.js";
 
 /* Tires are inventory parts with `tire: true` and a size, so tickets,
    stock counts, and canned jobs treat them like any part. This page is
@@ -25,10 +26,11 @@ const blank = () => ({
   active: true,
 });
 
-export function Tires({ shop, flash }) {
+export function Tires({ shop, cfg, flash }) {
   const [q, setQ] = useState("");
   const [only, setOnly] = useState("all"); // all | stock | low
   const [edit, setEdit] = useState(null);
+  const [dist, setDist] = useState(false);
   const vendors = activeList(shop.vendors).sort((a, b) => a.name.localeCompare(b.name));
   const all = useMemo(() => activeList(shop.parts).filter((p) => p.tire), [shop.parts]);
 
@@ -67,10 +69,14 @@ export function Tires({ shop, flash }) {
         <span className="muted">
           {onHandTotal} tires on hand · {sizes} size{sizes === 1 ? "" : "s"}
         </span>
+        <button className="btn" onClick={() => setDist(true)}>
+          Search US AutoForce
+        </button>
         <button className="btn primary" onClick={() => setEdit(blank())}>
           Add tire
         </button>
       </header>
+      {dist && <DistributorTires shop={shop} cfg={cfg} flash={flash} initialSize={isTireSize(q) ? normalizeTireSize(q) : ""} onClose={() => setDist(false)} />}
       <div className="deskBody">
         <div className="tableCard scroll">
           <table className="dk">
@@ -232,6 +238,115 @@ function TireForm({ tire, vendors, onClose, onSave }) {
       <button className="btn primary lg full" onClick={save}>
         Save tire
       </button>
+    </Modal>
+  );
+}
+
+/* Live tire lookup from the distributor (US AutoForce). Enter a size, see
+   what's in stock with your cost and retail, and add one to your inventory
+   so it can go on a ticket. */
+function DistributorTires({ shop, cfg, flash, initialSize, onClose }) {
+  const [size, setSize] = useState(initialSize || "");
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState(null);
+  const [added, setAdded] = useState({});
+
+  const run = async () => {
+    const s = size.trim();
+    if (!s) return;
+    setBusy(true);
+    setRes(await searchDistributorTires(s, cfg));
+    setBusy(false);
+  };
+  const addToStock = async (t) => {
+    await shop.savePart({
+      tire: true,
+      brand: t.brand,
+      model: t.model,
+      size: t.size,
+      loadSpeed: t.loadSpeed || "",
+      number: String(t.sku || "").toUpperCase(),
+      description: `${t.brand} ${t.model}`.trim(),
+      category: "Tires",
+      cost: toNum(t.cost),
+      price: toNum(t.retail),
+      onHand: 0,
+      taxable: true,
+      active: true,
+    });
+    setAdded((a) => ({ ...a, [t.sku]: true }));
+    flash(`${t.brand} ${t.model} added to your tires`);
+  };
+
+  return (
+    <Modal title="Tire search — US AutoForce" onClose={onClose} size="xwide">
+      <div className="rowBtns">
+        <input
+          className="search"
+          style={{ flex: 1 }}
+          value={size}
+          onChange={(e) => setSize(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && run()}
+          placeholder="Tire size, e.g. 225/65R17"
+          autoFocus
+        />
+        <button className="btn primary" onClick={run} disabled={busy || !size.trim()}>
+          {busy ? "Searching…" : "Search"}
+        </button>
+      </div>
+      {res && res.sample && (
+        <p className="setupNote" style={{ margin: "10px 0 0" }}>
+          Showing sample results. Connect your US AutoForce account (add the API credentials to the tire-search function) to see live stock and your real cost.
+        </p>
+      )}
+      {res && res.error && <p className="fldErr" style={{ marginTop: 8 }}>{res.error}</p>}
+      {res && (
+        <div className="tableCard scroll" style={{ marginTop: 12 }}>
+          <table className="dk">
+            <thead>
+              <tr>
+                <th>Tire</th>
+                <th>Size</th>
+                <th className="r">Stock</th>
+                <th className="r">Cost</th>
+                <th className="r">Retail</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {res.tires.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="emptyNote">No tires that size at the distributor.</td>
+                </tr>
+              )}
+              {res.tires.map((t) => {
+                const best = tireBestStock(t);
+                return (
+                  <tr key={t.sku}>
+                    <td>
+                      <strong>{t.brand} {t.model}</strong>
+                      {t.loadSpeed ? <span className="muted"> {t.loadSpeed}</span> : null}
+                      <span className="sub">{t.sku}</span>
+                    </td>
+                    <td>{t.size}</td>
+                    <td className={`r num ${t.onHand > 0 ? "" : "low"}`}>
+                      {t.onHand > 0 ? `${t.onHand}` : "0"}
+                      {best ? <span className="sub">{best.warehouse}</span> : null}
+                    </td>
+                    <td className="r num"><Money v={t.cost} /></td>
+                    <td className="r num"><strong><Money v={t.retail} /></strong></td>
+                    <td className="r">
+                      <button className="btn tiny" disabled={!!added[t.sku]} onClick={() => addToStock(t)}>
+                        {added[t.sku] ? "Added" : "Add to tires"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Modal>
   );
 }
