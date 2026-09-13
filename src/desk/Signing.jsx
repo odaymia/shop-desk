@@ -5,6 +5,7 @@ import { customerName, vehicleName } from "./useShop.js";
 import { parseAuthText } from "../lib/authForm.js";
 import { cloud, sGet, sDel } from "../storage/index.js";
 import { SIGNREQ_KEY } from "../lib/keys.js";
+import { QR, portalUrl } from "./QR.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* Electronic signatures. A signing view shows the whole estimate or
@@ -287,6 +288,7 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
    customer to sign; signing clears the request. */
 export function SignatureStation({ shop, cfg, flash }) {
   const [reqId, setReqId] = useState(null);
+  const [thanks, setThanks] = useState(null); // customer to show a receipts QR to after signing
   const load = () => sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
   useEffect(() => {
     load();
@@ -297,6 +299,37 @@ export function SignatureStation({ shop, cfg, flash }) {
 
   const order = reqId ? shop.orders[reqId] : null;
   const clearReq = () => sDel(SIGNREQ_KEY);
+
+  /* Right after they sign, the tablet shows a QR to the portal so the
+     customer can pull up all their receipts before handing it back. */
+  if (thanks) {
+    const email = thanks && thanks.email ? String(thanks.email).trim() : "";
+    return (
+      <div className="deskBody">
+        <div className="signWait">
+          <img src={cfg.logo || defaultLogo} alt="" />
+          <h1>Thank you!</h1>
+          <p className="muted" style={{ maxWidth: 460, marginBottom: 8 }}>Scan to see your receipts and service history any time.</p>
+          <QR value={portalUrl()} size={260} />
+          {email ? (
+            <p className="muted" style={{ maxWidth: 460 }}>
+              Sign in with your email: <strong>{email}</strong>. First time? Tap <strong>“Email me a sign-in link.”</strong>
+            </p>
+          ) : null}
+          <button
+            className="btn primary lg"
+            onClick={() => {
+              setThanks(null);
+              clearReq();
+              setReqId(null);
+            }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -315,11 +348,14 @@ export function SignatureStation({ shop, cfg, flash }) {
       shop={shop}
       cfg={cfg}
       flash={flash}
-      onDone={() => {
-        /* clear the request AND drop back to the waiting screen — the local
-           delete doesn't fire the sync subscription, so reset it here */
+      onDone={(saved) => {
         clearReq();
-        setReqId(null);
+        if (saved && order.status === "invoiced") {
+          /* signed the final invoice — show the receipts QR, then Done returns to the wait screen */
+          setThanks(shop.customers[order.customerId] || {});
+        } else {
+          setReqId(null);
+        }
       }}
     />
   );
