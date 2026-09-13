@@ -44,6 +44,48 @@ export function engineFluids(data, engine) {
     .filter((f) => f.products.length);
 }
 
+/* Keep the engine oils that are in the car's grade — Valvoline also lists
+   off-grade oils that will work, but the counter wants the right weight. */
+export function oilsInGrade(products, grade) {
+  const g = String(grade || "").trim();
+  if (!g) return products;
+  const re = new RegExp("(^|[^0-9])" + g.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&") + "([^0-9]|$)", "i");
+  const hit = products.filter((n) => re.test(n));
+  return hit.length ? hit : products;
+}
+
+/* Match a saved vehicle (clean make/model/engine + year) straight to the
+   Valvoline data, so the ticket can show its specs without a manual lookup. */
+export function findValvolineSpec(data, vehicle) {
+  if (!data || !vehicle) return null;
+  const mk = rows(data).find((x) => x.m.toLowerCase() === String(vehicle.make || "").toLowerCase());
+  if (!mk) return null;
+  const wantModel = String(vehicle.model || "").toLowerCase();
+  const wantEngine = String(vehicle.engine || "").toLowerCase();
+  const y = Number(vehicle.year) || 0;
+  let fallback = null;
+  for (const md of mk.mo) {
+    if (cleanModelName(md.n).toLowerCase() !== wantModel) continue;
+    for (const e of md.e) {
+      if (wantEngine && cleanEngineName(e.e).toLowerCase() !== wantEngine) continue;
+      const rng = yearRange(e.e);
+      const inYear = !y || !rng || (y >= rng[0] && y <= rng[1]);
+      if (inYear) return specOf(data, e);
+      if (!fallback) fallback = e;
+    }
+  }
+  return fallback ? specOf(data, fallback) : null;
+}
+function specOf(data, engine) {
+  return {
+    engine: cleanEngineName(engine.e),
+    grade: engine.g || "",
+    qt: engine.q || "",
+    oils: oilsInGrade(enginesProducts(data, engine), engine.g),
+    fluids: engineFluids(data, engine),
+  };
+}
+
 /* "5.6" -> "5.6 qt", tidy for display */
 export const qtText = (q) => (q == null || q === "" ? "" : `${q} qt`);
 

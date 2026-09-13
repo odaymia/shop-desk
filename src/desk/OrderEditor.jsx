@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Modal, Field, Text, Num, Money, fmtDateTime, fmtPhone, toNum } from "./ui.jsx";
 import { CustomerForm, CustomerPicker, VehicleForm } from "./forms.jsx";
 import { PartPicker, JobPicker } from "./pickers.jsx";
@@ -21,6 +21,7 @@ import {
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
 import { findSpec, matchOil, matchFilter } from "../lib/specs.js";
+import { loadValvolineSpecs, findValvolineSpec } from "../lib/valvolineSpecs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
 import { OilChangePicker } from "./OilChangePicker.jsx";
@@ -67,6 +68,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const [vehEdit, setVehEdit] = useState(null);
   const [custEdit, setCustEdit] = useState(false);
   const [specEdit, setSpecEdit] = useState(false);
+
+  /* When the car has no oil spec on file, pull Valvoline's for its exact
+     engine so the ticket shows grade + capacity + fluids automatically —
+     no manual lookup. Loaded on demand, only when it's actually needed. */
+  const draftVehicle = draft ? shop.vehicles[draft.vehicleId] : null;
+  const draftShopSpec = draftVehicle ? (findSpec(shop.specs, draftVehicle) || {}).spec : null;
+  const [vvData, setVvData] = useState(null);
+  const needVv = !!draftVehicle && !draftShopSpec && !vvData;
+  useEffect(() => {
+    if (!needVv) return undefined;
+    let ok = true;
+    loadValvolineSpecs().then((d) => ok && setVvData(d)).catch(() => {});
+    return () => { ok = false; };
+  }, [needVv]);
+  const vvSpec = useMemo(
+    () => (draftVehicle && !draftShopSpec && vvData ? findValvolineSpec(vvData, draftVehicle) : null),
+    [draftVehicle, draftShopSpec, vvData]
+  );
 
   /* adopt changes from another device only when we have nothing unsaved */
   useEffect(() => {
@@ -152,6 +171,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const customer = shop.customers[o.customerId];
   const vehicle = shop.vehicles[o.vehicleId];
   const vehicles = o.customerId ? vehiclesOf(shop.vehicles, o.customerId) : [];
+  /* the shop's own spec if entered, otherwise Valvoline's — so the oil
+     change prefills quarts and grade either way */
+  const shopSpec = vehicle ? (findSpec(shop.specs, vehicle) || {}).spec : null;
+  const effSpec =
+    shopSpec ||
+    (vvSpec ? { year: vehicle.year, make: vehicle.make, model: vehicle.model, engine: vehicle.engine, oilViscosity: vvSpec.grade, oilCapacityQt: vvSpec.qt, oilFilters: [] } : null);
   const t = orderTotals(o, cfg, customer);
   const rules = rulesFor(o, cfg, customer);
   const locked = o.status === STATUS.invoiced || o.status === STATUS.void || o.status === STATUS.deleted;
@@ -423,6 +448,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               shop={shop}
               cfg={cfg}
               locked={locked}
+              vvSpec={vvSpec}
               onEdit={() => setSpecEdit(true)}
               onAdd={() => setPick("oil")}
             />
@@ -763,7 +789,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <OilChangePicker
           cfg={cfg}
           shop={shop}
-          spec={vehicle ? (findSpec(shop.specs, vehicle) || {}).spec : null}
+          spec={effSpec}
           onClose={() => setPick(null)}
           onAdd={(lines, pkg) => {
             addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.techId || null } : l)));
@@ -1017,9 +1043,66 @@ function PaymentModal({ balance, onClose, onSave }) {
 
 /* Oil grade, quarts, filter numbers and Valvoline picks for the car on
    the ticket. Learned once per engine; a licensed feed can fill it later. */
-function SpecsCard({ vehicle, shop, cfg, locked, onEdit, onAdd }) {
+/* Valvoline product names, said the way the counter would. */
+const vvShort = (name) =>
+  String(name || "")
+    .replace(/\s*Motor Oil\s*$/i, "")
+    .replace(/\bSAE\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+const vvOilLabel = (name) => "Valvoline " + vvShort(name);
+
+function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
   const found = findSpec(shop.specs, vehicle);
   const sp = found && found.spec;
+  /* Nothing entered by the shop, but Valvoline has this exact engine —
+     show it automatically instead of an empty "add specs" prompt. */
+  if (!sp && vvSpec)
+    return (
+      <div className="card specs" style={{ marginTop: 14 }}>
+        <div className="cardHead">
+          <h3>Service specs <span className="st" style={{ marginLeft: 8 }}>from Valvoline</span></h3>
+          {!locked && (
+            <span className="rowBtns">
+              <button className="btn tiny" onClick={onEdit}>
+                Edit
+              </button>
+              <button className="btn tiny primary" onClick={onAdd}>
+                + Oil change
+              </button>
+            </span>
+          )}
+        </div>
+        <div className="specGrid">
+          <div>
+            <span>Oil</span>
+            <strong>{[vvSpec.grade, vvSpec.qt ? `${vvSpec.qt} qt` : ""].filter(Boolean).join(" · ") || "—"}</strong>
+          </div>
+          <div>
+            <span>{vvSpec.oils.length === 1 ? "Valvoline oil" : "Valvoline oils"}</span>
+            <strong>{vvSpec.oils.length ? vvOilLabel(vvSpec.oils[0]) : "—"}</strong>
+            {vvSpec.oils.slice(1, 4).map((o) => (
+              <em key={o}>{vvOilLabel(o)}</em>
+            ))}
+            {vvSpec.oils.length > 4 ? <em className="muted">+{vvSpec.oils.length - 4} more</em> : null}
+          </div>
+        </div>
+        {vvSpec.fluids.length > 0 && (
+          <div className="fluidGrid" style={{ marginTop: 10 }}>
+            {vvSpec.fluids.map((f) => (
+              <div key={f.system} style={{ display: "contents" }}>
+                <div className="fSys">{f.system}</div>
+                <div className="fProd">{f.products.map(vvShort).join(" · ")}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="legalNote" style={{ marginTop: 10 }}>
+          Valvoline's spec for this {vehicle.year} {vehicle.make} {vehicle.model}
+          {vehicle.engine ? ` ${vehicle.engine}` : ""}. Capacity is a guide — confirm on the dipstick. Tap Edit to save your own.
+        </p>
+      </div>
+    );
   if (!sp)
     return (
       <div className="card specs" style={{ marginTop: 14 }}>
