@@ -289,6 +289,8 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
 export function SignatureStation({ shop, cfg, flash, onLock }) {
   const [reqId, setReqId] = useState(null);
   const [thanks, setThanks] = useState(null); // customer to show a receipts QR to after signing
+  const [checkin, setCheckin] = useState(false); // customer is filling in their own info
+  const [checkedIn, setCheckedIn] = useState(false); // just-saved confirmation
   const load = () => sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
   useEffect(() => {
     load();
@@ -331,6 +333,38 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
     );
   }
 
+  /* A customer just saved their own info — a friendly confirmation, no data shown back. */
+  if (checkedIn) {
+    return (
+      <div className="deskBody">
+        <div className="signWait">
+          <img src={cfg.logo || defaultLogo} alt="" />
+          <h1>You're all set!</h1>
+          <p className="muted" style={{ maxWidth: 460 }}>Thanks — your details are with us. Please let our team know you've checked in.</p>
+          <button className="btn primary lg" onClick={() => setCheckedIn(false)}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* Self-serve intake: the customer types their own name, phone, email and address. */
+  if (checkin && !order) {
+    return (
+      <CheckInForm
+        shop={shop}
+        cfg={cfg}
+        flash={flash}
+        onCancel={() => setCheckin(false)}
+        onDone={() => {
+          setCheckin(false);
+          setCheckedIn(true);
+        }}
+      />
+    );
+  }
+
   if (!order) {
     return (
       <div className="deskBody">
@@ -338,8 +372,11 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
           <img src={cfg.logo || defaultLogo} alt="" />
           <h1>{cfg.shopName}</h1>
           <p className="muted">Ready to sign. When the front desk sends your estimate, it will appear here.</p>
+          <button className="btn primary lg" style={{ marginTop: 18 }} onClick={() => setCheckin(true)}>
+            Check in
+          </button>
           {onLock && (
-            <button className="btn" style={{ marginTop: 18 }} onClick={onLock} title="Hide the rest of the program behind this screen; a code gets you back">
+            <button className="btn" style={{ marginTop: 12 }} onClick={onLock} title="Hide the rest of the program behind this screen; a code gets you back">
               Lock to this screen
             </button>
           )}
@@ -363,5 +400,106 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
         }
       }}
     />
+  );
+}
+
+/* A tablet-friendly form the customer fills in themselves while they wait.
+   Write-only: it saves a new customer record and never shows anything back,
+   so nothing about other customers is exposed on the kiosk. */
+function CheckInForm({ shop, cfg, flash, onCancel, onDone }) {
+  const [d, setD] = useState({ first: "", last: "", phone: "", email: "", street: "", city: "", state: "CA", zip: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const set = (k) => (e) => {
+    const v = e.target.value;
+    setD((x) => ({ ...x, [k]: k === "state" ? v.toUpperCase().slice(0, 2) : v }));
+    setErr("");
+  };
+
+  const save = async () => {
+    if (!d.first.trim() && !d.last.trim()) return setErr("Please enter your name.");
+    if (!d.phone.trim()) return setErr("Please enter a phone number so we can reach you.");
+    setBusy(true);
+    try {
+      await shop.saveCustomer({
+        first: d.first.trim(),
+        last: d.last.trim(),
+        company: "",
+        phone: d.phone.trim(),
+        phone2: "",
+        email: d.email.trim(),
+        street: d.street.trim(),
+        city: d.city.trim(),
+        state: d.state.trim() || "CA",
+        zip: d.zip.trim(),
+        notes: "Checked in on the tablet",
+        taxExempt: false,
+        active: true,
+        selfCheckIn: true,
+        checkedInAt: Date.now(),
+      });
+      onDone();
+    } catch (e) {
+      setBusy(false);
+      flash && flash("Couldn't save — please try again.", "out");
+      console.error("check-in save failed", e);
+    }
+  };
+
+  return (
+    <div className="deskBody">
+      <div className="checkIn">
+        <img src={cfg.logo || defaultLogo} alt="" className="checkInLogo" />
+        <h1>Welcome — please check in</h1>
+        <p className="muted">Fill in your details and hand the tablet back to our team.</p>
+        <div className="fldRow">
+          <label className="fld">
+            <span>First name</span>
+            <input value={d.first} onChange={set("first")} autoFocus autoComplete="given-name" />
+          </label>
+          <label className="fld">
+            <span>Last name</span>
+            <input value={d.last} onChange={set("last")} autoComplete="family-name" />
+          </label>
+        </div>
+        <div className="fldRow">
+          <label className="fld">
+            <span>Phone</span>
+            <input value={d.phone} onChange={set("phone")} inputMode="tel" autoComplete="tel" placeholder="(619) 555-0100" />
+          </label>
+          <label className="fld">
+            <span>Email</span>
+            <input value={d.email} onChange={set("email")} type="email" inputMode="email" autoComplete="email" />
+          </label>
+        </div>
+        <label className="fld">
+          <span>Home address</span>
+          <input value={d.street} onChange={set("street")} autoComplete="street-address" placeholder="Street address" />
+        </label>
+        <div className="fldRow">
+          <label className="fld grow">
+            <span>City</span>
+            <input value={d.city} onChange={set("city")} autoComplete="address-level2" />
+          </label>
+          <label className="fld state">
+            <span>State</span>
+            <input value={d.state} onChange={set("state")} autoComplete="address-level1" />
+          </label>
+          <label className="fld zip">
+            <span>ZIP</span>
+            <input value={d.zip} onChange={set("zip")} inputMode="numeric" autoComplete="postal-code" />
+          </label>
+        </div>
+        {err && <p className="fldErr">{err}</p>}
+        <div className="signBtns">
+          <button className="btn primary lg" onClick={save} disabled={busy}>
+            {busy ? "Saving…" : "Submit"}
+          </button>
+          <button className="btn lg" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

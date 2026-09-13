@@ -275,6 +275,17 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .kioskGateCard input { width:100%; box-sizing:border-box; font-size:22px; text-align:center; letter-spacing:6px; padding:10px; border:1px solid var(--line); border-radius:9px; background:var(--asphalt); color:var(--ink); }
 .qr { margin:0 auto; background:#fff; padding:10px; border-radius:10px; }
 .qr svg { width:100%; height:100%; display:block; }
+.checkIn { max-width:620px; margin:0 auto; padding:32px 20px 48px; text-align:center; }
+.checkIn .checkInLogo { height:56px; margin-bottom:10px; }
+.checkIn h1 { margin:0 0 4px; }
+.checkIn .fldRow { display:flex; gap:14px; }
+.checkIn .fld { display:flex; flex-direction:column; gap:6px; flex:1; margin-top:14px; text-align:left; }
+.checkIn .fld > span { font-size:14px; color:var(--muted); }
+.checkIn .fld input { font-size:19px; padding:14px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); }
+.checkIn .fld.state { flex:0 0 72px; }
+.checkIn .fld.zip { flex:0 0 120px; }
+.checkIn .fld.grow { flex:1; }
+.checkIn .signBtns { margin-top:22px; }
 .fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }
 .fluidGrid .fSys { color:var(--muted); }
 .fluidGrid .fProd { font-weight:600; }
