@@ -54,27 +54,51 @@ export function oilsInGrade(products, grade) {
   return hit.length ? hit : products;
 }
 
-/* Match a saved vehicle (clean make/model/engine + year) straight to the
-   Valvoline data, so the ticket can show its specs without a manual lookup. */
+const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const displacement = (s) => {
+  const m = String(s || "").match(/(\d)[.,](\d)/);
+  return m ? m[1] + "." + m[2] : "";
+};
+
+/* Match a saved vehicle to the Valvoline data so the ticket shows its specs
+   without a manual lookup. Forgiving on purpose — imported cars store the
+   make/model/engine in all sorts of formats ("TOYOTA", "CAMRY", "2.5L L4"),
+   so it matches make/model case- and punctuation-insensitively and the
+   engine by displacement (2.5) when the exact name doesn't line up. */
 export function findValvolineSpec(data, vehicle) {
   if (!data || !vehicle) return null;
-  const mk = rows(data).find((x) => x.m.toLowerCase() === String(vehicle.make || "").toLowerCase());
+  const mk = rows(data).find((x) => norm(x.m) === norm(vehicle.make));
   if (!mk) return null;
-  const wantModel = String(vehicle.model || "").toLowerCase();
-  const wantEngine = String(vehicle.engine || "").toLowerCase();
+  const vModel = norm(vehicle.model);
+  if (!vModel) return null;
   const y = Number(vehicle.year) || 0;
-  let fallback = null;
+  const cands = [];
   for (const md of mk.mo) {
-    if (cleanModelName(md.n).toLowerCase() !== wantModel) continue;
+    const cm = norm(cleanModelName(md.n));
+    const modelHit = cm === vModel || (cm.length >= 3 && vModel.startsWith(cm)) || (vModel.length >= 3 && cm.startsWith(vModel));
+    if (!modelHit) continue;
     for (const e of md.e) {
-      if (wantEngine && cleanEngineName(e.e).toLowerCase() !== wantEngine) continue;
       const rng = yearRange(e.e);
-      const inYear = !y || !rng || (y >= rng[0] && y <= rng[1]);
-      if (inYear) return specOf(data, e);
-      if (!fallback) fallback = e;
+      cands.push({ e, inYear: !y || !rng || (y >= rng[0] && y <= rng[1]) });
     }
   }
-  return fallback ? specOf(data, fallback) : null;
+  if (!cands.length) return null;
+  const yearHits = cands.filter((c) => c.inYear);
+  const pool = yearHits.length ? yearHits : cands;
+  const vEng = norm(vehicle.engine);
+  const vDisp = displacement(vehicle.engine);
+  let hit =
+    (vEng && pool.find((c) => norm(cleanEngineName(c.e.e)) === vEng)) ||
+    (vDisp && pool.find((c) => displacement(c.e.e) === vDisp)) ||
+    (pool.length === 1 && pool[0]) ||
+    null;
+  if (!hit && !vEng) {
+    /* no engine on the car, but the whole model/year agrees on oil anyway */
+    const grades = new Set(pool.map((c) => c.e.g || ""));
+    const caps = new Set(pool.map((c) => String(c.e.q || "")));
+    if (grades.size === 1 && caps.size === 1) hit = pool[0];
+  }
+  return hit ? specOf(data, hit.e) : null;
 }
 function specOf(data, engine) {
   return {
