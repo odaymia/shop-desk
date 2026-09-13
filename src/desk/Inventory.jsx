@@ -34,6 +34,7 @@ export function Inventory({ shop, flash }) {
   const [edit, setEdit] = useState(null);
   const [quick, setQuick] = useState(false);
   const [receive, setReceive] = useState(false);
+  const [imp, setImp] = useState(false);
   const vendors = activeList(shop.vendors).sort((a, b) => a.name.localeCompare(b.name));
 
   const stock = useMemo(
@@ -77,12 +78,16 @@ export function Inventory({ shop, flash }) {
         <button className="btn" onClick={() => setQuick(true)}>
           Quick add
         </button>
+        <button className="btn" onClick={() => setImp(true)}>
+          Import
+        </button>
         <button className="btn primary" onClick={() => setEdit(blank())}>
           Add part
         </button>
       </header>
       {quick && <QuickAdd shop={shop} flash={flash} onClose={() => setQuick(false)} />}
       {receive && <ReceiveOrder shop={shop} flash={flash} onClose={() => setReceive(false)} />}
+      {imp && <ImportParts shop={shop} flash={flash} onClose={() => setImp(false)} />}
       <div className="deskBody">
         {cats.length > 1 && (
           <div className="catBar" style={{ paddingBottom: 14 }}>
@@ -290,6 +295,127 @@ export function PartForm({ part, vendors, onClose, onSave }) {
       <button className="btn primary lg full" onClick={save}>
         Save part
       </button>
+    </Modal>
+  );
+}
+
+/* Bulk import from a price book or distributor file. Paste rows (or pick a
+   .csv/.tsv/.txt file) with columns: part number, description, category,
+   cost, sell price, on hand. Matches existing stock by part number and
+   updates it in place — so re-importing a new price book refreshes costs
+   without making duplicates, and parts not in the file (your oils) are left
+   untouched. */
+function parseImport(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const out = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let c = line.includes("\t") ? line.split("\t") : line.split(",");
+    c = c.map((s) => s.trim());
+    const number = (c[0] || "").trim();
+    if (!number) continue;
+    // skip a header row
+    if (/^(part\s*)?(number|material|part\s*#|part\s*no)\b/i.test(number)) continue;
+    out.push({
+      number: number.toUpperCase(),
+      description: c[1] || "",
+      category: c[2] || "",
+      cost: c[3] || "",
+      price: c[4] || "",
+      onHand: c[5] || "",
+    });
+  }
+  return out;
+}
+
+function ImportParts({ shop, flash, onClose }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const byNumber = useMemo(() => {
+    const m = {};
+    for (const p of Object.values(shop.parts)) if (p.number) m[String(p.number).trim().toUpperCase()] = p;
+    return m;
+  }, [shop.parts]);
+
+  const parsed = useMemo(() => parseImport(text), [text]);
+  const plan = useMemo(() => {
+    let add = 0, update = 0;
+    const cats = {};
+    for (const r of parsed) {
+      (byNumber[r.number] ? (update++, 0) : (add++, 0));
+      cats[r.category || "—"] = (cats[r.category || "—"] || 0) + 1;
+    }
+    return { add, update, cats };
+  }, [parsed, byNumber]);
+
+  const onFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const rdr = new FileReader();
+    rdr.onload = () => setText(String(rdr.result || ""));
+    rdr.readAsText(f);
+  };
+
+  const run = async () => {
+    if (!parsed.length) return;
+    setBusy(true);
+    let add = 0, update = 0;
+    for (const r of parsed) {
+      const existing = byNumber[r.number];
+      const rec = {
+        ...(existing || blank()),
+        number: r.number,
+        description: r.description || (existing && existing.description) || "",
+        category: r.category || (existing && existing.category) || "",
+        cost: toNum(r.cost),
+        price: r.price !== "" ? toNum(r.price) : existing ? toNum(existing.price) : "",
+      };
+      if (r.onHand !== "") rec.onHand = toNum(r.onHand); // else keep existing / default 0
+      await shop.savePart(rec);
+      existing ? update++ : add++;
+    }
+    flash(`Imported: ${add} added, ${update} updated`);
+    setBusy(false);
+    onClose();
+  };
+
+  return (
+    <Modal title="Import parts from a price book" onClose={onClose} size="xwide">
+      <p className="muted" style={{ marginTop: 0 }}>
+        One part per line: <b>part number, description, category, cost, sell price, on hand</b> — separated by tabs
+        (paste straight from a spreadsheet) or commas. Existing part numbers are updated in place; everything else is
+        added. Parts not listed here are left alone.
+      </p>
+      <div className="rowBtns" style={{ marginBottom: 8 }}>
+        <label className="btn">
+          Choose a file…
+          <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={onFile} hidden />
+        </label>
+        <span className="muted">or paste below</span>
+      </div>
+      <textarea
+        className="ta"
+        style={{ minHeight: 140 }}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={"VA110\tVAL AIR FILTER\tEngine Air Filters\t5.35\t24.99\nVCA1022\tVAL CABIN AIR FILTER\tCabin Air Filters\t10.70\t44.99"}
+      />
+      {parsed.length > 0 && (
+        <p className="muted" style={{ marginTop: 8 }}>
+          {parsed.length} row{parsed.length === 1 ? "" : "s"} — <b>{plan.add}</b> new, <b>{plan.update}</b> updating.{" "}
+          {Object.entries(plan.cats)
+            .map(([c, n]) => `${n} ${c}`)
+            .join(" · ")}
+        </p>
+      )}
+      <div className="rowBtns" style={{ marginTop: 10 }}>
+        <button className="btn primary" onClick={run} disabled={busy || !parsed.length}>
+          {busy ? "Importing…" : `Import ${parsed.length || ""} part${parsed.length === 1 ? "" : "s"}`}
+        </button>
+        <button className="btn ghost" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+      </div>
     </Modal>
   );
 }
