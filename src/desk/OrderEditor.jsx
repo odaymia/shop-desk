@@ -1231,7 +1231,7 @@ function VisitHistory({ shop, order, vehicle, customer, nav }) {
           <tbody>
             {visits.map((o) => {
               const miles = o.mileageIn || o.mileageOut;
-              const codes = serviceCodes(o);
+              const codes = serviceCodes(o, shop.parts);
               return (
                 <tr key={o.id} className="visitRow" onClick={() => nav.openOrder(o.id)} title={`Open ticket #${o.number}`}>
                   <td>{fmtDate(o.invoicedAt || o.createdAt)}</td>
