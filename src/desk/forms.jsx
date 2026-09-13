@@ -4,7 +4,7 @@ import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
 import { loadValvolineSpecs, vvMakeList, vvModelList, vvEngineList } from "../lib/valvolineSpecs.js";
-import { customerName, vehicleName, activeList, vehiclesOf, searchText } from "./useShop.js";
+import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
 
 /* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
 function mergeOpts(a, b) {
@@ -361,27 +361,31 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
 export function CustomerPicker({ shop, onPick, onClose }) {
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
+  /* Index the cars by owner in one pass, and sort the customers once — a
+     shop's imported history is tens of thousands of each, so looking up a
+     customer's cars by scanning all of them (per customer) locked the tab. */
+  const vehsBy = useMemo(() => {
+    const m = {};
+    for (const v of Object.values(shop.vehicles)) {
+      if (v.active === false) continue;
+      (m[v.customerId] = m[v.customerId] || []).push(v);
+    }
+    return m;
+  }, [shop.vehicles]);
+  const sorted = useMemo(
+    () => activeList(shop.customers).sort((a, b) => customerName(a).localeCompare(customerName(b))),
+    [shop.customers]
+  );
   const rows = useMemo(() => {
-    const list = activeList(shop.customers).map((c) => {
-      const vehs = vehiclesOf(shop.vehicles, c.id);
-      return { c, vehs };
-    });
-    return list
-      .filter(({ c, vehs }) =>
-        searchText(
-          q,
-          c.first,
-          c.last,
-          c.company,
-          c.phone,
-          c.phone2,
-          c.email,
-          ...vehs.map((v) => `${vehicleName(v)} ${v.plate || ""} ${v.vin || ""}`)
-        )
-      )
-      .sort((a, b) => customerName(a.c).localeCompare(customerName(b.c)))
-      .slice(0, 60);
-  }, [shop.customers, shop.vehicles, q]);
+    const out = [];
+    for (const c of sorted) {
+      const vehs = vehsBy[c.id] || [];
+      if (q && !searchText(q, c.first, c.last, c.company, c.phone, c.phone2, c.email, ...vehs.map((v) => `${vehicleName(v)} ${v.plate || ""} ${v.vin || ""}`))) continue;
+      out.push({ c, vehs });
+      if (out.length >= 60) break; // a page at a time; the search box reaches the rest
+    }
+    return out;
+  }, [sorted, vehsBy, q]);
 
   if (adding)
     return (
