@@ -54,7 +54,12 @@ export function oilsInGrade(products, grade) {
   return hit.length ? hit : products;
 }
 
-const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const norm = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // strip accents so "Coupé" matches "Coupe"
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 const displacement = (s) => {
   const m = String(s || "").match(/(\d)[.,](\d)/);
   return m ? m[1] + "." + m[2] : "";
@@ -72,33 +77,62 @@ export function findValvolineSpec(data, vehicle) {
   const vModel = norm(vehicle.model);
   if (!vModel) return null;
   const y = Number(vehicle.year) || 0;
-  const cands = [];
-  for (const md of mk.mo) {
-    const cm = norm(cleanModelName(md.n));
-    const modelHit = cm === vModel || (cm.length >= 3 && vModel.startsWith(cm)) || (vModel.length >= 3 && cm.startsWith(vModel));
-    if (!modelHit) continue;
-    for (const e of md.e) {
-      const rng = yearRange(e.e);
-      cands.push({ e, inYear: !y || !rng || (y >= rng[0] && y <= rng[1]) });
-    }
-  }
-  if (!cands.length) return null;
-  const yearHits = cands.filter((c) => c.inYear);
-  const pool = yearHits.length ? yearHits : cands;
   const vEng = norm(vehicle.engine);
   const vDisp = displacement(vehicle.engine);
-  let hit =
-    (vEng && pool.find((c) => norm(cleanEngineName(c.e.e)) === vEng)) ||
-    (vDisp && pool.find((c) => displacement(c.e.e) === vDisp)) ||
-    (pool.length === 1 && pool[0]) ||
-    null;
-  if (!hit && !vEng) {
-    /* no engine on the car, but the whole model/year agrees on oil anyway */
-    const grades = new Set(pool.map((c) => c.e.g || ""));
-    const caps = new Set(pool.map((c) => String(c.e.q || "")));
-    if (grades.size === 1 && caps.size === 1) hit = pool[0];
+  const inYear = (e) => {
+    const r = yearRange(e.e);
+    return !y || !r || (y >= r[0] && y <= r[1]);
+  };
+  /* pick the best engine from a set: the car's exact engine, then its
+     displacement, then the lone option, then a set that all takes the same oil */
+  const pick = (list) => {
+    if (!list.length) return null;
+    const yh = list.filter(inYear);
+    const pool = yh.length ? yh : list;
+    let hit =
+      (vEng && pool.find((e) => norm(cleanEngineName(e.e)) === vEng)) ||
+      (vDisp && pool.find((e) => displacement(e.e) === vDisp)) ||
+      (pool.length === 1 && pool[0]) ||
+      null;
+    if (!hit) {
+      const grades = new Set(pool.map((e) => e.g || ""));
+      const caps = new Set(pool.map((e) => String(e.q || "")));
+      if (grades.size === 1 && caps.size === 1) hit = pool[0];
+    }
+    return hit || null;
+  };
+
+  /* Pass A: the shop's model is Valvoline's model (Toyota Camry, Ford F-150). */
+  const a = [];
+  for (const md of mk.mo) {
+    const cm = norm(cleanModelName(md.n));
+    if (cm === vModel || (cm.length >= 3 && vModel.startsWith(cm)) || (vModel.length >= 3 && cm.startsWith(vModel))) {
+      for (const e of md.e) a.push(e);
+    }
   }
-  return hit ? specOf(data, hit.e) : null;
+  const hitA = pick(a);
+  if (hitA) return specOf(data, hitA);
+
+  /* Pass B: the shop's "model" is really the engine/trim. BMW files a
+     "840i Gran Coupe" under model "8 Series Gran Coupé", engine "840i Gran
+     Coupé" — so match when the car's model shows up in the engine text. */
+  const b = [];
+  for (const md of mk.mo) {
+    for (const e of md.e) {
+      if (!inYear(e)) continue;
+      if (norm(e.e).includes(vModel) || (norm(cleanModelName(md.n)) + norm(e.e)).includes(vModel)) b.push(e);
+    }
+  }
+  if (b.length) {
+    const grades = new Set(b.map((e) => e.g || ""));
+    const caps = new Set(b.map((e) => String(e.q || "")));
+    if (grades.size === 1 && caps.size === 1) return specOf(data, b[0]);
+    /* the trims disagree on oil — only commit if the car's displacement
+       singles one out, otherwise leave it blank rather than guess wrong */
+    const dm = vDisp && b.filter((e) => displacement(e.e) === vDisp);
+    if (dm && dm.length === 1) return specOf(data, dm[0]);
+  }
+  return null;
 }
 function specOf(data, engine) {
   return {
