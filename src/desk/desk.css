@@ -260,6 +260,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .ckPsi label { display:flex; align-items:center; gap:8px; font-size:16px; font-weight:600; }
 .ckPsi label > span:first-child { min-width:48px; }
 .ckPsi input { font-size:22px; width:96px; min-width:0; padding:8px 12px; text-align:center; border:1px solid var(--line); border-radius:9px; background:var(--asphalt); color:var(--ink); }
+.specGrid { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; align-items:baseline; }
+.specGrid span { color:var(--muted); }
+.specGrid strong { font-size:20px; }
 .ckKeys { margin:16px 0 12px; font-size:12px; color:var(--muted); }
 .ckKeys b { color:var(--ink); font-weight:600; }
 .ckGrid { display:grid; grid-template-columns:1fr auto; gap:3px 12px; font-size:13px; }

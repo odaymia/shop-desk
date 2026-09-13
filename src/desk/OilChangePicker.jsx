@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Modal, Money, toNum } from "./ui.jsx";
 import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
+import { OilSpecLookup } from "./OilSpecLookup.jsx";
 import { uid } from "../lib/ids.js";
 
 /* Oil change, three taps: the package, the quarts (from the car's spec
@@ -14,15 +15,29 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const [oil, setOil] = useState(null);
   const [step, setStep] = useState("package"); // package | quarts | oil | filter
   const [allOils, setAllOils] = useState(false); // show every oil, past the package's type
+  const [lookup, setLookup] = useState(false); // the Valvoline grade/capacity lookup
+  const [lookedGrade, setLookedGrade] = useState(""); // grade the lookup filled in
   const oils = oilItems(shop.parts);
   const filters = oilFilterItems(shop.parts);
-  const grade = spec ? spec.oilViscosity : "";
+  const grade = lookedGrade || (spec ? spec.oilViscosity : "");
   const suggestedOils = grade ? matchOil(shop.parts, grade) : [];
   const suggestedFilters = spec ? matchFilter(shop.parts, spec.oilFilters) : [];
   const q = toNum(quarts) || (pkg ? pkg.quarts : 5);
   const wantType = pkg ? packageOilType(pkg) : null; // the oil type this package calls for, or null
 
   const finish = (filt) => onAdd(oilPackageLines(pkg, q, oil, filt, uid), pkg);
+
+  if (lookup)
+    return (
+      <OilSpecLookup
+        onClose={() => setLookup(false)}
+        onApply={({ grade: g, qt }) => {
+          if (qt) setQuarts(qt);
+          if (g) setLookedGrade(g);
+          setLookup(false);
+        }}
+      />
+    );
 
   if (step === "package")
     return (
@@ -78,6 +93,9 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
             <>All {q || pkg.quarts} qt included in the package.</>
           )}
         </p>
+        <button className="btn lg full" style={{ marginBottom: 8 }} onClick={() => setLookup(true)}>
+          Look up grade &amp; capacity (Valvoline)
+        </button>
         <button className="btn primary lg full" onClick={() => setStep("oil")}>
           Next: which oil
         </button>
