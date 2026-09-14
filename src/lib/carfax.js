@@ -21,6 +21,11 @@ const mdy = (ts) => {
   return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
 };
 const clean = (v) => String(v == null ? "" : v).replace(/[|"\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+/* CARFAX wants the location phone as xxx-xxx-xxxx */
+const phoneDashed = (v) => {
+  const d = String(v == null ? "" : v).replace(/\D/g, "").slice(-10);
+  return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : "";
+};
 
 /* "1234 Main St, San Diego, CA 92101" → parts; anything odd lands in ADDRESS */
 export function splitAddress(text) {
@@ -58,7 +63,7 @@ export function carfaxRows(order, vehicle, cfg) {
     CITY: a.city,
     STATE: a.state,
     POSTAL_CODE: a.zip,
-    PHONE: clean(cfg.shopPhone).replace(/\D/g, ""),
+    PHONE: phoneDashed(cfg.shopPhone),
     URL: clean(cfg.shopWebsite),
   };
   const rows = [];

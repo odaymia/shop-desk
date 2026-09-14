@@ -1,6 +1,21 @@
 import { useState } from "react";
 import { Field, Text } from "./ui.jsx";
 import { carfaxRows, carfaxFile, carfaxFileName } from "../lib/carfax.js";
+import { loyaltyRows, loyaltyFile, loyaltyFileName } from "../lib/carfaxLoyalty.js";
+
+const TWO_YEARS = 730 * 86400 * 1000;
+
+function download(name, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 
 /* Settings → CARFAX. Builds the service-history file CARFAX takes from
    partnered management systems. Nightly automatic delivery needs
@@ -9,6 +24,8 @@ import { carfaxRows, carfaxFile, carfaxFileName } from "../lib/carfax.js";
 export function CarfaxPanel({ cfg, shop, d, set, flash }) {
   const [range, setRange] = useState("night"); // night | month | all
   const [last, setLast] = useState(null);
+  const [lrange, setLrange] = useState("all"); // customer list: month | all
+  const [llast, setLlast] = useState(null);
 
   const build = () => {
     const now = Date.now();
@@ -27,16 +44,21 @@ export function CarfaxPanel({ cfg, shop, d, set, flash }) {
     }
     if (!rows.length) return flash("No posted invoices with a VIN in that range", "out");
     const name = carfaxFileName("ShopDesk", range === "all" ? "HIST" : "PROD");
-    const blob = new Blob([carfaxFile(rows)], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    download(name, carfaxFile(rows), "text/plain");
     setLast({ name, invoices, rows: rows.length, noVin });
+  };
+
+  /* The Shop Loyalty Program customer list (CSV). Archive goes back at most
+     24 months per CARFAX; the daily is the last day's transactions. */
+  const buildLoyalty = () => {
+    const now = Date.now();
+    const since = lrange === "month" ? now - 31 * 86400 * 1000 : now - TWO_YEARS;
+    const rows = loyaltyRows(shop.orders, shop.customers, shop.vehicles, cfg, since);
+    if (!rows.length) return flash("No reachable customers with a VIN in that range", "out");
+    const optedIn = rows.filter((r) => r.EMAIL_OPT_IN === "Yes" || r.CELLPHONE_OPT_IN === "Yes").length;
+    const name = loyaltyFileName("ShopDesk", lrange === "all" ? "HIST" : "PROD");
+    download(name, loyaltyFile(rows), "text/csv");
+    setLlast({ name, rows: rows.length, optedIn });
   };
 
   return (
@@ -77,6 +99,37 @@ export function CarfaxPanel({ cfg, shop, d, set, flash }) {
         <p className="muted" style={{ marginTop: 10 }}>
           {last.name}: {last.invoices.toLocaleString()} invoices, {last.rows.toLocaleString()} lines.
           {last.noVin ? ` ${last.noVin.toLocaleString()} invoices skipped for having no VIN on the car.` : ""}
+        </p>
+      )}
+
+      <h3 className="subhead" style={{ marginTop: 36 }}>
+        CARFAX Shop Loyalty Program (customer list)
+      </h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        The customer list lets CARFAX send your customers their free CARFAX report and VIN-specific service reminders on
+        your behalf. It includes their email, cell, name, and the VIN they had serviced. A customer is marked opted-in
+        only if their record says they agreed — everyone else goes out as “No,” so you don’t contact anyone who didn’t
+        consent. CARFAX gives you the Provider ID when you enroll.
+      </p>
+      <Field label="CARFAX Provider ID">
+        <Text value={d.carfaxProviderId || ""} onChange={(v) => set("carfaxProviderId")(v.trim())} placeholder="4-digit, from CARFAX" />
+      </Field>
+      <div className="rowBtns" style={{ alignItems: "center", marginTop: 10 }}>
+        <div className="seg">
+          <button className={lrange === "month" ? "on" : ""} onClick={() => setLrange("month")}>
+            Last 30 days
+          </button>
+          <button className={lrange === "all" ? "on" : ""} onClick={() => setLrange("all")}>
+            Back file (last 24 months)
+          </button>
+        </div>
+        <button className="btn" onClick={buildLoyalty}>
+          Download customer list
+        </button>
+      </div>
+      {llast && (
+        <p className="muted" style={{ marginTop: 10 }}>
+          {llast.name}: {llast.rows.toLocaleString()} customers. {llast.optedIn.toLocaleString()} opted in to be contacted.
         </p>
       )}
     </>
