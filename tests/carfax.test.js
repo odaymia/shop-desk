@@ -31,7 +31,7 @@ test("one row per labor or part line, fees and discounts left out, no prices or 
   assert.equal(rows[0].PLATE, "8ABC123");
   assert.equal(rows[0].CITY, "San Diego");
   assert.equal(rows[0].PHONE, "619-555-0142");
-  assert.equal(rows[0].MANAGEMENT_SYSTEM, "Shop Desk");
+  assert.equal(rows[0].MANAGEMENT_SYSTEM, "Bolt Badger");
   assert.equal(rows[0].LOCATION_ID, "GAC1");
   assert.equal(Object.keys(rows[0]).length, CARFAX_FIELDS.length);
   assert.equal(JSON.stringify(rows).includes("144.31"), false);

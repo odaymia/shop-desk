@@ -8,6 +8,11 @@
    credentials; until then the desk can produce the file for a manual
    hand-off. Customer names and prices are never included. */
 
+/* The management-system / partner name CARFAX approves and stamps on every
+   record and file name. This is the software product, the same across every
+   shop that reports through it — not the individual shop. */
+export const PARTNER_NAME = "Bolt Badger";
+
 export const CARFAX_FIELDS = [
   "VIN", "RO_OPEN_DATE", "RO_CLOSE_DATE", "MILEAGE", "ODOMETER_MEASURE", "RO_INVOICE_NUMBER",
   "SERVICE_DESCRIPTION", "LABOR_DESCRIPTION", "PART_NAME_DESCRIPTION", "PART_QUANTITY",
@@ -56,7 +61,7 @@ export function carfaxRows(order, vehicle, cfg) {
     MODEL_YEAR: String(vehicle.year || ""),
     PLATE: clean(vehicle.plate).toUpperCase(),
     PLATE_STATE: clean(vehicle.plateState).toUpperCase(),
-    MANAGEMENT_SYSTEM: "Shop Desk",
+    MANAGEMENT_SYSTEM: PARTNER_NAME,
     LOCATION_ID: clean(cfg.carfaxLocationId),
     LOCATION_NAME: clean(cfg.shopName),
     ADDRESS: a.address,

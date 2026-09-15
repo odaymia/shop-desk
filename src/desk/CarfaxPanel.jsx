@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Field, Text } from "./ui.jsx";
-import { carfaxRows, carfaxFile, carfaxFileName } from "../lib/carfax.js";
+import { carfaxRows, carfaxFile, carfaxFileName, PARTNER_NAME } from "../lib/carfax.js";
 import { loyaltyRows, loyaltyFile, loyaltyFileName } from "../lib/carfaxLoyalty.js";
 
 const TWO_YEARS = 730 * 86400 * 1000;
@@ -43,7 +43,7 @@ export function CarfaxPanel({ cfg, shop, d, set, flash }) {
       } else noVin++;
     }
     if (!rows.length) return flash("No posted invoices with a VIN in that range", "out");
-    const name = carfaxFileName("ShopDesk", range === "all" ? "HIST" : "PROD");
+    const name = carfaxFileName(PARTNER_NAME, range === "all" ? "HIST" : "PROD");
     download(name, carfaxFile(rows), "text/plain");
     setLast({ name, invoices, rows: rows.length, noVin });
   };
@@ -56,7 +56,7 @@ export function CarfaxPanel({ cfg, shop, d, set, flash }) {
     const rows = loyaltyRows(shop.orders, shop.customers, shop.vehicles, cfg, since);
     if (!rows.length) return flash("No reachable customers with a VIN in that range", "out");
     const optedIn = rows.filter((r) => r.EMAIL_OPT_IN === "Yes" || r.CELLPHONE_OPT_IN === "Yes").length;
-    const name = loyaltyFileName("ShopDesk", lrange === "all" ? "HIST" : "PROD");
+    const name = loyaltyFileName(PARTNER_NAME, lrange === "all" ? "HIST" : "PROD");
     download(name, loyaltyFile(rows), "text/csv");
     setLlast({ name, rows: rows.length, optedIn });
   };
