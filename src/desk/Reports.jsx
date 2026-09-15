@@ -103,6 +103,26 @@ export function Reports({ shop, cfg, employees, nav }) {
     return { rows, grand, paid, tickets };
   }, [r.inv, shop.jobs, cfg.oilPackages, cfg.commission]);
 
+  const coupons = useMemo(() => {
+    const by = {};
+    for (const { o } of r.inv) {
+      for (const l of o.lines || []) {
+        if (l.kind === "discount" && l.couponId) {
+          const row = (by[l.couponId] = by[l.couponId] || { id: l.couponId, code: l.couponCode || "", uses: 0, total: 0 });
+          row.uses += 1;
+          row.total = round2(row.total + Number(l.qty || 1) * Number(l.price || 0));
+        }
+      }
+    }
+    const rows = Object.values(by)
+      .map((row) => {
+        const c = shop.coupons[row.id];
+        return { ...row, code: (c && c.code) || row.code || "—", name: (c && c.name) || "" };
+      })
+      .sort((a, b) => b.total - a.total);
+    return { rows, total: round2(rows.reduce((a, x) => a + x.total, 0)), uses: rows.reduce((a, x) => a + x.uses, 0) };
+  }, [r.inv, shop.coupons]);
+
   const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
   const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays), [shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays]);
   const cats = useMemo(() => [...new Set(items.map((it) => it.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
@@ -120,6 +140,7 @@ export function Reports({ shop, cfg, employees, nav }) {
           {[
             ["sales", "Sales summary"],
             ["commission", "Commissions"],
+            ["coupons", "Coupons"],
             ["items", "Sales by item"],
             ["reorder", "Reorder planner"],
           ].map(([k, label]) => (
@@ -150,6 +171,7 @@ export function Reports({ shop, cfg, employees, nav }) {
       </header>
       <div className="deskBody">
         {view === "commission" && <CommissionReport data={commission} shop={shop} cfg={cfg} techName={techName} nav={nav} />}
+        {view === "coupons" && <CouponsReport data={coupons} />}
         {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} />}
         {view === "reorder" && <ReorderReport rows={reorderRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} coverDays={coverDays} setCoverDays={setCoverDays} leadDays={leadDays} setLeadDays={setLeadDays} from={from} to={to} />}
         {view === "sales" && (
@@ -318,6 +340,61 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
         </>
         )}
+      </div>
+    </>
+  );
+}
+
+function CouponsReport({ data }) {
+  return (
+    <>
+      <div className="statRow">
+        <div className="stat">
+          <span>Discounts given</span>
+          <strong>
+            <Money v={data.total} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Coupons redeemed</span>
+          <strong>{data.uses}</strong>
+        </div>
+      </div>
+      <div className="card">
+        <div className="cardHead">
+          <h3>Coupons redeemed in this range</h3>
+        </div>
+        <table className="dk">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th className="r">Times used</th>
+              <th className="r">Total discount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="emptyNote">
+                  No coupons redeemed in this range.
+                </td>
+              </tr>
+            )}
+            {data.rows.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <strong>{r.code}</strong>
+                </td>
+                <td className="muted">{r.name || "—"}</td>
+                <td className="r num">{r.uses}</td>
+                <td className="r num">
+                  <Money v={r.total} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </>
   );

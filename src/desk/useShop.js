@@ -6,6 +6,7 @@ import {
   PART_PREFIX,
   VENDOR_PREFIX,
   JOB_PREFIX,
+  COUPON_PREFIX,
   ORDER_PREFIX,
   SPEC_PREFIX,
   specStoreKey,
@@ -15,6 +16,7 @@ import {
   partKey,
   vendorKey,
   jobKey,
+  couponKey,
   orderKey,
 } from "../lib/keys.js";
 import { STATUS, canTransition, snapshotRules, stockMoves, round2 } from "../lib/invoice.js";
@@ -38,6 +40,7 @@ const TABLES = [
   ["parts", PART_PREFIX, partKey],
   ["vendors", VENDOR_PREFIX, vendorKey],
   ["jobs", JOB_PREFIX, jobKey],
+  ["coupons", COUPON_PREFIX, couponKey],
   ["orders", ORDER_PREFIX, orderKey],
   ["specs", SPEC_PREFIX, specStoreKey],
 ];
@@ -48,6 +51,7 @@ const empty = () => ({
   parts: {},
   vendors: {},
   jobs: {},
+  coupons: {},
   orders: {},
   specs: {},
   counters: {},
@@ -222,6 +226,7 @@ export function useShop(cfg) {
     if (saved.portal || (j.id && ref.current.jobs[j.id] && ref.current.jobs[j.id].portal !== saved.portal)) publishShop();
     return saved;
   }, [put, publishShop]);
+  const saveCoupon = useCallback((c) => put("coupons", couponKey, c), [put]);
   const saveOrder = useCallback((o) => put("orders", orderKey, o), [put]);
   /* one spec per year/make/model/engine; the key is the id so a re-save replaces */
   const saveSpec = useCallback((sp) => put("specs", specStoreKey, { ...sp, id: specKey(sp).replace(/[^A-Za-z0-9|.-]/g, "_") }), [put]);
@@ -336,6 +341,7 @@ export function useShop(cfg) {
     savePartsBulk,
     saveVendor,
     saveJob,
+    saveCoupon,
     saveOrder,
     saveSpec,
     createOrder,

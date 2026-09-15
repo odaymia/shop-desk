@@ -299,6 +299,22 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .visitRow:hover { background:var(--asphalt); }
 .visitCodes { font-weight:600; letter-spacing:.02em; }
 .commReadout { margin:8px 0 0; font-size:14px; padding:8px 10px; background:var(--asphalt); border-radius:8px; }
+
+/* coupon picker on a ticket */
+.couponList { display:flex; flex-direction:column; gap:10px; }
+.couponRow { text-align:left; border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:12px 14px; cursor:pointer; }
+.couponRow:hover { border-color:var(--signal); background:#fff; }
+.cpMain { display:flex; align-items:baseline; gap:12px; }
+.cpMain strong { font-size:16px; letter-spacing:.02em; }
+.cpVal { color:var(--muted); font-size:14px; }
+.cpAmt { margin-left:auto; font-weight:700; color:var(--signal); }
+.cpName { font-size:13px; margin-top:2px; }
+
+/* service scope chips in the coupon form */
+.svcPick { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 2px; }
+.svcChip { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; font-size:13px; }
+.svcChip.on { border-color:var(--signal); background:var(--panel); color:var(--ink); font-weight:600; }
+.svcChip input { margin:0; }
 .fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }
 .fluidGrid .fSys { color:var(--muted); }
 .fluidGrid .fProd { font-weight:600; }

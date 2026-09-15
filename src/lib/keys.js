@@ -14,6 +14,7 @@ export const VEHICLE_PREFIX = "sd:vehicle:";
 export const PART_PREFIX = "sd:part:";
 export const VENDOR_PREFIX = "sd:vendor:";
 export const JOB_PREFIX = "sd:job:";
+export const COUPON_PREFIX = "sd:coupon:";
 export const ORDER_PREFIX = "sd:order:";
 export const SPEC_PREFIX = "sd:spec:"; // service specs per engine (oil grade, capacity, filter numbers)
 export const specStoreKey = (id) => SPEC_PREFIX + id;
@@ -23,6 +24,7 @@ export const vehicleKey = (id) => VEHICLE_PREFIX + id;
 export const partKey = (id) => PART_PREFIX + id;
 export const vendorKey = (id) => VENDOR_PREFIX + id;
 export const jobKey = (id) => JOB_PREFIX + id;
+export const couponKey = (id) => COUPON_PREFIX + id;
 export const orderKey = (id) => ORDER_PREFIX + id;
 
 /* shared with the time clock; see src/storage/cloud.js for how it's pulled */

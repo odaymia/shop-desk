@@ -8,6 +8,7 @@ import { Inventory } from "./Inventory.jsx";
 import { Tires } from "./Tires.jsx";
 import { Vendors } from "./Vendors.jsx";
 import { Jobs } from "./Jobs.jsx";
+import { Coupons } from "./Coupons.jsx";
 import { Staff } from "./Staff.jsx";
 import { Reports } from "./Reports.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
@@ -24,6 +25,7 @@ const PAGES = [
   ["inventory", "Inventory"],
   ["tires", "Tires"],
   ["jobs", "Canned jobs"],
+  ["coupons", "Coupons"],
   ["vendors", "Vendors"],
   ["staff", "Staff"],
   ["reports", "Reports"],
@@ -176,6 +178,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "inventory" && <Inventory shop={shop} flash={flash} />}
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
           {page === "jobs" && <Jobs shop={shop} cfg={cfg} flash={flash} />}
+          {page === "coupons" && <Coupons shop={shop} cfg={cfg} flash={flash} />}
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}

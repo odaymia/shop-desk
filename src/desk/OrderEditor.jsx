@@ -6,6 +6,7 @@ import { ConfirmDelete } from "./Orders.jsx";
 import { customerName, vehicleName, vehiclesOf, ordersOf } from "./useShop.js";
 import { serviceCodes } from "../lib/serviceCodes.js";
 import { orderPayout } from "../lib/commission.js";
+import { applicableCoupons, couponDiscount, couponValueText, orderJobNames, orderSubtotalBase } from "../lib/coupons.js";
 import {
   STATUS,
   PAY_METHODS,
@@ -587,8 +588,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   <button className="btn tiny" onClick={() => addLine("fee")}>
                     + Fee
                   </button>
-                  <button className="btn tiny" onClick={() => addLine("discount")}>
-                    + Discount
+                  <button className="btn tiny" onClick={() => setPick("coupon")}>
+                    Coupon
                   </button>
                   <button className="btn tiny" onClick={() => addLine("note")}>
                     + Note
@@ -829,6 +830,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           }}
         />
       )}
+      {pick === "coupon" && (
+        <CouponPicker
+          shop={shop}
+          order={o}
+          onClose={() => setPick(null)}
+          onApply={(coupon, amount) => {
+            addLine("discount", { description: coupon.name || coupon.code, qty: 1, price: amount, couponId: coupon.id, couponCode: coupon.code });
+            setPick(null);
+            flash(`${coupon.code} applied`);
+          }}
+        />
+      )}
       {pick === "oil" && (
         <OilChangePicker
           cfg={cfg}
@@ -1025,7 +1038,7 @@ function LineRow({ l, prev, rules, techs, locked, set, remove }) {
               {l.kind === "labor" ? (
                 <input className="r" inputMode="decimal" value={l.rate} onChange={(e) => set({ rate: e.target.value })} onBlur={(e) => set({ rate: toNum(e.target.value) })} readOnly={locked} />
               ) : (
-                <input className="r" inputMode="decimal" value={l.price} onChange={(e) => set({ price: e.target.value })} onBlur={(e) => set({ price: toNum(e.target.value) })} readOnly={locked} />
+                <input className="r" inputMode="decimal" value={l.price} onChange={(e) => set({ price: e.target.value })} onBlur={(e) => set({ price: toNum(e.target.value) })} readOnly={locked || !!l.couponId} title={l.couponId ? "Set by the coupon — remove the line to change it" : undefined} />
               )}
             </td>
             <td className="chk">
@@ -1266,5 +1279,47 @@ function VisitHistory({ shop, order, vehicle, customer, nav }) {
         </table>
       )}
     </div>
+  );
+}
+
+/* The coupon picker: shows only the coupons whose rules fit this ticket right
+   now (services on it, first-time customer, date window, minimum), each with
+   the exact amount it would take off. There's no free-typed discount. */
+function CouponPicker({ shop, order, onClose, onApply }) {
+  const cust = shop.customers[order.customerId];
+  const priorInvoiced = order.customerId
+    ? ordersOf(shop.orders, { customerId: order.customerId }).filter((x) => x.status === "invoiced" && x.id !== order.id).length
+    : 0;
+  const isFirstTime = !cust || priorInvoiced === 0;
+  const already = new Set((order.lines || []).filter((l) => l.kind === "discount" && l.couponId).map((l) => l.couponId));
+  const ctx = { jobNames: orderJobNames(order), isFirstTime, subtotal: orderSubtotalBase(order), now: Date.now() };
+  const list = applicableCoupons(shop.coupons, ctx)
+    .filter((c) => !already.has(c.id))
+    .map((c) => ({ c, amount: couponDiscount(c, order) }))
+    .filter((x) => x.amount > 0);
+
+  return (
+    <Modal title="Apply a coupon" onClose={onClose} size="wide">
+      {list.length === 0 ? (
+        <p className="muted" style={{ margin: 0 }}>
+          No coupons apply to this ticket right now. Coupons are created under the Coupons tab; one shows here only when its rules match what's on the ticket.
+        </p>
+      ) : (
+        <div className="couponList">
+          {list.map(({ c, amount }) => (
+            <button key={c.id} className="couponRow" onClick={() => onApply(c, amount)}>
+              <div className="cpMain">
+                <strong>{c.code}</strong>
+                <span className="cpVal">{couponValueText(c)}</span>
+                <span className="cpAmt">
+                  −<Money v={amount} />
+                </span>
+              </div>
+              {c.name ? <div className="cpName muted">{c.name}</div> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }
