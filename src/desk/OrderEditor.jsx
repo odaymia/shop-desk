@@ -68,6 +68,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const draftRef = useRef(order);
   const dirty = useRef(false);
   const timer = useRef(null);
+  const stickerAfterChecklist = useRef(null); // sticker to print once a post-time checklist is closed
   const saveRef = useRef(shop.saveOrder);
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
@@ -259,12 +260,21 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       const saved = await shop.setStatus(latest, to, customer);
       draftRef.current = saved;
       setDraft(saved);
-      /* on approval to a repair order, run the service checklist if the
-         ticket has an oil change and one hasn't been done yet */
+      /* run the service checklist when an oil change ticket moves to a
+         repair order or gets posted, if one hasn't been done yet */
       const oilOnTicket = hasOilChange(saved);
-      setPick(to === STATUS.open && oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
-      /* posting an oil change pops the windshield reminder sticker to print */
-      if (to === STATUS.invoiced && oilOnTicket && cfg.oilSticker !== false) setSticker({ id: saved.id, auto: true });
+      const needsChecklist =
+        oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false && (to === STATUS.open || to === STATUS.invoiced);
+      const stickerNow = to === STATUS.invoiced && oilOnTicket && cfg.oilSticker !== false;
+      if (needsChecklist) {
+        setPick("checklist");
+        /* posting also prints the reminder sticker — hold it until the
+           checklist is filled so the two don't fight over the screen */
+        stickerAfterChecklist.current = stickerNow ? { id: saved.id, auto: true } : null;
+      } else {
+        setPick(null);
+        if (stickerNow) setSticker({ id: saved.id, auto: true });
+      }
       flash(
         to === STATUS.invoiced ? `Invoice #${saved.number} posted` : to === STATUS.open ? `RO #${saved.number} approved` : to === STATUS.void ? `Invoice #${saved.number} voided` : `Back to estimate`,
         to === STATUS.void ? "out" : "in"
@@ -272,6 +282,14 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     } catch (e) {
       flash(e.message, "out");
     }
+  };
+  /* Close the checklist modal, and if posting left a reminder sticker
+     waiting behind it, print it now. */
+  const closeChecklist = () => {
+    setPick(null);
+    const s = stickerAfterChecklist.current;
+    stickerAfterChecklist.current = null;
+    if (s) setSticker(s);
   };
   const askPost = () => {
     if (!o.lines.some((l) => l.kind !== "note")) return flash("Nothing on the ticket yet", "out");
@@ -1019,7 +1037,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           cfg={cfg}
           order={o}
           prior={priorChecklist(shop.orders, o.vehicleId, o.id)}
-          onCancel={() => setPick(null)}
+          onCancel={closeChecklist}
           onSave={(items) => {
             const at = Date.now();
             update((d) => ({
@@ -1027,7 +1045,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               checklist: { at, byId: d.techId || null, items },
               history: d.checklist ? d.history : [...(d.history || []), { at, what: "service checklist filled" }],
             }));
-            setPick(null);
+            closeChecklist();
             flash("Checklist saved");
           }}
         />
