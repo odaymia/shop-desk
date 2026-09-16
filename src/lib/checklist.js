@@ -16,18 +16,18 @@ export const REPLACED = "Replaced";
 
 export const DEFAULT_CHECKLIST = [
   { id: "oil", label: "Engine oil", kind: "choice", options: ["Replaced", "Level OK", "Added", "Checked OK", "At your request"], value: "Level OK", auto: "oil change | motor oil | engine oil" },
-  { id: "oilFilter", label: "Oil filter", kind: "choice", options: ["Replaced", "Checked OK", "At your request"], value: "Checked OK", auto: "oil filter" },
-  { id: "rearDiff", label: "Rear diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Can't check", "N/A"], value: "At your request", auto: "rear diff | rear differential" },
-  { id: "trans", label: "Transmission fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "At your request", "Sealed", "Can't check"], value: "Level OK", auto: "transmission fluid | transmission flush | transmission service" },
-  { id: "wipers", label: "Wiper blades", kind: "choice", options: ["Checked OK", "Replaced", "At your request"], value: "Checked OK", auto: "wiper" },
-  { id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Replaced", "At your request"], value: "Checked OK", auto: "air filter -cabin | engine filter" },
-  { id: "cabinFilter", label: "Cabin air filter", kind: "choice", options: ["Checked OK", "Replaced", "At your request", "Can't check", "N/A"], value: "Checked OK", auto: "cabin filter | cabin air" },
-  { id: "brakeFluid", label: "Brake fluid", kind: "choice", options: ["Sensor OK", "Level OK", "Added", "Replaced", "At your request"], value: "Sensor OK", auto: "brake fluid | brake flush" },
-  { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush" },
-  { id: "coolant", label: "Radiator fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Can't check", "At your request"], value: "Level OK", auto: "coolant flush | radiator flush | coolant service | antifreeze" },
+  { id: "oilFilter", label: "Oil filter", kind: "choice", options: ["Replaced", "Checked OK", "Recommend", "At your request"], value: "Checked OK", auto: "oil filter" },
+  { id: "rearDiff", label: "Rear diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "rear diff | rear differential" },
+  { id: "trans", label: "Transmission fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "At your request", "Sealed", "Can't check"], value: "Level OK", auto: "transmission fluid | transmission flush | transmission service" },
+  { id: "wipers", label: "Wiper blades", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "wiper" },
+  { id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "air filter -cabin | engine filter" },
+  { id: "cabinFilter", label: "Cabin air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request", "Can't check", "N/A"], value: "Checked OK", auto: "cabin filter | cabin air" },
+  { id: "brakeFluid", label: "Brake fluid", kind: "choice", options: ["Sensor OK", "Level OK", "Added", "Replaced", "Recommend", "At your request"], value: "Sensor OK", auto: "brake fluid | brake flush" },
+  { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "Recommend", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush" },
+  { id: "coolant", label: "Radiator fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "Can't check", "At your request"], value: "Level OK", auto: "coolant flush | radiator flush | coolant service | antifreeze" },
   { id: "washer", label: "Windshield wash fluid", kind: "choice", options: ["Added", "Full", "Can't check"], value: "Added", auto: "" },
   { id: "tirePsi", label: "Tire pressure", kind: "pressure", value: "F35 R35", auto: "", remember: true },
-  { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case" },
+  { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case" },
   { id: "lfDepth", label: "Front driver side tire depth", kind: "depth", value: "", auto: "" },
   { id: "rfDepth", label: "Front passenger side tire depth", kind: "depth", value: "", auto: "" },
   { id: "lrDepth", label: "Rear driver side tire depth", kind: "depth", value: "", auto: "" },
@@ -57,6 +57,46 @@ export function replacedOnTicket(item, lines) {
   return (lines || []).some(
     (l) => l && (l.kind === "part" || l.kind === "labor" || l.kind === "sublet") && matchesAuto(item.auto, `${l.description || ""} ${l.job || ""}`)
   );
+}
+
+/* Keep an already-filled checklist in step with the ticket as services
+   are added or removed after it was first done. An item whose service is
+   now on the ticket flips to Replaced; an item the ticket had flipped,
+   but whose service has since come off, reverts to what it was before
+   (the value it held is remembered in `prior`), or to its default. A
+   manual choice on an item the ticket doesn't drive is left untouched.
+   Returns the same array when nothing changed, so the caller can skip a
+   save. */
+export function syncChecklist(items, lines, cfgItems) {
+  if (!Array.isArray(items) || !items.length) return items;
+  const cfg = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
+  const autoOf = (id) => (cfg.find((x) => x.id === id) || {}).auto || "";
+  const defOf = (id) => (cfg.find((x) => x.id === id) || {}).value || "";
+  let changed = false;
+  const next = items.map((it) => {
+    if (!it || it.kind !== "choice") return it;
+    const words = autoOf(it.id);
+    if (!words) return it; // item the ticket can't drive: leave the manual value
+    const onTicket = replacedOnTicket({ auto: words }, lines);
+    if (onTicket) {
+      if (it.value === REPLACED && it.auto) return it; // already right
+      changed = true;
+      /* remember the value we're covering so removing the service can put
+         it back; if it was already auto, keep whatever was stashed */
+      const prior = it.auto ? it.prior : it.value;
+      return { ...it, value: REPLACED, auto: true, prior };
+    }
+    if (it.auto) {
+      /* the ticket had flipped this on; the service is gone now, so undo */
+      changed = true;
+      const back = it.prior != null && it.prior !== "" ? it.prior : defOf(it.id);
+      const rest = { ...it };
+      delete rest.prior;
+      return { ...rest, value: back, auto: false };
+    }
+    return it;
+  });
+  return changed ? next : items;
 }
 
 /* Options for an item: the config's list, always including Replaced so

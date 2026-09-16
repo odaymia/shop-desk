@@ -34,7 +34,7 @@ import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
 import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
-import { priorChecklist } from "../lib/checklist.js";
+import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY } from "../lib/keys.js";
 import { OrderSign } from "./Signing.jsx";
@@ -126,14 +126,21 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const update = useCallback(
     (patch) => {
       const cur = draftRef.current;
-      const next = typeof patch === "function" ? patch(cur) : { ...cur, ...patch };
+      let next = typeof patch === "function" ? patch(cur) : { ...cur, ...patch };
+      /* when the ticket's lines change, keep a filled checklist in step:
+         a service added flips its item to Replaced, a service removed puts
+         it back where it was */
+      if (next.lines !== cur.lines && next.checklist && next.checklist.items) {
+        const items = syncChecklist(next.checklist.items, next.lines, cfg.checklist);
+        if (items !== next.checklist.items) next = { ...next, checklist: { ...next.checklist, items } };
+      }
       draftRef.current = next;
       dirty.current = true;
       setDraft(next);
       clearTimeout(timer.current);
       timer.current = setTimeout(flushNow, 600);
     },
-    [flushNow]
+    [flushNow, cfg.checklist]
   );
 
   /* A parts cart sent back by a catalog lands as its own record; when

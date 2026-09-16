@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_CHECKLIST, startChecklist, replacedOnTicket, cycle, withDepthDefault, checklistSummary, optionsOf, normalizeChecklist, priorChecklist } from "../src/lib/checklist.js";
+import { DEFAULT_CHECKLIST, startChecklist, replacedOnTicket, syncChecklist, cycle, withDepthDefault, checklistSummary, optionsOf, normalizeChecklist, priorChecklist } from "../src/lib/checklist.js";
 import { DEFAULT_OIL_PACKAGES, oilPackageLines } from "../src/lib/oilchange.js";
 
 const byId = (items, id) => items.find((x) => x.id === id);
@@ -60,7 +60,7 @@ test("priorChecklist is the car's latest filled one, skipping deleted and the ti
 
 test("space cycles through the choices and wraps; number keys map onto the same list", () => {
   const opts = optionsOf(byId(DEFAULT_CHECKLIST, "wipers"), DEFAULT_CHECKLIST);
-  assert.deepEqual(opts, ["Checked OK", "Replaced", "At your request"]);
+  assert.deepEqual(opts, ["Checked OK", "Replaced", "Recommend", "At your request"]);
   assert.equal(cycle(opts, "Checked OK"), "Replaced");
   assert.equal(cycle(opts, "At your request"), "Checked OK");
   assert.equal(cycle(opts, "Checked OK", -1), "At your request");
@@ -92,6 +92,42 @@ test("the summary prints depths in 32nds and leaves blanks blank", () => {
     { label: "Rear passenger side tire depth", text: "" },
     { label: "Engine oil", text: "Replaced" },
   ]);
+});
+
+test("syncChecklist: adding a service flips the item to Replaced, removing it puts back what it was", () => {
+  // the tech marked the air filter Recommend during the walk-around
+  let items = startChecklist(DEFAULT_CHECKLIST, [], null).map((it) => (it.id === "airFilter" ? { ...it, value: "Recommend" } : it));
+  assert.equal(byId(items, "airFilter").value, "Recommend");
+
+  // customer says yes — the air filter replacement goes on the ticket
+  const withFilter = [{ kind: "part", description: "Engine air filter", job: "Air filter replacement" }];
+  items = syncChecklist(items, withFilter, DEFAULT_CHECKLIST);
+  assert.equal(byId(items, "airFilter").value, "Replaced");
+  assert.equal(byId(items, "airFilter").auto, true);
+
+  // customer changes their mind — the line comes off, it goes back to Recommend
+  items = syncChecklist(items, [], DEFAULT_CHECKLIST);
+  assert.equal(byId(items, "airFilter").value, "Recommend");
+  assert.equal(byId(items, "airFilter").auto, false);
+});
+
+test("syncChecklist: a manual choice the ticket doesn't drive is left alone, and no-op returns the same array", () => {
+  const items = startChecklist(DEFAULT_CHECKLIST, [], null).map((it) => (it.id === "wipers" ? { ...it, value: "Recommend" } : it));
+  const same = syncChecklist(items, [{ kind: "part", description: "Oil filter", job: "Oil change" }], DEFAULT_CHECKLIST);
+  assert.equal(byId(same, "wipers").value, "Recommend"); // untouched — no wiper on the ticket
+  assert.equal(byId(same, "oilFilter").value, "Replaced"); // the oil filter line did flip
+  // running it again with the same lines changes nothing and returns the same reference
+  assert.equal(syncChecklist(same, [{ kind: "part", description: "Oil filter", job: "Oil change" }], DEFAULT_CHECKLIST), same);
+});
+
+test("syncChecklist: an item auto-flipped at creation reverts to its default when the service comes off", () => {
+  let n = 0;
+  const lines = oilPackageLines(DEFAULT_OIL_PACKAGES[0], 5, null, null, () => `L${++n}`);
+  let items = startChecklist(DEFAULT_CHECKLIST, lines, null);
+  assert.equal(byId(items, "oilFilter").value, "Replaced");
+  items = syncChecklist(items, [], DEFAULT_CHECKLIST); // whole oil change removed
+  assert.equal(byId(items, "oilFilter").value, "Checked OK"); // back to its default
+  assert.equal(byId(items, "oilFilter").auto, false);
 });
 
 test("settings rows normalize: comma options, blank labels dropped, text items lose auto", () => {
