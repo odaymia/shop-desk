@@ -28,16 +28,38 @@ export function lastOilUsed(order) {
 }
 
 const mdy = (d) => `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
+const posInt = (v) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+/* The mileage the ticket knows: what was read out at service, else the
+   car's last recorded odometer, else 0 (unknown — ask for it). */
+export function currentMileage(order, vehicle) {
+  return posInt((order && (order.mileageOut || order.mileageIn)) || (vehicle && vehicle.mileage) || 0);
+}
+
+/* The reminder interval to default to: whatever was last set for this
+   specific car wins, so its next visit starts from the same numbers;
+   otherwise the shop's default, otherwise 3 months / 3,000 miles. */
+export function reminderMonthsFor(vehicle, cfg) {
+  return posInt(vehicle && vehicle.reminderMonths) || posInt(cfg && cfg.reminderMonths) || 3;
+}
+export function reminderMilesFor(vehicle, cfg) {
+  return posInt(vehicle && vehicle.reminderMiles) || posInt(cfg && cfg.reminderMiles) || 3000;
+}
 
 /* Everything the sticker prints, filled from the ticket, the car, and the
-   shop's reminder interval. */
-export function stickerData(order, cfg, vehicle) {
-  const months = Number(cfg && cfg.reminderMonths) || 3;
-  const miles = Number(cfg && cfg.reminderMiles) || 3000;
+   reminder interval. `opts` lets the sticker screen compute live as the
+   tech edits the mileage or the months/miles interval; anything omitted
+   falls back to the car's or shop's defaults. */
+export function stickerData(order, cfg, vehicle, opts = {}) {
+  const months = opts.months != null && opts.months !== "" ? posInt(opts.months) : reminderMonthsFor(vehicle, cfg);
+  const miles = opts.miles != null && opts.miles !== "" ? posInt(opts.miles) : reminderMilesFor(vehicle, cfg);
+  const cur = opts.mileage != null && opts.mileage !== "" ? posInt(opts.mileage) : currentMileage(order, vehicle);
   const at = (order && (order.invoicedAt || order.createdAt)) || Date.now();
   const d = new Date(at);
   d.setMonth(d.getMonth() + months);
-  const cur = Number((order && (order.mileageOut || order.mileageIn)) || (vehicle && vehicle.mileage) || 0);
   const plate = vehicle && vehicle.plate ? String(vehicle.plate).toUpperCase() : "";
   const vname = vehicle ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") : "";
   return {
@@ -45,5 +67,8 @@ export function stickerData(order, cfg, vehicle) {
     nextDate: mdy(d),
     nextMileage: cur > 0 ? cur + miles : null,
     lastOil: lastOilUsed(order),
+    months,
+    miles,
+    mileage: cur,
   };
 }

@@ -268,12 +268,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       const stickerNow = to === STATUS.invoiced && oilOnTicket && cfg.oilSticker !== false;
       if (needsChecklist) {
         setPick("checklist");
-        /* posting also prints the reminder sticker — hold it until the
+        /* posting also pops the reminder sticker — hold it until the
            checklist is filled so the two don't fight over the screen */
-        stickerAfterChecklist.current = stickerNow ? { id: saved.id, auto: true } : null;
+        stickerAfterChecklist.current = stickerNow ? { id: saved.id } : null;
       } else {
         setPick(null);
-        if (stickerNow) setSticker({ id: saved.id, auto: true });
+        if (stickerNow) setSticker({ id: saved.id });
       }
       flash(
         to === STATUS.invoiced ? `Invoice #${saved.number} posted` : to === STATUS.open ? `RO #${saved.number} approved` : to === STATUS.void ? `Invoice #${saved.number} voided` : `Back to estimate`,
@@ -345,7 +345,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             Revisions{revisionCount(o) ? ` (${revisionCount(o)})` : ""}
           </button>
           {hasOilChange(o) && (
-            <button className="btn" onClick={() => setSticker({ id: o.id, auto: false })} title="Print the oil-change reminder sticker">
+            <button className="btn" onClick={() => setSticker({ id: o.id })} title="Print the oil-change reminder sticker">
               Sticker
             </button>
           )}
@@ -894,8 +894,15 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           order={shop.orders[sticker.id]}
           cfg={cfg}
           vehicle={shop.vehicles[shop.orders[sticker.id].vehicleId]}
-          auto={sticker.auto}
           onClose={() => setSticker(null)}
+          onSave={({ months, miles, mileage }) => {
+            const ord = shop.orders[sticker.id];
+            const v = ord && shop.vehicles[ord.vehicleId];
+            /* remember the interval on the car so its next visit defaults to it */
+            if (v) shop.saveVehicle({ ...v, reminderMonths: months || null, reminderMiles: miles || null });
+            /* record the mileage on this ticket if it had none */
+            if (mileage && ord && !ord.mileageOut && !ord.mileageIn) update((dd) => (dd.id === ord.id ? { ...dd, mileageOut: mileage } : dd));
+          }}
         />
       )}
       {showRevs && (

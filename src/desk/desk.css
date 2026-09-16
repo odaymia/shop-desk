@@ -324,6 +324,19 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .stShop strong { font-size:11px; color:#0a1440; }
 .stShop span { font-size:8.5px; color:#333; }
 @media print { .stickerSheet { box-shadow:none; margin:0; } }
+/* the review panel above the sticker — on screen only, never printed */
+.stickerForm { width:3.3in; max-width:100%; box-sizing:border-box; margin:0 auto 16px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 6px 20px rgba(0,0,0,.14); }
+.stickerForm h3 { margin:0 0 12px; font-size:15px; }
+.stFld { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+.stFld > span { font-size:12px; font-weight:600; color:var(--muted); }
+.stFld input { padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:16px; font-variant-numeric:tabular-nums; }
+.stFld.need > span { color:var(--red, #b3261e); }
+.stFld.need input { border-color:var(--red, #b3261e); }
+.stFldRow { display:flex; gap:10px; }
+.stFldRow .stFld { flex:1; margin-bottom:10px; }
+.stCalc { font-size:14px; margin:8px 0 4px; }
+.stNote { font-size:12px; margin:0; }
+@media print { .stickerForm { display:none !important; } }
 
 /* one-click delete of a whole job/package on the ticket */
 .jobDel { margin-left:10px; border:1px solid var(--line); background:#fff; color:var(--warn,#b0341f); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer; vertical-align:middle; }
