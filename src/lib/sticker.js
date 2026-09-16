@@ -33,10 +33,11 @@ const posInt = (v) => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
-/* The mileage the ticket knows: what was read out at service, else the
-   car's last recorded odometer, else 0 (unknown — ask for it). */
-export function currentMileage(order, vehicle) {
-  return posInt((order && (order.mileageOut || order.mileageIn)) || (vehicle && vehicle.mileage) || 0);
+/* The mileage entered on THIS ticket — mileage out, else mileage in, else
+   0 (unknown). Deliberately not the car's stored odometer from a prior
+   visit: the sticker's mileage stays blank until it's read this visit. */
+export function currentMileage(order) {
+  return posInt(order && (order.mileageOut || order.mileageIn)) || 0;
 }
 
 /* The reminder interval to default to: whatever was last set for this
@@ -56,7 +57,7 @@ export function reminderMilesFor(vehicle, cfg) {
 export function stickerData(order, cfg, vehicle, opts = {}) {
   const months = opts.months != null && opts.months !== "" ? posInt(opts.months) : reminderMonthsFor(vehicle, cfg);
   const miles = opts.miles != null && opts.miles !== "" ? posInt(opts.miles) : reminderMilesFor(vehicle, cfg);
-  const cur = opts.mileage != null && opts.mileage !== "" ? posInt(opts.mileage) : currentMileage(order, vehicle);
+  const cur = opts.mileage != null && opts.mileage !== "" ? posInt(opts.mileage) : currentMileage(order);
   const at = (order && (order.invoicedAt || order.createdAt)) || Date.now();
   const d = new Date(at);
   d.setMonth(d.getMonth() + months);

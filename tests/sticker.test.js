@@ -48,11 +48,12 @@ test("a longer interval pushes the date and mileage out", () => {
   assert.equal(d.nextMileage, 68500);
 });
 
-test("currentMileage reads the ticket, then the car, else 0 (unknown)", () => {
-  assert.equal(currentMileage({ mileageOut: 62000, mileageIn: 61000 }, { mileage: 5 }), 62000);
-  assert.equal(currentMileage({ mileageIn: 61000 }, { mileage: 5 }), 61000);
-  assert.equal(currentMileage({}, { mileage: 40000 }), 40000);
-  assert.equal(currentMileage({}, {}), 0);
+test("currentMileage reads only this ticket's mileage, never a prior visit's odometer", () => {
+  assert.equal(currentMileage({ mileageOut: 62000, mileageIn: 61000 }), 62000);
+  assert.equal(currentMileage({ mileageIn: 61000 }), 61000);
+  // the car's stored odometer is ignored — the sticker stays blank until read this visit
+  assert.equal(currentMileage({ mileageIn: 0 }, { mileage: 40000 }), 0);
+  assert.equal(currentMileage({}), 0);
 });
 
 test("the reminder interval defaults to the car's own setting, then the shop's, then 3mo/3000mi", () => {

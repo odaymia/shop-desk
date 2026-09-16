@@ -49,7 +49,7 @@ function StickerLabel({ d, cfg }) {
    Print puts the label out on its own sheet; onSave remembers the interval
    on the car and onAssign records the crew on the ticket. */
 export function Sticker({ order, cfg, vehicle, employees, requireCrew, onAssign, onClose, onSave }) {
-  const known = currentMileage(order, vehicle);
+  const known = currentMileage(order);
   const [mileage, setMileage] = useState(known ? String(known) : "");
   const [months, setMonths] = useState(String(reminderMonthsFor(vehicle, cfg)));
   const [miles, setMiles] = useState(String(reminderMilesFor(vehicle, cfg)));
