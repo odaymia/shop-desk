@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { stickerData } from "../lib/sticker.js";
 import { fmtPhone } from "./ui.jsx";
 
@@ -19,7 +20,10 @@ export function Sticker({ order, cfg, vehicle, auto, onClose }) {
     };
   }, [auto, onClose]);
 
-  return (
+  /* Render as a direct child of .root (where the receipt print lives) so the
+     print rules that hide everything else don't hide the sticker too. */
+  const target = (typeof document !== "undefined" && (document.querySelector(".root") || document.body)) || null;
+  const node = (
     <div className="printSheet show">
       <style>{`@media print { @page { size: auto; margin: 0; } }`}</style>
       <div className="printBar">
@@ -66,4 +70,5 @@ export function Sticker({ order, cfg, vehicle, auto, onClose }) {
       </div>
     </div>
   );
+  return target ? createPortal(node, target) : node;
 }
