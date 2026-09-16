@@ -25,10 +25,15 @@ test("lastOilUsed picks the oil (most quarts), not the filter, and strips '(incl
 
 test("stickerData computes next date and mileage from the interval", () => {
   const d = stickerData(oilOrder, cfg, vehicle);
-  assert.equal(d.vehicleId, "8ABC123"); // plate, uppercased
+  assert.equal(d.vehicleId, "8ABC123"); // plate, uppercased (no state on this vehicle)
   assert.equal(d.nextDate, "09/15/2026"); // Jun 15 + 3 months
   assert.equal(d.nextMileage, 64000); // 61000 + 3000
   assert.equal(d.lastOil, "Valvoline Full Synthetic 5W-30");
+});
+
+test("the vehicle id is the plate shown with its state, like CA - 8ABC123", () => {
+  const d = stickerData(oilOrder, cfg, { ...vehicle, plateState: "ca" });
+  assert.equal(d.vehicleId, "CA - 8ABC123");
 });
 
 test("stickerData falls back to the vehicle name when there's no plate, and blanks mileage when unknown", () => {

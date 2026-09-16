@@ -60,7 +60,10 @@ export function stickerData(order, cfg, vehicle, opts = {}) {
   const at = (order && (order.invoicedAt || order.createdAt)) || Date.now();
   const d = new Date(at);
   d.setMonth(d.getMonth() + months);
-  const plate = vehicle && vehicle.plate ? String(vehicle.plate).toUpperCase() : "";
+  /* the license plate is the vehicle id, shown with its state — "CA - 8ABC123" */
+  const plateNum = vehicle && vehicle.plate ? String(vehicle.plate).toUpperCase().trim() : "";
+  const state = vehicle && vehicle.plateState ? String(vehicle.plateState).toUpperCase().trim() : "";
+  const plate = plateNum ? (state ? `${state} - ${plateNum}` : plateNum) : "";
   const vname = vehicle ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") : "";
   return {
     vehicleId: plate || vname || (vehicle && vehicle.vin ? String(vehicle.vin).slice(-8).toUpperCase() : ""),

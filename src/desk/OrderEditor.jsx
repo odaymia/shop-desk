@@ -265,11 +265,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       const oilOnTicket = hasOilChange(saved);
       const needsChecklist =
         oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false && (to === STATUS.open || to === STATUS.invoiced);
-      const stickerNow = to === STATUS.invoiced && oilOnTicket && cfg.oilSticker !== false;
+      /* the reminder sticker pops on both a repair order and a post */
+      const stickerNow = (to === STATUS.open || to === STATUS.invoiced) && oilOnTicket && cfg.oilSticker !== false;
       if (needsChecklist) {
         setPick("checklist");
-        /* posting also pops the reminder sticker — hold it until the
-           checklist is filled so the two don't fight over the screen */
+        /* the sticker also pops here — hold it until the checklist is
+           filled so the two don't fight over the screen */
         stickerAfterChecklist.current = stickerNow ? { id: saved.id } : null;
       } else {
         setPick(null);
