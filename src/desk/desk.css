@@ -382,11 +382,15 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .sheet .shCheck .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px 14px; font-size:10px; }
 .sheet .shCheck .grid div { display:flex; justify-content:space-between; gap:6px; border-bottom:1px dotted #bbb; padding:1px 0; }
 .sheet .shCheck .grid strong { white-space:nowrap; }
-/* recommended services: two columns, a touch bolder, with a note under */
-.sheet .shRecs { margin-top:8px; }
-.sheet .shRecs .grid { grid-template-columns:repeat(2,1fr); font-size:10.5px; }
-.sheet .shRecs .grid strong { color:#0a1440; }
-.sheet .shRecNote { margin:3px 0 0; font-size:8.5px; color:#666; font-style:italic; }
+/* recommended services: a bold, bordered callout so the customer sees it */
+.sheet .shRecs { margin-top:14px; border:2.5px solid #b3261e; border-radius:8px; padding:10px 14px; background:#fdf3f2; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.sheet .shRecs h4 { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#b3261e; margin:0 0 8px; }
+.sheet .shRecs .grid { display:block; font-size:13px; }
+.sheet .shRecs .grid div { display:flex; justify-content:space-between; align-items:baseline; gap:12px; border-bottom:1px solid #eabfbb; padding:5px 0; }
+.sheet .shRecs .grid div:last-child { border-bottom:none; }
+.sheet .shRecs .grid span { font-weight:600; color:#1a1a1a; }
+.sheet .shRecs .grid strong { color:#b3261e; font-size:14px; font-weight:800; white-space:nowrap; }
+.sheet .shRecNote { margin:8px 0 0; font-size:10px; color:#555; font-style:italic; }
 @media (max-width:760px) { .ckWrap { grid-template-columns:1fr; } .ckList { max-height:30vh; } }
 
 .pickInstead { align-self:flex-start; margin-top:4px; background:none; border:none; padding:0; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; }
