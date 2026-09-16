@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
     const p = payload as Record<string, unknown>;
     const kind = p.kind === "invoice" ? "invoice" : "estimate";
-    const msg = `${p.shopName || "Your shop"}: please review and sign your ${kind} #${p.number || ""}. ${link}`;
+    const msg = `${p.shopName || "Your shop"}: please review and sign your ${kind} #${p.number || ""}. ${link} Reply STOP to opt out.`;
     const { sent, error } = await sendSms(phone, msg);
     return json({ token: t, link, sent, sendError: error || null });
   }
