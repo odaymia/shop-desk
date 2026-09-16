@@ -75,8 +75,8 @@ function sampleData() {
 
   const now = Date.now();
   const mkOil = (oilId, oilPrice) => [
-    { id: "l1", kind: "labor", description: "Full service oil change", details: "Up to 5 qt, filter, fluid check.", hours: 1, rate: 24.99, unit: "service", taxable: false, packaged: true, job: "Oil change" },
-    { id: "l2", kind: "part", partId: oilId, number: "", description: "Motor oil", qty: 5, price: oilPrice, cost: 0, condition: "new", taxable: true, packaged: true, job: "Oil change" },
+    { id: "l1", kind: "labor", description: "Full service oil change", details: "Up to 5 qt, filter, fluid check.", hours: 1, rate: 24.99, unit: "service", taxable: false, packaged: true, oil: true, job: "Oil change" },
+    { id: "l2", kind: "part", partId: oilId, number: "", description: "Motor oil", qty: 5, price: oilPrice, cost: 0, condition: "new", taxable: true, packaged: true, oil: true, job: "Oil change" },
     { id: "l3", kind: "part", partId: "dp_of1", number: "VO106", description: "Engine oil filter", qty: 1, price: 6.99, cost: 2.1, condition: "new", taxable: true, packaged: true, job: "Oil change" },
   ];
   const mkBrakes = () => [

@@ -180,6 +180,48 @@ export function stockMoves(order) {
   return [...byPart].map(([partId, qty]) => ({ partId, qty }));
 }
 
+/* A canned job can carry one set price (`job.packagePrice`) instead of
+   pricing each line on its own — the oil change model applied to any
+   fluid service. The parts used keep their retail price and are the only
+   thing taxed; whatever is left of the set price is the service labor,
+   which isn't taxed. The customer always pays the set price. The parts
+   and the service labor fold into a single line on the printed receipt
+   (`packaged`); fees stay their own lines, added on top. Given the
+   already-expanded lines and the set price, returns the repriced set. */
+export function packageJobLines(lines, price, job, mkId) {
+  const pkg = round2(price);
+  const parts = lines.filter((l) => l.kind === "part");
+  const labors = lines.filter((l) => l.kind === "labor");
+  const others = lines.filter((l) => l.kind !== "part" && l.kind !== "labor");
+  let partsAmt = round2(parts.reduce((a, l) => a + lineAmount(l), 0));
+  let laborAmt = round2(pkg - partsAmt);
+  if (laborAmt < 0 && partsAmt > 0) {
+    /* the parts alone list for more than the set price (a loss leader):
+       scale them to the price so the ticket still ties out, no labor */
+    const f = pkg / partsAmt;
+    for (const p of parts) p.price = round2(num(p.price) * f);
+    partsAmt = round2(parts.reduce((a, l) => a + lineAmount(l), 0));
+    laborAmt = round2(pkg - partsAmt);
+  }
+  for (const p of parts) {
+    p.taxable = true; // the retail parts are the tax base
+    p.packaged = true;
+  }
+  const first = labors[0];
+  const service = makeLine("labor", {}, {
+    id: mkId(),
+    description: (first && first.description) || job.name,
+    details: (first && first.details) || "",
+    hours: 1,
+    rate: Math.max(0, laborAmt),
+    unit: "service",
+    taxable: false, // the service labor is not taxed
+    packaged: true,
+    job: job.name,
+  });
+  return [service, ...parts, ...others];
+}
+
 /* Expand a canned job into fresh lines priced at today's rates. A job
    line may carry its own price; otherwise the inventory part's price is
    used when there is one, and labor falls back to the shop rate.
@@ -187,7 +229,11 @@ export function stockMoves(order) {
    A job can be priced per unit (`job.unit`, e.g. "tire"): lines marked
    `perUnit` have their qty or hours multiplied by `count`. Labor on such
    a line is a flat amount per unit, so `hours` holds the count and the
-   line carries `unit` so screens say "4 tires", not "4 hr". */
+   line carries `unit` so screens say "4 tires", not "4 hr".
+
+   A job can instead carry one set price (`job.packagePrice`): the lines
+   are repriced so the parts are the taxable base and the remainder is
+   untaxed service labor — see packageJobLines. */
 export function jobLines(job, cfg, parts, mkId, count = 1) {
   const n = Math.max(1, num(count) || 1);
   const out = [];
@@ -216,7 +262,8 @@ export function jobLines(job, cfg, parts, mkId, count = 1) {
     }
     out.push(makeLine(t.kind, cfg, extra));
   }
-  return out;
+  const pkg = num(job && job.packagePrice);
+  return pkg > 0 ? packageJobLines(out, pkg, job, mkId) : out;
 }
 
 /* "4 tires" for per-unit labor, "1.5 hr" otherwise. */

@@ -254,7 +254,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       setDraft(saved);
       /* on approval to a repair order, run the service checklist if the
          ticket has an oil change and one hasn't been done yet */
-      const oilOnTicket = (saved.lines || []).some((l) => l.packaged);
+      const oilOnTicket = hasOilChange(saved);
       setPick(to === STATUS.open && oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
       /* posting an oil change pops the windshield reminder sticker to print */
       if (to === STATUS.invoiced && oilOnTicket && cfg.oilSticker !== false) setSticker({ id: saved.id, auto: true });

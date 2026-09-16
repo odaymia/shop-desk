@@ -189,6 +189,14 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
           <Field label="Priced per (leave blank for a fixed job)">
             <Text value={d.unit || ""} onChange={(v) => setD({ ...d, unit: v.trim().toLowerCase() })} placeholder="tire, wheel, quart" />
           </Field>
+          <Field label="Set price (tax follows the parts)">
+            <Text
+              value={d.packagePrice == null ? "" : d.packagePrice}
+              onChange={(v) => setD({ ...d, packagePrice: clean(v) })}
+              inputMode="decimal"
+              placeholder="blank = itemized"
+            />
+          </Field>
           <Field label="Commission $ (per sale)">
             <Text value={d.commission == null ? "" : d.commission} onChange={(v) => setD({ ...d, commission: clean(v) })} inputMode="decimal" placeholder="0.00" />
           </Field>
@@ -197,6 +205,14 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
           <p className="noteBox">
             When this job goes on a ticket you'll be asked how many {d.unit}s. Lines with “× count” checked multiply by
             that number; the rest are added once.
+          </p>
+        )}
+        {toNum(d.packagePrice) > 0 && (
+          <p className="noteBox">
+            This job sells for a <strong>set price of ${toNum(d.packagePrice).toFixed(2)}</strong>, priced like an oil
+            change: list the parts used and link each to inventory so its retail price is the tax base. The labor is
+            figured automatically as the set price minus the parts, and isn't taxed. Leave the part prices and labor
+            rate below blank — they're computed. (Set price is for fixed jobs; clear the “Priced per” field.)
           </p>
         )}
         <div className="subhead">Lines</div>
@@ -315,7 +331,7 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                 ? { ...l, qty: toNum(l.qty) || 1, price: toNum(l.price) }
                 : { ...l, qty: toNum(l.qty) || 1, price: numOrNull(l.price), cost: numOrNull(l.cost) }
             );
-            onSave({ ...d, name: d.name.trim(), commission: numOrNull(d.commission), lines });
+            onSave({ ...d, name: d.name.trim(), commission: numOrNull(d.commission), packagePrice: numOrNull(d.packagePrice), lines });
           }}
         >
           Save job

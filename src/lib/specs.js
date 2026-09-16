@@ -78,6 +78,7 @@ export function oilChangeLines(spec, parts, mkId, cfg) {
       cost: oil ? Number(oil.cost) || 0 : 0,
       condition: "new",
       taxable: null,
+      oil: true, // the oil that went in, for the reminder sticker
       job: label,
     });
   }
@@ -100,7 +101,7 @@ export function oilChangeLines(spec, parts, mkId, cfg) {
   }
   const laborPrice = Number(cfg && cfg.oilChangeLaborPrice) || 0;
   if (out.length && laborPrice > 0) {
-    out.push({ id: mkId(), kind: "labor", description: "Lube, oil, and filter", details: spec.resetProcedure ? `Reset maintenance light: ${spec.resetProcedure}` : "", hours: 1, rate: laborPrice, unit: "service", taxable: null, job: label });
+    out.push({ id: mkId(), kind: "labor", description: "Lube, oil, and filter", details: spec.resetProcedure ? `Reset maintenance light: ${spec.resetProcedure}` : "", hours: 1, rate: laborPrice, unit: "service", taxable: null, oil: true, job: label });
   }
   return out;
 }

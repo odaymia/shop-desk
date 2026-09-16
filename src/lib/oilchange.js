@@ -54,6 +54,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       unit: "service",
       taxable: false,
       packaged: true, // fold into one package line on the printed receipt
+      oil: true, // an oil change — triggers the reminder sticker
       job,
     },
     {
@@ -68,6 +69,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       condition: "new",
       taxable: true,
       packaged: true,
+      oil: true, // the oil that went in, for the sticker's "last oil used"
       job,
     },
     {

@@ -4,15 +4,22 @@
    sticker: the vehicle, when/at what mileage the next service is due, and the
    oil that was used. Values are computed here; the layout is in Sticker.jsx. */
 
-/* An oil change is on the ticket when any line is part of a package. */
+/* An oil change is on the ticket when a line is flagged as oil, or (older
+   tickets, before the flag) a packaged line reads like an oil change.
+   Other fluid packages (transmission, coolant…) fold the same way but are
+   not oil, so they must not trigger the sticker. */
+const readsOil = (l) => /oil change|\blof\b|lube, oil/i.test(`${(l && l.job) || ""} ${(l && l.description) || ""}`);
 export function hasOilChange(order) {
-  return (((order && order.lines) || []).some((l) => l.packaged));
+  return (((order && order.lines) || []).some((l) => l.oil || (l.packaged && readsOil(l))));
 }
 
-/* The oil that went in: among the package's parts, the one with the most
-   quarts (the filter is qty 1), by its description. */
+/* The oil that went in: among the oil lines, the part with the most quarts
+   (the filter is qty 1), by its description. Falls back to packaged parts
+   that read like oil for tickets made before the oil flag existed. */
 export function lastOilUsed(order) {
-  const parts = (((order && order.lines) || []).filter((l) => l.packaged && l.kind === "part"));
+  const lines = ((order && order.lines) || []).filter((l) => l.kind === "part");
+  const flagged = lines.filter((l) => l.oil);
+  const parts = flagged.length ? flagged : lines.filter((l) => l.packaged && readsOil(l));
   if (!parts.length) return "";
   const oil = parts.reduce((a, b) => (Number(b.qty) > Number(a.qty) ? b : a));
   return String(oil.description || "")
