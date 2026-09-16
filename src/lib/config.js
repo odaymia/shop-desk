@@ -37,6 +37,9 @@ export const DEFAULT_CFG = {
   hours: "", // free text for the portal card: "Mon–Fri 8–6, Sat 8–2"
   nextOrderNumber: 1001, // first estimate/RO/invoice number; the live counter is in sd:counters
   commission: { split: { advisor: 40, top: 30, pit: 30 } }, // how a service's flat spiff is split among the three on the ticket; amounts live on each job/package
+  reminderMonths: 3, // oil-change reminder sticker: months until the next service
+  reminderMiles: 3000, // oil-change reminder sticker: miles until the next service
+  oilSticker: true, // pop the reminder sticker to print when an oil-change ticket is posted
   invoiceFooter:
     "Thank you for your business. Parts and labor are warranted for 12 months or 12,000 miles, whichever comes first. Returned parts are subject to a restocking fee.",
   authorizationText:

@@ -74,6 +74,8 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       serviceMenu: normalizeMenu(d.serviceMenu),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
       commission: { ...(d.commission || {}), split: { advisor: toNum(split.advisor), top: toNum(split.top), pit: toNum(split.pit) } },
+      reminderMonths: Math.max(0, Math.floor(toNum(d.reminderMonths)) || 3),
+      reminderMiles: Math.max(0, Math.floor(toNum(d.reminderMiles)) || 3000),
     });
     flash("Settings saved");
   };
@@ -301,6 +303,22 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Shares are proportions — they don't have to add to 100. Right now:{" "}
             {toNum(split.advisor)} / {toNum(split.top)} / {toNum(split.pit)} (advisor / top / pit).
           </p>
+
+          <h3 className="subhead">Oil-change reminder sticker</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            When an oil-change ticket is posted, the reminder sticker pops up to print — vehicle, next service date and mileage, and the oil used, with your shop name and address. Set how far out the next service is.
+          </p>
+          <div className="fldRow">
+            <Field label="Next service in (months)">
+              <Text value={d.reminderMonths == null ? "" : String(d.reminderMonths)} onChange={(v) => set("reminderMonths")(v.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="3" />
+            </Field>
+            <Field label="Next service in (miles)">
+              <Text value={d.reminderMiles == null ? "" : String(d.reminderMiles)} onChange={(v) => set("reminderMiles")(v.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="3000" />
+            </Field>
+            <Field label="When a ticket is posted">
+              {onOff("oilSticker", "Pop the sticker to print", "Don't print automatically")}
+            </Field>
+          </div>
 
           <h3 className="subhead">Service checklist</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>

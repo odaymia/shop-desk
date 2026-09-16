@@ -9,6 +9,8 @@ import { orderPayout } from "../lib/commission.js";
 import { applicableCoupons, couponDiscount, couponValueText, orderJobNames, orderSubtotalBase } from "../lib/coupons.js";
 import { symptomGroups, addSymptom } from "../lib/symptoms.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
+import { hasOilChange } from "../lib/sticker.js";
+import { Sticker } from "./Sticker.jsx";
 import {
   STATUS,
   PAY_METHODS,
@@ -77,6 +79,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const [specEdit, setSpecEdit] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showRevs, setShowRevs] = useState(false);
+  const [sticker, setSticker] = useState(null); // { id, auto } — the reminder sticker to print
 
   /* When the car has no oil spec on file, pull Valvoline's for its exact
      engine so the ticket shows grade + capacity + fluids automatically —
@@ -251,8 +254,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       setDraft(saved);
       /* on approval to a repair order, run the service checklist if the
          ticket has an oil change and one hasn't been done yet */
-      const hasOilChange = (saved.lines || []).some((l) => l.packaged);
-      setPick(to === STATUS.open && hasOilChange && !saved.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
+      const oilOnTicket = (saved.lines || []).some((l) => l.packaged);
+      setPick(to === STATUS.open && oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
+      /* posting an oil change pops the windshield reminder sticker to print */
+      if (to === STATUS.invoiced && oilOnTicket && cfg.oilSticker !== false) setSticker({ id: saved.id, auto: true });
       flash(
         to === STATUS.invoiced ? `Invoice #${saved.number} posted` : to === STATUS.open ? `RO #${saved.number} approved` : to === STATUS.void ? `Invoice #${saved.number} voided` : `Back to estimate`,
         to === STATUS.void ? "out" : "in"
@@ -314,6 +319,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           <button className="btn" onClick={async () => (await flushNow(), setShowRevs(true))} title="Snapshots of this ticket over time">
             Revisions{revisionCount(o) ? ` (${revisionCount(o)})` : ""}
           </button>
+          {hasOilChange(o) && (
+            <button className="btn" onClick={() => setSticker({ id: o.id, auto: false })} title="Print the oil-change reminder sticker">
+              Sticker
+            </button>
+          )}
           {(o.status === STATUS.estimate || o.status === STATUS.open || o.status === STATUS.invoiced) && (customer || vehicle) && (
             <>
               <button className="btn" onClick={async () => (await flushNow(), setSigning(true))}>
@@ -854,6 +864,15 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       {pick === "customer" && <CustomerPicker shop={shop} onPick={pickCustomer} onClose={() => setPick(null)} />}
       {signing && <OrderSign order={o} shop={shop} cfg={cfg} flash={flash} onDone={() => setSigning(false)} />}
       {showQR && <PortalQR customer={customer} onClose={() => setShowQR(false)} />}
+      {sticker && shop.orders[sticker.id] && (
+        <Sticker
+          order={shop.orders[sticker.id]}
+          cfg={cfg}
+          vehicle={shop.vehicles[shop.orders[sticker.id].vehicleId]}
+          auto={sticker.auto}
+          onClose={() => setSticker(null)}
+        />
+      )}
       {showRevs && (
         <RevisionsModal
           order={o}
