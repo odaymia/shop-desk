@@ -25,6 +25,7 @@ import {
   owesBalance,
   fmtMoney,
   PART_CONDITIONS,
+  crewAssigned,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
@@ -256,6 +257,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   /* ---------- status ---------- */
   const moveTo = async (to) => {
     const latest = await flushNow();
+    /* an oil change can't be posted until the crew is recorded — set it on
+       the reminder-sticker screen or in Details */
+    if (to === STATUS.invoiced && hasOilChange(latest) && !crewAssigned(latest)) {
+      setSticker({ id: latest.id });
+      return flash("Assign the advisor, top tech, and pit tech before posting an oil change.", "out");
+    }
     try {
       const saved = await shop.setStatus(latest, to, customer);
       draftRef.current = saved;
@@ -895,6 +902,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           order={shop.orders[sticker.id]}
           cfg={cfg}
           vehicle={shop.vehicles[shop.orders[sticker.id].vehicleId]}
+          employees={techs}
+          requireCrew={hasOilChange(shop.orders[sticker.id])}
+          onAssign={(patch) => update((dd) => (dd.id === sticker.id ? { ...dd, ...patch } : dd))}
           onClose={() => setSticker(null)}
           onSave={({ months, miles, mileage }) => {
             const ord = shop.orders[sticker.id];

@@ -157,6 +157,14 @@ export function laborHours(order) {
   );
 }
 
+/* The three commission roles a quick-lube oil change needs recorded:
+   advisor (writer), top tech (hood), pit tech (under car). Used to make
+   assigning the crew mandatory before an oil change is posted. */
+export function crewAssigned(order) {
+  const o = order || {};
+  return !!(o.advisorId || o.writerId) && !!(o.topTechId || o.techId) && !!o.pitTechId;
+}
+
 /* ---------- status ---------- */
 export function canTransition(from, to) {
   return (

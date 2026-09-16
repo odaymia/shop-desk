@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText, conditionLabel, owesBalance } from "../src/lib/invoice.js";
+import { orderTotals, lineAmount, lineTaxable, stockMoves, canTransition, jobLines, makeLine, fmtMoney, laborHours, laborQtyText, conditionLabel, owesBalance, crewAssigned } from "../src/lib/invoice.js";
+
+test("crewAssigned is true only when advisor, top tech, and pit tech are all set", () => {
+  assert.equal(crewAssigned({ advisorId: "a", topTechId: "t", pitTechId: "p" }), true);
+  assert.equal(crewAssigned({ writerId: "a", techId: "t", pitTechId: "p" }), true); // legacy field names count
+  assert.equal(crewAssigned({ advisorId: "a", topTechId: "t" }), false); // no pit tech
+  assert.equal(crewAssigned({ topTechId: "t", pitTechId: "p" }), false); // no advisor
+  assert.equal(crewAssigned({}), false);
+  assert.equal(crewAssigned(null), false);
+});
 
 const cfg = {
   laborRate: 150,
