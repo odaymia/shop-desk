@@ -549,6 +549,79 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           )}
 
           <div className="card" style={{ marginTop: 14 }}>
+            {!locked && (
+              <div className="addBar">
+                {(cfg.serviceMenu || []).map((m) => (
+                  <button
+                    key={m.id}
+                    className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`}
+                    onClick={() => {
+                      if (m.oil) return setPick("oil");
+                      const pc = menuPartCat(m);
+                      if (pc) {
+                        setPartCat(pc);
+                        return setPick("part");
+                      }
+                      setJobCat(m.category || m.name);
+                      setPick("job");
+                    }}
+                  >
+                    {m.name}
+                  </button>
+                ))}
+                <button
+                  className="btn tiny ghost"
+                  onClick={() => {
+                    setJobCat("");
+                    setPick("job");
+                  }}
+                  title="Every canned job, whatever its category"
+                >
+                  All jobs
+                </button>
+              </div>
+            )}
+            {!locked && (
+              <div className="addBar" style={{ paddingTop: 6, marginBottom: 14 }}>
+                {CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
+                  <button key={k} className="btn tiny" onClick={() => openCatalog(k, url)} title={`Open ${label} in a new tab`}>
+                    {label} ↗
+                  </button>
+                ))}
+                <button
+                  className="btn tiny"
+                  onClick={() => {
+                    setPartCat("");
+                    setPick("part");
+                  }}
+                >
+                  + Part
+                </button>
+                <button className="btn tiny" onClick={() => addLine("labor", { techId: o.topTechId || o.techId || null })}>
+                  + Labor
+                </button>
+                <button className="btn tiny" onClick={() => addLine("sublet")}>
+                  + Sublet
+                </button>
+                <button className="btn tiny" onClick={() => addLine("fee")}>
+                  + Fee
+                </button>
+                <button className="btn tiny" onClick={() => setPick("coupon")}>
+                  Coupon
+                </button>
+                <button className="btn tiny" onClick={() => addLine("note")}>
+                  + Note
+                </button>
+                <button className="btn tiny" onClick={() => setPick("checklist")} title="The walk-around checklist, filled from the keyboard">
+                  Checklist
+                </button>
+                {o.lines.length > 0 && (
+                  <button className="btn tiny danger" style={{ marginLeft: "auto" }} onClick={clearLines} title="Remove every line and start over">
+                    Clear all
+                  </button>
+                )}
+              </div>
+            )}
             <div className="cardHead" style={{ marginBottom: 6 }}>
               <h3 style={{ fontSize: 14 }}>Customer states (prints on the ticket)</h3>
               {!locked && (
@@ -608,79 +681,6 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   ))}
                 </tbody>
               </table>
-              {!locked && (
-                <div className="addBar">
-                  {(cfg.serviceMenu || []).map((m) => (
-                    <button
-                      key={m.id}
-                      className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`}
-                      onClick={() => {
-                        if (m.oil) return setPick("oil");
-                        const pc = menuPartCat(m);
-                        if (pc) {
-                          setPartCat(pc);
-                          return setPick("part");
-                        }
-                        setJobCat(m.category || m.name);
-                        setPick("job");
-                      }}
-                    >
-                      {m.name}
-                    </button>
-                  ))}
-                  <button
-                    className="btn tiny ghost"
-                    onClick={() => {
-                      setJobCat("");
-                      setPick("job");
-                    }}
-                    title="Every canned job, whatever its category"
-                  >
-                    All jobs
-                  </button>
-                </div>
-              )}
-              {!locked && (
-                <div className="addBar" style={{ paddingTop: 6 }}>
-                  {CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
-                    <button key={k} className="btn tiny" onClick={() => openCatalog(k, url)} title={`Open ${label} in a new tab`}>
-                      {label} ↗
-                    </button>
-                  ))}
-                  <button
-                    className="btn tiny"
-                    onClick={() => {
-                      setPartCat("");
-                      setPick("part");
-                    }}
-                  >
-                    + Part
-                  </button>
-                  <button className="btn tiny" onClick={() => addLine("labor", { techId: o.topTechId || o.techId || null })}>
-                    + Labor
-                  </button>
-                  <button className="btn tiny" onClick={() => addLine("sublet")}>
-                    + Sublet
-                  </button>
-                  <button className="btn tiny" onClick={() => addLine("fee")}>
-                    + Fee
-                  </button>
-                  <button className="btn tiny" onClick={() => setPick("coupon")}>
-                    Coupon
-                  </button>
-                  <button className="btn tiny" onClick={() => addLine("note")}>
-                    + Note
-                  </button>
-                  <button className="btn tiny" onClick={() => setPick("checklist")} title="The walk-around checklist, filled from the keyboard">
-                    Checklist
-                  </button>
-                  {o.lines.length > 0 && (
-                    <button className="btn tiny danger" style={{ marginLeft: "auto" }} onClick={clearLines} title="Remove every line and start over">
-                      Clear all
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           </div>
           <VisitHistory shop={shop} order={o} vehicle={vehicle} customer={customer} nav={nav} />
