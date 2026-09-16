@@ -382,6 +382,11 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .sheet .shCheck .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px 14px; font-size:10px; }
 .sheet .shCheck .grid div { display:flex; justify-content:space-between; gap:6px; border-bottom:1px dotted #bbb; padding:1px 0; }
 .sheet .shCheck .grid strong { white-space:nowrap; }
+/* recommended services: two columns, a touch bolder, with a note under */
+.sheet .shRecs { margin-top:8px; }
+.sheet .shRecs .grid { grid-template-columns:repeat(2,1fr); font-size:10.5px; }
+.sheet .shRecs .grid strong { color:#0a1440; }
+.sheet .shRecNote { margin:3px 0 0; font-size:8.5px; color:#666; font-style:italic; }
 @media (max-width:760px) { .ckWrap { grid-template-columns:1fr; } .ckList { max-height:30vh; } }
 
 .pickInstead { align-self:flex-start; margin-top:4px; background:none; border:none; padding:0; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; }

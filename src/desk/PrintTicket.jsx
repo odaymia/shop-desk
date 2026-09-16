@@ -4,7 +4,7 @@ import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { staffLabel } from "../lib/names.js";
-import { checklistSummary } from "../lib/checklist.js";
+import { checklistSummary, recommendedServices } from "../lib/checklist.js";
 import { parseAuthText } from "../lib/authForm.js";
 
 /* The paper copy. Black on white, one page for most tickets. */
@@ -27,6 +27,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
     if (g && g.job === (l.job || "")) g.lines.push(l);
     else groups.push({ job: l.job || "", lines: [l] });
   }
+  const recs = o.checklist && o.checklist.items ? recommendedServices(o.checklist.items, cfg.checklist) : [];
 
   return (
     <div className="printSheet show">
@@ -130,6 +131,21 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {recs.length > 0 && (
+            <div className="shCheck shRecs">
+              <h4>Recommended services</h4>
+              <div className="grid">
+                {recs.map((r, i) => (
+                  <div key={i}>
+                    <span>{r.label}</span>
+                    <strong>{r.price > 0 ? `est. ${fmtMoney(r.price)}` : "ask us"}</strong>
+                  </div>
+                ))}
+              </div>
+              <p className="shRecNote">Recommended from today's inspection — estimated prices, not included in the total above. Ask us to add any of these.</p>
             </div>
           )}
 

@@ -13,21 +13,24 @@
 
 export const CHECK_STATES = ["Checked OK", "Level OK", "Added", "Replaced", "At your request", "Can't check"];
 export const REPLACED = "Replaced";
+/* Mark an item Recommend and it prints on the receipt as a recommended
+   service with the estimated price set on the item (recommendPrice). */
+export const RECOMMEND = "Recommend";
 
 export const DEFAULT_CHECKLIST = [
   { id: "oil", label: "Engine oil", kind: "choice", options: ["Replaced", "Level OK", "Added", "Checked OK", "At your request"], value: "Level OK", auto: "oil change | motor oil | engine oil" },
   { id: "oilFilter", label: "Oil filter", kind: "choice", options: ["Replaced", "Checked OK", "Recommend", "At your request"], value: "Checked OK", auto: "oil filter" },
-  { id: "rearDiff", label: "Rear diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "rear diff | rear differential" },
-  { id: "trans", label: "Transmission fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "At your request", "Sealed", "Can't check"], value: "Level OK", auto: "transmission fluid | transmission flush | transmission service" },
-  { id: "wipers", label: "Wiper blades", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "wiper" },
-  { id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "air filter -cabin | engine filter" },
-  { id: "cabinFilter", label: "Cabin air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request", "Can't check", "N/A"], value: "Checked OK", auto: "cabin filter | cabin air" },
-  { id: "brakeFluid", label: "Brake fluid", kind: "choice", options: ["Sensor OK", "Level OK", "Added", "Replaced", "Recommend", "At your request"], value: "Sensor OK", auto: "brake fluid | brake flush" },
-  { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "Recommend", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush" },
-  { id: "coolant", label: "Radiator fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "Can't check", "At your request"], value: "Level OK", auto: "coolant flush | radiator flush | coolant service | antifreeze" },
+  { id: "rearDiff", label: "Rear diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "rear diff | rear differential", recommendPrice: 90, recommendLabel: "Rear differential fluid service" },
+  { id: "trans", label: "Transmission fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "At your request", "Sealed", "Can't check"], value: "Level OK", auto: "transmission fluid | transmission flush | transmission service", recommendPrice: 180, recommendLabel: "Transmission fluid service" },
+  { id: "wipers", label: "Wiper blades", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "wiper", recommendPrice: 25, recommendLabel: "Wiper blade replacement" },
+  { id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "air filter -cabin | engine filter", recommendPrice: 30, recommendLabel: "Engine air filter replacement" },
+  { id: "cabinFilter", label: "Cabin air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request", "Can't check", "N/A"], value: "Checked OK", auto: "cabin filter | cabin air", recommendPrice: 40, recommendLabel: "Cabin air filter replacement" },
+  { id: "brakeFluid", label: "Brake fluid", kind: "choice", options: ["Sensor OK", "Level OK", "Added", "Replaced", "Recommend", "At your request"], value: "Sensor OK", auto: "brake fluid | brake flush", recommendPrice: 110, recommendLabel: "Brake fluid flush" },
+  { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "Recommend", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush", recommendPrice: 100, recommendLabel: "Power steering fluid flush" },
+  { id: "coolant", label: "Radiator fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "Can't check", "At your request"], value: "Level OK", auto: "coolant flush | radiator flush | coolant service | antifreeze", recommendPrice: 130, recommendLabel: "Coolant flush and fill" },
   { id: "washer", label: "Windshield wash fluid", kind: "choice", options: ["Added", "Full", "Can't check"], value: "Added", auto: "" },
   { id: "tirePsi", label: "Tire pressure", kind: "pressure", value: "F35 R35", auto: "", remember: true },
-  { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case" },
+  { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case", recommendPrice: 90, recommendLabel: "Front differential fluid service" },
   { id: "lfDepth", label: "Front driver side tire depth", kind: "depth", value: "", auto: "" },
   { id: "rfDepth", label: "Front passenger side tire depth", kind: "depth", value: "", auto: "" },
   { id: "lrDepth", label: "Rear driver side tire depth", kind: "depth", value: "", auto: "" },
@@ -123,7 +126,12 @@ export function startChecklist(cfgItems, lines, prior) {
         const p = prior.find((x) => x.id === it.id);
         if (p && p.value) value = p.value;
       }
-      return { id: it.id, label: it.label, kind, value, auto };
+      const item = { id: it.id, label: it.label, kind, value, auto };
+      /* carry the recommend estimate along so the receipt can price a
+         recommended item without reaching back into settings */
+      if (Number(it.recommendPrice) > 0) item.recommendPrice = Number(it.recommendPrice);
+      if (it.recommendLabel) item.recommendLabel = it.recommendLabel;
+      return item;
     });
 }
 
@@ -174,6 +182,25 @@ export function checklistSummary(items) {
   return (items || []).map((it) => ({ label: it.label, text: displayValue(it) }));
 }
 
+/* Services the tech marked Recommend on the checklist, for the receipt:
+   each with the wording the customer reads and an estimated price. The
+   price and label come from the item's config (recommendPrice /
+   recommendLabel), or from the item itself when startChecklist copied
+   them on; the label falls back to the item's own name. */
+export function recommendedServices(items, cfgItems) {
+  const cfg = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
+  const pick = (...vals) => vals.find((v) => v != null && v !== "");
+  return (items || [])
+    .filter((it) => it && it.value === RECOMMEND)
+    .map((it) => {
+      const c = cfg.find((x) => x.id === it.id) || {};
+      const d = DEFAULT_CHECKLIST.find((x) => x.id === it.id) || {}; // standard fallback for older configs
+      const price = Number(pick(it.recommendPrice, c.recommendPrice, d.recommendPrice)) || 0;
+      const label = String(pick(it.recommendLabel, c.recommendLabel, d.recommendLabel) || "").trim() || String(it.label || c.label || "Service");
+      return { id: it.id, label, price };
+    });
+}
+
 /* The car's last filled checklist, for remembered items */
 export function priorChecklist(orders, vehicleId, exceptId) {
   if (!vehicleId) return null;
@@ -203,6 +230,8 @@ export function normalizeChecklist(rows) {
         value: String(r.value || "").trim(),
         auto: kind === "choice" ? String(r.auto || "").trim() : "",
         remember: !!r.remember,
+        recommendPrice: Number(r.recommendPrice) || 0,
+        recommendLabel: String(r.recommendLabel || "").trim(),
       };
     });
 }

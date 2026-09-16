@@ -332,7 +332,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </Field>
           <div className="miniLines">
             {(d.checklist || []).map((it, i) => (
-              <div key={it.id || i} className="miniLine" style={{ gridTemplateColumns: "1.4fr 110px 2fr 1fr 1fr 36px" }}>
+              <div key={it.id || i} className="miniLine" style={{ gridTemplateColumns: "1.3fr 100px 1.7fr 0.9fr 1fr 74px 30px" }}>
                 <input value={it.label || ""} onChange={(e) => setCk(i, { label: e.target.value })} placeholder="Engine oil" />
                 <select value={it.kind || "choice"} onChange={(e) => setCk(i, { kind: e.target.value })} title="How it's answered">
                   <option value="choice">Choices</option>
@@ -353,6 +353,14 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
                   onChange={(e) => setCk(i, { auto: e.target.value })}
                   placeholder="Replaced when the ticket has…"
                   title="Words on a ticket line that mean this was replaced"
+                  disabled={(it.kind || "choice") !== "choice"}
+                />
+                <input
+                  inputMode="decimal"
+                  value={it.recommendPrice == null || Number(it.recommendPrice) === 0 ? "" : it.recommendPrice}
+                  onChange={(e) => setCk(i, { recommendPrice: e.target.value })}
+                  placeholder="est $"
+                  title="Estimated price shown on the receipt when this item is marked Recommend"
                   disabled={(it.kind || "choice") !== "choice"}
                 />
                 <button className="lineX" onClick={() => set("checklist")(d.checklist.filter((_, k) => k !== i))} aria-label="Remove">

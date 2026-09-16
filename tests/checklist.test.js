@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_CHECKLIST, startChecklist, replacedOnTicket, syncChecklist, cycle, withDepthDefault, checklistSummary, optionsOf, normalizeChecklist, priorChecklist } from "../src/lib/checklist.js";
+import { DEFAULT_CHECKLIST, startChecklist, replacedOnTicket, syncChecklist, recommendedServices, cycle, withDepthDefault, checklistSummary, optionsOf, normalizeChecklist, priorChecklist } from "../src/lib/checklist.js";
 import { DEFAULT_OIL_PACKAGES, oilPackageLines } from "../src/lib/oilchange.js";
 
 const byId = (items, id) => items.find((x) => x.id === id);
@@ -128,6 +128,35 @@ test("syncChecklist: an item auto-flipped at creation reverts to its default whe
   items = syncChecklist(items, [], DEFAULT_CHECKLIST); // whole oil change removed
   assert.equal(byId(items, "oilFilter").value, "Checked OK"); // back to its default
   assert.equal(byId(items, "oilFilter").auto, false);
+});
+
+test("recommendedServices lists the items marked Recommend with their label and estimated price", () => {
+  const items = startChecklist(DEFAULT_CHECKLIST, [], null).map((it) =>
+    it.id === "airFilter" || it.id === "cabinFilter" ? { ...it, value: "Recommend" } : it
+  );
+  const recs = recommendedServices(items, DEFAULT_CHECKLIST);
+  assert.deepEqual(recs, [
+    { id: "airFilter", label: "Engine air filter replacement", price: 30 },
+    { id: "cabinFilter", label: "Cabin air filter replacement", price: 40 },
+  ]);
+});
+
+test("recommendedServices falls back to the standard price for a pre-existing config that lacks it", () => {
+  // an older saved item: has the id but no recommendPrice/recommendLabel
+  const items = [{ id: "airFilter", label: "Air filter", kind: "choice", value: "Recommend" }];
+  const oldCfg = [{ id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Recommend"], value: "Checked OK" }];
+  const recs = recommendedServices(items, oldCfg);
+  assert.equal(recs[0].price, 30); // from the standard default
+  assert.equal(recs[0].label, "Engine air filter replacement");
+});
+
+test("recommendedServices ignores non-recommended items and prices a custom item at 0 (ask us)", () => {
+  const items = [
+    { id: "airFilter", value: "Checked OK" },
+    { id: "custom1", label: "Serpentine belt", kind: "choice", value: "Recommend" },
+  ];
+  const recs = recommendedServices(items, [{ id: "custom1", label: "Serpentine belt", kind: "choice", options: ["Checked OK", "Recommend"] }]);
+  assert.deepEqual(recs, [{ id: "custom1", label: "Serpentine belt", price: 0 }]);
 });
 
 test("settings rows normalize: comma options, blank labels dropped, text items lose auto", () => {
