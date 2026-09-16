@@ -432,8 +432,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               Void
             </button>
           )}
-          {(o.status === STATUS.estimate || o.status === STATUS.open) && (
-            <button className="btn danger" onClick={() => setPick("confirmDelete")}>
+          {(o.status === STATUS.estimate || o.status === STATUS.open || o.status === STATUS.void) && (
+            <button className="btn danger" onClick={() => setPick("confirmDelete")} title={o.status === STATUS.void ? "Remove this voided receipt from the lists" : undefined}>
               Delete
             </button>
           )}

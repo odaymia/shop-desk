@@ -99,7 +99,8 @@ test("status transitions", () => {
   assert.equal(canTransition("void", "invoiced"), false);
   assert.equal(canTransition("estimate", "deleted"), true);
   assert.equal(canTransition("open", "deleted"), true);
-  assert.equal(canTransition("invoiced", "deleted"), false);
+  assert.equal(canTransition("invoiced", "deleted"), false); // must void first
+  assert.equal(canTransition("void", "deleted"), true); // a voided receipt can be deleted
   assert.equal(canTransition("deleted", "open"), false);
 });
 

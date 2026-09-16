@@ -164,7 +164,8 @@ export function canTransition(from, to) {
     (from === "open" && to === "estimate") ||
     ((from === "estimate" || from === "open") && to === "invoiced") ||
     ((from === "estimate" || from === "open") && to === "deleted") ||
-    (from === "invoiced" && to === "void")
+    (from === "invoiced" && to === "void") ||
+    (from === "void" && to === "deleted")
   );
 }
 
