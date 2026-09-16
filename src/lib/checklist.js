@@ -103,11 +103,19 @@ export function syncChecklist(items, lines, cfgItems) {
 }
 
 /* Options for an item: the config's list, always including Replaced so
-   an auto-marked item can be cycled back to it. */
+   an auto-marked item can be cycled back to it, and Recommend on any
+   serviceable item (one that carries a recommend estimate on it, its
+   config, or the standard list) so the option shows even when a saved
+   checklist was set up before Recommend existed. */
 export function optionsOf(item, cfgItems) {
   const c = (cfgItems || []).find((x) => x.id === item.id) || item;
-  const o = Array.isArray(c.options) && c.options.length ? c.options : CHECK_STATES;
-  return o.includes(REPLACED) ? o : [...o, REPLACED];
+  const d = DEFAULT_CHECKLIST.find((x) => x.id === item.id) || {};
+  const o = Array.isArray(c.options) && c.options.length ? [...c.options] : [...CHECK_STATES];
+  if (!o.includes(REPLACED)) o.push(REPLACED);
+  const recommendable =
+    Number(item.recommendPrice) > 0 || Number(c.recommendPrice) > 0 || Number(d.recommendPrice) > 0 || !!(c.recommendLabel || d.recommendLabel);
+  if (recommendable && !o.includes(RECOMMEND)) o.push(RECOMMEND);
+  return o;
 }
 
 /* A fresh checklist for a ticket: defaults, ticket lines marking what

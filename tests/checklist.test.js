@@ -130,6 +130,16 @@ test("syncChecklist: an item auto-flipped at creation reverts to its default whe
   assert.equal(byId(items, "oilFilter").auto, false);
 });
 
+test("optionsOf offers Recommend on a serviceable item even when a saved config predates it", () => {
+  // an older saved air-filter item with no Recommend and no recommend fields
+  const oldItem = { id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Replaced", "At your request"] };
+  const opts = optionsOf(oldItem, [oldItem]);
+  assert.ok(opts.includes("Recommend")); // added from the standard default
+  // an item with no recommend estimate anywhere (engine oil) does not get it
+  const oil = { id: "oil", label: "Engine oil", kind: "choice", options: ["Level OK", "Replaced"] };
+  assert.ok(!optionsOf(oil, [oil]).includes("Recommend"));
+});
+
 test("recommendedServices lists the items marked Recommend with their label and estimated price", () => {
   const items = startChecklist(DEFAULT_CHECKLIST, [], null).map((it) =>
     it.id === "airFilter" || it.id === "cabinFilter" ? { ...it, value: "Recommend" } : it
