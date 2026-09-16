@@ -7,6 +7,8 @@ import { customerName, vehicleName, vehiclesOf, ordersOf } from "./useShop.js";
 import { serviceCodes } from "../lib/serviceCodes.js";
 import { orderPayout } from "../lib/commission.js";
 import { applicableCoupons, couponDiscount, couponValueText, orderJobNames, orderSubtotalBase } from "../lib/coupons.js";
+import { symptomGroups, addSymptom } from "../lib/symptoms.js";
+import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import {
   STATUS,
   PAY_METHODS,
@@ -74,6 +76,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const [custEdit, setCustEdit] = useState(false);
   const [specEdit, setSpecEdit] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [showRevs, setShowRevs] = useState(false);
 
   /* When the car has no oil spec on file, pull Valvoline's for its exact
      engine so the ticket shows grade + capacity + fluids automatically —
@@ -302,6 +305,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           <button className="btn" onClick={async () => (await flushNow(), nav.print(o.id))}>
             Print
           </button>
+          <button className="btn" onClick={async () => (await flushNow(), setShowRevs(true))} title="Snapshots of this ticket over time">
+            Revisions{revisionCount(o) ? ` (${revisionCount(o)})` : ""}
+          </button>
           {(o.status === STATUS.estimate || o.status === STATUS.open || o.status === STATUS.invoiced) && (customer || vehicle) && (
             <>
               <button className="btn" onClick={async () => (await flushNow(), setSigning(true))}>
@@ -479,15 +485,21 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           )}
 
           <div className="card" style={{ marginTop: 14 }}>
-            <Field label="Customer states (prints on the ticket)">
-              <textarea
-                className="ta"
-                value={o.concern || ""}
-                onChange={(e) => update({ concern: e.target.value })}
-                placeholder="Grinding noise from the front when braking…"
-                readOnly={locked}
-              />
-            </Field>
+            <div className="cardHead" style={{ marginBottom: 6 }}>
+              <h3 style={{ fontSize: 14 }}>Customer states (prints on the ticket)</h3>
+              {!locked && (
+                <button className="btn tiny" onClick={() => setPick("symptom")}>
+                  + Common symptom
+                </button>
+              )}
+            </div>
+            <textarea
+              className="ta"
+              value={o.concern || ""}
+              onChange={(e) => update({ concern: e.target.value })}
+              placeholder="Grinding noise from the front when braking…"
+              readOnly={locked}
+            />
 
             <div className="tkLines">
               <table className="lines">
@@ -772,6 +784,16 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       {pick === "customer" && <CustomerPicker shop={shop} onPick={pickCustomer} onClose={() => setPick(null)} />}
       {signing && <OrderSign order={o} shop={shop} cfg={cfg} flash={flash} onDone={() => setSigning(false)} />}
       {showQR && <PortalQR customer={customer} onClose={() => setShowQR(false)} />}
+      {showRevs && (
+        <RevisionsModal
+          order={o}
+          onClose={() => setShowRevs(false)}
+          onSave={(note) => {
+            update((d) => withRevision(d, makeRevision(d, cfg, customer, note)));
+            flash("Revision saved");
+          }}
+        />
+      )}
       {specEdit && vehicle && (
         <SpecForm
           vehicle={vehicle}
@@ -840,6 +862,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             setPick(null);
             flash(`${coupon.code} applied`);
           }}
+        />
+      )}
+      {pick === "symptom" && (
+        <SymptomPicker
+          cfg={cfg}
+          onClose={() => setPick(null)}
+          onPick={(text) => update((d) => ({ ...d, concern: addSymptom(d.concern, text) }))}
         />
       )}
       {pick === "oil" && (
@@ -1279,6 +1308,94 @@ function VisitHistory({ shop, order, vehicle, customer, nav }) {
         </table>
       )}
     </div>
+  );
+}
+
+/* Quick-fill for "Customer states": tap common complaints to drop them into
+   the concern box. Stays open so several can be added. */
+function SymptomPicker({ cfg, onClose, onPick }) {
+  const groups = symptomGroups(cfg);
+  return (
+    <Modal title="Common symptoms" onClose={onClose} size="wide">
+      <p className="muted" style={{ marginTop: 0 }}>Tap to add to “Customer states.” Add as many as apply, then close.</p>
+      {groups.map(([cat, items]) => (
+        <div key={cat} className="symGroup">
+          <div className="symCat">{cat}</div>
+          <div className="symChips">
+            {items.map((s) => (
+              <button key={s} className="symChip" onClick={() => onPick(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </Modal>
+  );
+}
+
+/* Revision history: a running record of what the ticket looked like at each
+   step, and a box to save a new snapshot with a note about what changed. */
+function RevisionsModal({ order, onClose, onSave }) {
+  const [note, setNote] = useState("");
+  const [openId, setOpenId] = useState(null);
+  const revs = [...(order.revisions || [])].reverse(); // newest first
+  return (
+    <Modal title="Revisions" onClose={onClose} size="wide">
+      <div className="revNew">
+        <input className="search" style={{ flex: 1 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What changed? (e.g. added brake flush per customer)" />
+        <button
+          className="btn primary"
+          onClick={() => {
+            onSave(note.trim());
+            onClose();
+          }}
+        >
+          Save revision
+        </button>
+      </div>
+      <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+        A revision saves a snapshot of the ticket exactly as it is now — its lines, totals, and what the customer states — so you have a record of what the customer saw at each step.
+      </p>
+      {revs.length === 0 ? (
+        <p className="emptyNote">No revisions saved yet.</p>
+      ) : (
+        <div className="revList">
+          {revs.map((r, i) => (
+            <div key={r.id} className="revItem">
+              <button className="revHead" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                <span className="revNo">#{revs.length - i}</span>
+                <span className="revWhen">{fmtDateTime(r.at)}</span>
+                <span className="revNote">{r.note || <em className="muted">(no note)</em>}</span>
+                <span className="revTot">
+                  <Money v={r.total} />
+                </span>
+              </button>
+              {openId === r.id && (
+                <div className="revLines">
+                  {(r.lines || [])
+                    .filter((l) => l.kind !== "note" || l.description)
+                    .map((l, li) => (
+                      <div key={li} className="revLine">
+                        <span>
+                          {l.description || l.job || l.kind}
+                          {l.kind === "labor" && l.hours ? ` · ${l.hours} hr` : ""}
+                          {(l.kind === "part" || l.kind === "fee") && Number(l.qty) > 1 ? ` · ${l.qty}` : ""}
+                        </span>
+                        <span className="r">
+                          {l.kind === "discount" ? "-" : ""}
+                          <Money v={lineAmount(l)} />
+                        </span>
+                      </div>
+                    ))}
+                  {r.concern ? <div className="revConcern">Customer states: {r.concern}</div> : null}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }
 

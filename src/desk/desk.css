@@ -310,6 +310,28 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .cpAmt { margin-left:auto; font-weight:700; color:var(--signal); }
 .cpName { font-size:13px; margin-top:2px; }
 
+/* common-symptom picker */
+.symGroup { margin-bottom:14px; }
+.symCat { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; margin-bottom:7px; }
+.symChips { display:flex; flex-wrap:wrap; gap:7px; }
+.symChip { border:1px solid var(--line); border-radius:999px; padding:7px 13px; background:var(--panel); cursor:pointer; font-size:13px; color:var(--ink); }
+.symChip:hover { border-color:var(--signal); background:#fff; }
+
+/* revisions */
+.revNew { display:flex; gap:10px; align-items:center; }
+.revList { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.revItem { border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.revHead { width:100%; display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--panel); cursor:pointer; text-align:left; }
+.revHead:hover { background:#fff; }
+.revNo { font-family:var(--mono, ui-monospace, monospace); font-weight:700; color:var(--signal); flex:none; }
+.revWhen { color:var(--muted); font-size:13px; flex:none; }
+.revNote { flex:1; }
+.revTot { font-weight:700; }
+.revLines { padding:10px 14px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:5px; font-size:14px; }
+.revLine { display:flex; justify-content:space-between; gap:12px; }
+.revLine .r { font-variant-numeric:tabular-nums; }
+.revConcern { color:var(--muted); font-size:13px; margin-top:6px; white-space:pre-wrap; }
+
 /* service scope chips in the coupon form */
 .svcPick { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 2px; }
 .svcChip { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; font-size:13px; }
