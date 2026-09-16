@@ -310,6 +310,10 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .cpAmt { margin-left:auto; font-weight:700; color:var(--signal); }
 .cpName { font-size:13px; margin-top:2px; }
 
+/* one-click delete of a whole job/package on the ticket */
+.jobDel { margin-left:10px; border:1px solid var(--line); background:#fff; color:var(--warn,#b0341f); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer; vertical-align:middle; }
+.jobDel:hover { border-color:var(--warn,#b0341f); background:#fff5f4; }
+
 /* common-symptom picker */
 .symGroup { margin-bottom:14px; }
 .symCat { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; margin-bottom:7px; }

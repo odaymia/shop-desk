@@ -210,6 +210,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const addLines = (lines) => update((d) => ({ ...d, lines: [...d.lines, ...lines] }));
   const setLine = (id, patch) => update((d) => ({ ...d, lines: d.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
   const removeLine = (id) => update((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== id) }));
+  /* remove every line that belongs to one job/package in a single click */
+  const removeJob = (jobName) => update((d) => ({ ...d, lines: d.lines.filter((l) => (l.job || "") !== jobName) }));
+  const clearLines = () => {
+    if (!o.lines.length) return;
+    if (window.confirm("Remove every line from this ticket? This can't be undone.")) update((d) => ({ ...d, lines: [] }));
+  };
 
   /* When the ticket already has a car with no owner (the plate-first
      flow), the customer becomes that car's owner. Otherwise their cars
@@ -597,6 +603,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                       locked={locked}
                       set={(patch) => setLine(l.id, patch)}
                       remove={() => removeLine(l.id)}
+                      removeJob={removeJob}
                     />
                   ))}
                 </tbody>
@@ -667,6 +674,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   <button className="btn tiny" onClick={() => setPick("checklist")} title="The walk-around checklist, filled from the keyboard">
                     Checklist
                   </button>
+                  {o.lines.length > 0 && (
+                    <button className="btn tiny danger" style={{ marginLeft: "auto" }} onClick={clearLines} title="Remove every line and start over">
+                      Clear all
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1045,7 +1057,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   );
 }
 
-function LineRow({ l, prev, rules, techs, locked, set, remove }) {
+function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
   const showJob = l.job && (!prev || prev.job !== l.job);
   const tag = { part: "Part", labor: "Labor", sublet: "Sublet", fee: "Fee", discount: "Discount", note: "Note" }[l.kind];
   const taxable = lineTaxable(l, rules);
@@ -1053,7 +1065,14 @@ function LineRow({ l, prev, rules, techs, locked, set, remove }) {
     <>
       {showJob && (
         <tr className="jobHead">
-          <td colSpan={8}>{l.job}</td>
+          <td colSpan={8}>
+            {l.job}
+            {!locked && (
+              <button className="jobDel" onClick={() => removeJob(l.job)} title={`Remove the whole ${l.job} in one click`}>
+                ✕ Remove
+              </button>
+            )}
+          </td>
         </tr>
       )}
       <tr>
