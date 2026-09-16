@@ -108,6 +108,26 @@ drop policy if exists "members rw punches" on punches;
 create policy "members rw punches" on punches
   for all using (is_member(shop_id)) with check (is_member(shop_id));
 
+-- Remote signing: when the front desk texts an estimate/invoice to a customer
+-- who left the car, one row holds a snapshot to display and the signature they
+-- send back. Reached only through the "sign" Edge Function (service role) — RLS
+-- is on with no policies, so neither the browser nor an anon visitor can read
+-- the table directly; the random token in the link is the only key.
+create table if not exists sign_requests (
+  token text primary key,
+  shop_id uuid not null references shops(id) on delete cascade,
+  order_id text not null,
+  slot text not null,                       -- 'authorization' | 'delivery'
+  payload jsonb not null,                   -- what the customer sees (lines, totals, statement)
+  status text not null default 'pending',   -- 'pending' | 'signed'
+  signature jsonb,                          -- { img, name, at } sent back by the customer
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '7 days')
+);
+create index if not exists sign_requests_shop on sign_requests (shop_id, created_at);
+alter table sign_requests enable row level security;
+-- (intentionally no policies: only the Edge Function's service role touches this)
+
 -- Punch photos and signatures live in Storage, under <shop_id>/...
 insert into storage.buckets (id, name, public)
   values ('media', 'media', false)

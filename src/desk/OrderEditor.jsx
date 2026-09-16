@@ -313,6 +313,64 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               <button className="btn" onClick={async () => (await flushNow(), setSigning(true))}>
                 Get signature
               </button>
+              {customer && (
+                <button
+                  className="btn"
+                  title="Text the customer a link to review and sign — for when they left the car"
+                  onClick={async () => {
+                    const phone = String((customer && customer.phone) || "").replace(/\D/g, "");
+                    if (phone.length < 10) return flash("Add a cell number to the customer first.", "out");
+                    await flushNow();
+                    const isInvoice = o.status === STATUS.invoiced || o.status === STATUS.void;
+                    const slot = isInvoice ? "delivery" : "authorization";
+                    const payload = {
+                      kind: isInvoice ? "invoice" : "estimate",
+                      number: o.number,
+                      dateText: fmtDate(o.invoicedAt || o.createdAt),
+                      shopName: cfg.shopName,
+                      shopAddress: cfg.shopAddress,
+                      shopPhone: cfg.shopPhone,
+                      customerName: customerName(customer),
+                      customerPhone: fmtPhone(customer.phone),
+                      vehicleName: vehicleName(vehicle),
+                      vehicleSub: vehicle ? [vehicle.engine, vehicle.plate].filter(Boolean).join(" · ") : "",
+                      concern: o.concern || "",
+                      lines: (o.lines || [])
+                        .filter((l) => l.kind !== "note" || l.description)
+                        .map((l) => ({
+                          label: (l.job && l.job !== l.description ? l.job + ": " : "") + (l.description || l.job || l.kind),
+                          sub: l.kind === "labor" ? `${l.hours || 0} hr` : l.kind === "part" && Number(l.qty) > 1 ? `× ${l.qty}` : "",
+                          amount: lineAmount(l),
+                          discount: l.kind === "discount",
+                        })),
+                      subtotal: t.subtotal,
+                      taxLabel: `Sales tax${t.taxRate ? ` (${t.taxRate}%)` : ""}`,
+                      tax: t.tax,
+                      total: t.total,
+                      balance: isInvoice && owesBalance(o, t) ? t.balance : 0,
+                      statement: isInvoice ? cfg.invoiceFooter || "" : cfg.authorizationText || "",
+                      heading: isInvoice ? "Please review and sign for your vehicle" : "Please review and approve this estimate",
+                    };
+                    try {
+                      const res = await cloud.invoke("sign", { action: "create", orderId: o.id, slot, phone: customer.phone, payload });
+                      if (res && res.sent) flash("Texted to the customer to sign.");
+                      else if (res && res.link) {
+                        try {
+                          await navigator.clipboard.writeText(res.link);
+                        } catch {
+                          /* clipboard blocked */
+                        }
+                        flash("Texting isn't set up yet — link copied, paste it to the customer.", "out");
+                      } else flash("Couldn't send.", "out");
+                    } catch (e) {
+                      console.error("text to sign failed", e);
+                      flash("Couldn't send — the shop must be online and set up for texting.", "out");
+                    }
+                  }}
+                >
+                  Text to sign
+                </button>
+              )}
               <button
                 className="btn"
                 onClick={async () => {
