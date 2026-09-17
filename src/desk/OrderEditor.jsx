@@ -268,12 +268,14 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       draftRef.current = saved;
       setDraft(saved);
       /* run the service checklist when an oil change ticket moves to a
-         repair order or gets posted, if one hasn't been done yet */
+         repair order or gets posted, if one hasn't been done yet — but not
+         when reopening a posted invoice to fix it (that's a correction) */
+      const reopening = latest.status === STATUS.invoiced && to === STATUS.open;
       const oilOnTicket = hasOilChange(saved);
       const needsChecklist =
-        oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false && (to === STATUS.open || to === STATUS.invoiced);
+        !reopening && oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false && (to === STATUS.open || to === STATUS.invoiced);
       /* the reminder sticker pops on both a repair order and a post */
-      const stickerNow = (to === STATUS.open || to === STATUS.invoiced) && oilOnTicket && cfg.oilSticker !== false;
+      const stickerNow = !reopening && (to === STATUS.open || to === STATUS.invoiced) && oilOnTicket && cfg.oilSticker !== false;
       if (needsChecklist) {
         setPick("checklist");
         /* the sticker also pops here — hold it until the checklist is
@@ -284,7 +286,15 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         if (stickerNow) setSticker({ id: saved.id });
       }
       flash(
-        to === STATUS.invoiced ? `Invoice #${saved.number} posted` : to === STATUS.open ? `RO #${saved.number} approved` : to === STATUS.void ? `Invoice #${saved.number} voided` : `Back to estimate`,
+        to === STATUS.invoiced
+          ? `Invoice #${saved.number} posted`
+          : to === STATUS.open
+          ? reopening
+            ? `Invoice #${saved.number} reopened to a repair order`
+            : `RO #${saved.number} approved`
+          : to === STATUS.void
+          ? `Invoice #${saved.number} voided`
+          : `Back to estimate`,
         to === STATUS.void ? "out" : "in"
       );
     } catch (e) {
@@ -471,6 +481,16 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             </button>
           )}
           {o.status === STATUS.invoiced && (
+            <button className="btn" onClick={() => setPick("coupon")} title="Apply a coupon the customer showed at the counter">
+              Add coupon
+            </button>
+          )}
+          {o.status === STATUS.invoiced && (
+            <button className="btn ghost" onClick={() => setPick("confirmReopen")} title="Reopen this invoice to a repair order to fix it, then post again">
+              Back to repair order
+            </button>
+          )}
+          {o.status === STATUS.invoiced && (
             <button className="btn danger" onClick={() => setPick("confirmVoid")}>
               Void
             </button>
@@ -491,7 +511,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 ? `This ticket was deleted ${fmtDateTime(o.deletedAt)}.`
                 : o.status === STATUS.void
                 ? `This invoice was voided ${fmtDateTime(o.voidedAt)}. It stays on file; nothing on it can change.`
-                : `Posted ${fmtDateTime(o.invoicedAt)}. Lines and totals are locked. To fix a mistake, void it and write a new ticket — the customer's paperwork has this number on it.`}
+                : `Posted ${fmtDateTime(o.invoicedAt)}. Lines are locked, but you can still add a coupon. To change anything else, use Back to repair order, fix it, and post again — the number stays the same.`}
             </div>
           )}
 
@@ -1115,6 +1135,23 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           </div>
         </Modal>
       )}
+      {pick === "confirmReopen" && (
+        <Modal title={`Reopen invoice #${o.number}?`} onClose={() => setPick(null)}>
+          <p className="muted" style={{ lineHeight: 1.5 }}>
+            This goes back to a repair order so you can change it — add a coupon, fix a line — then post it again. Parts go
+            back into inventory until you re-post, and the number stays the same.
+            {t.paid > 0 ? " Payments already taken stay on the ticket." : ""}
+          </p>
+          <div className="rowBtns" style={{ marginTop: 10 }}>
+            <button className="btn primary lg" onClick={() => moveTo(STATUS.open)}>
+              Back to repair order
+            </button>
+            <button className="btn lg" onClick={() => setPick(null)}>
+              Cancel
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -1216,7 +1253,7 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
           </>
         )}
         <td>
-          {!locked && (
+          {(!locked || l.kind === "discount") && (
             <button className="lineX" onClick={remove} aria-label="Remove line">
               ✕
             </button>

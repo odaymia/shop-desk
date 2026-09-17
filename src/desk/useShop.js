@@ -292,7 +292,19 @@ export function useShop(cfg) {
       if (!canTransition(order.status, to)) throw new Error(`Can't move a ${order.status} ticket to ${to}`);
       const now = Date.now();
       let next = { ...order, status: to, history: [...(order.history || []), { at: now, what: to }] };
-      if (to === STATUS.open && !order.approvedAt) next.approvedAt = now;
+      if (to === STATUS.open) {
+        if (!order.approvedAt) next.approvedAt = now;
+        /* reopening a posted invoice: undo the post so re-posting is clean
+           — put the stock back and let it price live again while edited */
+        if (order.status === STATUS.invoiced) {
+          if (order.stockApplied) {
+            await moveStock(next, -1);
+            next.stockApplied = false;
+          }
+          next.invoicedAt = null;
+          next.rules = null;
+        }
+      }
       if (to === STATUS.invoiced) {
         next.invoicedAt = now;
         next.rules = snapshotRules(cfg, customer);

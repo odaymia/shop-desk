@@ -103,7 +103,7 @@ test("stock moves group by part and skip hand-typed parts", () => {
 test("status transitions", () => {
   assert.equal(canTransition("estimate", "open"), true);
   assert.equal(canTransition("open", "invoiced"), true);
-  assert.equal(canTransition("invoiced", "open"), false);
+  assert.equal(canTransition("invoiced", "open"), true); // reopen a posted invoice to fix it
   assert.equal(canTransition("invoiced", "void"), true);
   assert.equal(canTransition("void", "invoiced"), false);
   assert.equal(canTransition("estimate", "deleted"), true);

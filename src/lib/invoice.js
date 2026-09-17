@@ -172,6 +172,7 @@ export function canTransition(from, to) {
     (from === "open" && to === "estimate") ||
     ((from === "estimate" || from === "open") && to === "invoiced") ||
     ((from === "estimate" || from === "open") && to === "deleted") ||
+    (from === "invoiced" && to === "open") || // reopen a posted invoice to fix it
     (from === "invoiced" && to === "void") ||
     (from === "void" && to === "deleted")
   );
