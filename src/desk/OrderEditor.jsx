@@ -53,6 +53,9 @@ const MENU_PART_CATS = {
   "engine air filter": "Engine Air Filters",
   "cabin air filters": "Cabin Air Filters",
   "cabin air filter": "Cabin Air Filters",
+  wipers: "Wipers",
+  wiper: "Wipers",
+  "wiper blades": "Wipers",
 };
 function menuPartCat(m) {
   if (m.partCat) return m.partCat;

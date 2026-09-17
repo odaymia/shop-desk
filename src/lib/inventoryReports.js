@@ -15,6 +15,7 @@ export function itemCategory(item) {
   if (/cabin/.test(text)) return "Cabin Air Filters";
   if (/oil ?filter/.test(text)) return "Oil Filters";
   if (/air ?filter|air element|engine air/.test(text)) return "Engine Air Filters";
+  if (/wiper/.test(text)) return "Wipers";
   /* brake pads number like SC…, rotors end in RGS (the shop's numbering) */
   if (num.length >= 4 && num.startsWith("SC")) return "Brake Pads";
   if (num.endsWith("RGS")) return "Brake Rotors";
