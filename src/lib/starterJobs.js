@@ -41,6 +41,20 @@ export const STARTER_JOBS = [
       { kind: "labor", description: "Replace rear brake pads", hours: 1, rate: 170 },
     ],
   },
+  {
+    /* priced per blade — the picker asks for 1 or a pair, and the blade and
+       install both multiply. The blade's price is typed or comes from
+       inventory; set your own numbers under Canned jobs. */
+    starterKey: "wiper-blades",
+    name: "Wiper blade replacement",
+    category: "Wipers",
+    unit: "blade",
+    defaultCount: 2,
+    lines: [
+      { kind: "part", description: "Wiper blade", number: "", partId: null, qty: 1, price: null, cost: null, condition: "new", perUnit: true },
+      { kind: "labor", description: "Install wiper blade", hours: 1, rate: 5, perUnit: true },
+    ],
+  },
   /* The rest of the service menu. Labor is at the shop's rate (rate null)
      and the part's price is typed on the ticket or comes from inventory
      (price null) until the shop sets its own numbers under Canned jobs. */

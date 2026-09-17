@@ -175,7 +175,7 @@ export function JobPicker({ shop, cfg, onPick, onClose, lastTireSize, category }
         {rows.map((j) => {
           const price = orderTotals({ lines: jobLines(j, cfg, shop.parts, uid), noSupplies: true }, cfg).subtotal;
           return (
-            <li key={j.id} onClick={() => (j.unit ? (setAsking(j), setCount(4)) : onPick(j, 1))}>
+            <li key={j.id} onClick={() => (j.unit ? (setAsking(j), setCount(Math.max(1, Number(j.defaultCount) || 4))) : onPick(j, 1))}>
               <div className="main">
                 <strong>{j.name}</strong>
                 <span>

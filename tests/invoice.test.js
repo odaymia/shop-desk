@@ -181,6 +181,24 @@ test("tire job: 4 tires multiplies the tire, the $25 labor, and the $1.75 fee", 
   assert.equal(laborQtyText({ hours: 1.5 }), "1.5 hr");
 });
 
+test("wiper job: priced per blade — a pair doubles the blade and install, one is single", async () => {
+  const { STARTER_JOBS } = await import("../src/lib/starterJobs.js");
+  const wipers = STARTER_JOBS.find((j) => j.starterKey === "wiper-blades");
+  assert.equal(wipers.unit, "blade");
+  assert.equal(wipers.defaultCount, 2);
+  const pair = jobLines(wipers, { laborRate: 150 }, {}, () => "x", 2);
+  const blade = pair.find((l) => l.kind === "part");
+  const labor = pair.find((l) => l.kind === "labor");
+  assert.equal(blade.qty, 2); // a pair
+  assert.equal(labor.hours, 2);
+  assert.equal(labor.rate, 5);
+  assert.equal(labor.unit, "blade");
+  assert.equal(laborQtyText(labor), "2 blades");
+  const single = jobLines(wipers, {}, {}, () => "x", 1);
+  assert.equal(single.find((l) => l.kind === "part").qty, 1);
+  assert.equal(laborQtyText(single.find((l) => l.kind === "labor")), "1 blade");
+});
+
 test("a job with no unit ignores the count", () => {
   const job = { name: "Fixed", lines: [{ kind: "labor", hours: 1, rate: 100 }] };
   assert.equal(jobLines(job, cfg, {}, () => "x", 4)[0].hours, 1);

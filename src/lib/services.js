@@ -8,6 +8,7 @@ export const DEFAULT_SERVICE_MENU = [
   { id: "tires", name: "Tires", color: "red", category: "Tires" },
   { id: "air", name: "Air filters", color: "green", category: "Air filters" },
   { id: "cabin", name: "Cabin air filters", color: "green", category: "Cabin air filters" },
+  { id: "wipers", name: "Wipers", color: "green", category: "Wipers" },
   { id: "trans", name: "Transmission", color: "green", category: "Transmission services" },
   { id: "radiator", name: "Radiator", color: "green", category: "Radiator services" },
   { id: "brakeFluid", name: "Brake fluid", color: "green", category: "Brake fluid services" },
