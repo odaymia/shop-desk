@@ -1,6 +1,43 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planMerge, remap, mergeCustomer, mergeVehicle } from "../src/lib/importMerge.js";
+import { planMerge, remap, mergeCustomer, mergeVehicle, isSymbolPlaceholder, planUnlinkPlaceholders } from "../src/lib/importMerge.js";
+
+test("isSymbolPlaceholder: symbol/blank names with no phone or email; letters or contact make it safe", () => {
+  assert.equal(isSymbolPlaceholder({ first: ".", last: "" }), true);
+  assert.equal(isSymbolPlaceholder({ first: ",", last: "'" }), true);
+  assert.equal(isSymbolPlaceholder({ first: "", last: "" }), true);
+  assert.equal(isSymbolPlaceholder({ first: "Al", last: "" }), false); // has letters
+  assert.equal(isSymbolPlaceholder({ company: "Acme" }), false); // company name
+  assert.equal(isSymbolPlaceholder({ first: ".", phone: "619-555-0142" }), false); // phone identifies them
+  assert.equal(isSymbolPlaceholder({ first: ".", email: "a@b.com" }), false); // email identifies them
+});
+
+test("planUnlinkPlaceholders un-links only symbol customers that own more than one car", () => {
+  const customers = {
+    dot: { id: "dot", first: ",", last: "", active: true }, // symbol, 3 cars -> target
+    solo: { id: "solo", first: ".", last: "", active: true }, // symbol, 1 car -> left alone
+    real: { id: "real", first: "Maria", last: "Alvarez", active: true }, // named -> left alone
+    fleet: { id: "fleet", first: "", last: "", phone: "6195551234", active: true }, // phone id -> left alone
+  };
+  const vehicles = {
+    v1: { id: "v1", customerId: "dot", active: true },
+    v2: { id: "v2", customerId: "dot", active: true },
+    v3: { id: "v3", customerId: "dot", active: true },
+    v4: { id: "v4", customerId: "solo", active: true },
+    v5: { id: "v5", customerId: "real", active: true },
+    v6: { id: "v6", customerId: "fleet", active: true },
+    v7: { id: "v7", customerId: "fleet", active: true },
+  };
+  const orders = { o1: { id: "o1", customerId: "dot", vehicleId: "v1" }, o2: { id: "o2", customerId: "real", vehicleId: "v5" } };
+  const plan = planUnlinkPlaceholders({ customers, vehicles, orders });
+  assert.deepEqual(plan.customers.map((c) => c.id), ["dot"]);
+  assert.equal(plan.customers[0].active, false); // retired
+  assert.deepEqual(plan.vehicles.map((v) => v.id).sort(), ["v1", "v2", "v3"]);
+  assert.ok(plan.vehicles.every((v) => v.customerId === null));
+  assert.deepEqual(plan.orders.map((o) => o.id), ["o1"]);
+  assert.equal(plan.orders[0].customerId, null);
+  assert.deepEqual(plan.counts, { customers: 1, vehicles: 3, orders: 1 });
+});
 
 const existing = {
   customers: { m1c1: { id: "m1c1", first: "Maria", last: "Lopez", phone: "6195550142", email: "" } },

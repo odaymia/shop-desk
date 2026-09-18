@@ -122,3 +122,33 @@ export function mergeVehicle(existing, incoming) {
   if (Number(incoming.mileage) > Number(out.mileage || 0)) out.mileage = incoming.mileage;
   return out;
 }
+
+/* A customer whose only "name" is punctuation (".", ",", "'", "-", …) with
+   no letters, and no phone or email to identify them — a placeholder a
+   counter typed to satisfy a system that demanded a name. */
+const hasLetters = (s) => /[A-Za-z]/.test(String(s || ""));
+export function isSymbolPlaceholder(c) {
+  if (!c) return false;
+  const named = hasLetters(c.first) || hasLetters(c.last) || hasLetters(c.company);
+  const phone = digits(c.phone).length === 10 || digits(c.phone2).length === 10;
+  const email = String(c.email || "").trim() !== "";
+  return !named && !phone && !email;
+}
+
+/* Clean up placeholder-named customers that ended up owning many unrelated
+   cars because the old key collapsed every symbol name onto one account.
+   For each such customer that owns more than one car, un-links the cars and
+   their orders (back to walk-in) and retires the empty customer. Returns
+   the records to write plus counts — pure, so the caller previews first. */
+export function planUnlinkPlaceholders({ customers, vehicles, orders }) {
+  const vehs = Object.values(vehicles || {});
+  const ords = Object.values(orders || {});
+  const carsByOwner = {};
+  for (const v of vehs) if (v.customerId && v.active !== false) (carsByOwner[v.customerId] ||= []).push(v);
+  const targets = Object.values(customers || {}).filter((c) => c && c.active !== false && isSymbolPlaceholder(c) && (carsByOwner[c.id] || []).length > 1);
+  const ids = new Set(targets.map((c) => c.id));
+  const vehiclesOut = vehs.filter((v) => ids.has(v.customerId)).map((v) => ({ ...v, customerId: null }));
+  const ordersOut = ords.filter((o) => ids.has(o.customerId)).map((o) => ({ ...o, customerId: null }));
+  const customersOut = targets.map((c) => ({ ...c, active: false }));
+  return { customers: customersOut, vehicles: vehiclesOut, orders: ordersOut, counts: { customers: customersOut.length, vehicles: vehiclesOut.length, orders: ordersOut.length } };
+}

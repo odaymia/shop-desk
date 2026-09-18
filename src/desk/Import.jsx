@@ -13,7 +13,7 @@ import {
 import { uid } from "../lib/ids.js";
 import { sGet, sSet } from "../storage/index.js";
 import { specStoreKey } from "../lib/keys.js";
-import { planMerge, remap, mergeCustomer, mergeVehicle } from "../lib/importMerge.js";
+import { planMerge, remap, mergeCustomer, mergeVehicle, planUnlinkPlaceholders } from "../lib/importMerge.js";
 import { specKey } from "../lib/specs.js";
 
 /* Load an import bundle (tools/m1import/export_m1.py makes one from a
@@ -36,7 +36,25 @@ export function ImportPanel({ roster, saveRoster, flash, shop }) {
   const [err, setErr] = useState("");
   const [progress, setProgress] = useState(null); // { done, total, label }
   const [finished, setFinished] = useState(false);
+  const [cleanup, setCleanup] = useState(null); // preview of the placeholder-customer un-link
+  const [cleaning, setCleaning] = useState(false);
   const fileRef = useRef(null);
+
+  const findPlaceholders = () => setCleanup(planUnlinkPlaceholders({ customers: shop.customers, vehicles: shop.vehicles, orders: shop.orders }));
+  const runCleanup = async () => {
+    if (!cleanup || cleaning) return;
+    setCleaning(true);
+    try {
+      if (cleanup.vehicles.length) await shop.saveVehiclesBulk(cleanup.vehicles);
+      if (cleanup.orders.length) await shop.saveOrdersBulk(cleanup.orders);
+      if (cleanup.customers.length) await shop.saveCustomersBulk(cleanup.customers);
+      flash(`Un-linked ${cleanup.counts.vehicles} cars from ${cleanup.counts.customers} placeholder customer${cleanup.counts.customers === 1 ? "" : "s"}`);
+      setCleanup(null);
+    } catch (e) {
+      flash(e.message || "Cleanup failed", "out");
+    }
+    setCleaning(false);
+  };
 
   const pick = async (file) => {
     setErr("");
@@ -200,6 +218,45 @@ export function ImportPanel({ roster, saveRoster, flash, shop }) {
             <p className="legalNote">Leave this window open until it finishes.</p>
           )}
         </Modal>
+      )}
+
+      <h3 className="subhead" style={{ marginTop: 40 }}>
+        Clean up placeholder-named customers
+      </h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        On the old system a name was required, so counters typed a symbol like “.”, “,” or “'”. Those collapsed into one
+        account that ended up owning many unrelated cars. This un-links them: each car and its ticket history become a
+        walk-in again, and the empty customer is retired. Customers with a real name, a phone, or an email are never
+        touched.
+      </p>
+      <div className="rowBtns" style={{ marginBottom: 12 }}>
+        <button className="btn" onClick={findPlaceholders}>
+          Find placeholder customers
+        </button>
+      </div>
+      {cleanup && (
+        <div className="card" style={{ maxWidth: 560 }}>
+          {cleanup.counts.customers === 0 ? (
+            <p style={{ margin: 0 }}>None found — nothing to clean up.</p>
+          ) : (
+            <>
+              <p style={{ marginTop: 0, lineHeight: 1.5 }}>
+                <strong>{cleanup.counts.customers.toLocaleString()}</strong> placeholder customer
+                {cleanup.counts.customers === 1 ? "" : "s"} own <strong>{cleanup.counts.vehicles.toLocaleString()}</strong> cars
+                across <strong>{cleanup.counts.orders.toLocaleString()}</strong> tickets. Un-link them so each car is its own
+                walk-in?
+              </p>
+              <div className="rowBtns">
+                <button className="btn primary" onClick={runCleanup} disabled={cleaning}>
+                  {cleaning ? "Working…" : "Un-link them"}
+                </button>
+                <button className="btn ghost" onClick={() => setCleanup(null)} disabled={cleaning}>
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </>
   );

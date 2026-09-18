@@ -69,7 +69,11 @@ def main(folder, out):
                 # owner → customer (walk-ins get a placeholder keyed to the car)
                 o = inv.find(".//owner")
                 first, last = title(txt(o, "name/first")), title(txt(o, "name/last"))
-                if first in (".", "") and last in (".", ""): first, last = "", ""
+                # a name with no letters (".", ",", "'", "-", …) is a placeholder the
+                # counter typed because the old system demanded one — treat it as blank so
+                # unrelated cars aren't keyed to one shared "name"
+                if not re.search(r"[A-Za-z]", first): first = ""
+                if not re.search(r"[A-Za-z]", last): last = ""
                 phones = []
                 for k in ("cell", "home", "work"):
                     d = re.sub(r"\D", "", txt(o, f"phone_numbers/phone_number_{k}/area_code_{k}") + txt(o, f"phone_numbers/phone_number_{k}/phone_{k}"))

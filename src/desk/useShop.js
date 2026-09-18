@@ -220,6 +220,9 @@ export function useShop(cfg) {
   }, [put, publishCustomer]);
   const savePart = useCallback((p) => put("parts", partKey, p), [put]);
   const savePartsBulk = useCallback((list) => putMany("parts", partKey, list), [putMany]);
+  const saveCustomersBulk = useCallback((list) => putMany("customers", customerKey, list), [putMany]);
+  const saveVehiclesBulk = useCallback((list) => putMany("vehicles", vehicleKey, list), [putMany]);
+  const saveOrdersBulk = useCallback((list) => putMany("orders", orderKey, list), [putMany]);
   const saveVendor = useCallback((v) => put("vendors", vendorKey, v), [put]);
   const saveJob = useCallback(async (j) => {
     const saved = await put("jobs", jobKey, j);
@@ -351,6 +354,9 @@ export function useShop(cfg) {
     saveVehicle,
     savePart,
     savePartsBulk,
+    saveCustomersBulk,
+    saveVehiclesBulk,
+    saveOrdersBulk,
     saveVendor,
     saveJob,
     saveCoupon,
