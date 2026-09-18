@@ -1,6 +1,44 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { commissionForOrder, splitCommission, orderCrew, commissionByEmployee } from "../src/lib/commission.js";
+import { commissionForOrder, splitCommission, orderCrew, commissionByEmployee, serviceCommission, orderPayout } from "../src/lib/commission.js";
+
+test("serviceCommission: per-role object with fixed amounts and percents", () => {
+  const comm = { advisor: { mode: "amt", value: 10 }, top: { mode: "pct", value: 5 }, pit: { mode: "amt", value: 4 } };
+  const c = serviceCommission(comm, 200, { advisor: 40, top: 30, pit: 30 });
+  assert.equal(c.advisor, 10); // fixed $10
+  assert.equal(c.top, 10); // 5% of $200
+  assert.equal(c.pit, 4); // fixed $4
+  assert.equal(c.total, 24);
+});
+
+test("serviceCommission: a legacy flat number splits by the global split", () => {
+  const c = serviceCommission(12, 100, { advisor: 50, top: 25, pit: 25 });
+  assert.equal(c.total, 12);
+  assert.equal(c.advisor, 6);
+  assert.equal(c.top, 3);
+  assert.equal(c.pit, 3);
+});
+
+test("commissionForOrder aggregates per-role commissions across services", () => {
+  const jobsPP = {
+    t: { id: "t", name: "Transmission flush", commission: { advisor: { mode: "amt", value: 10 }, top: { mode: "amt", value: 5 }, pit: { mode: "amt", value: 5 } } },
+    a: { id: "a", name: "Air filter", commission: { advisor: { mode: "pct", value: 10 }, top: { mode: "amt", value: 2 } } },
+  };
+  const order = {
+    lines: [
+      { kind: "labor", job: "Transmission flush", hours: 1, rate: 150 },
+      { kind: "part", job: "Air filter", qty: 1, price: 30 }, // $30 revenue -> advisor 10% = $3
+    ],
+  };
+  const { total, advisor, top, pit } = commissionForOrder(order, jobsPP, []);
+  assert.equal(advisor, 13); // 10 + 3
+  assert.equal(top, 7); // 5 + 2
+  assert.equal(pit, 5); // 5 + 0
+  assert.equal(total, 25);
+  const pay = orderPayout({ ...order, advisorId: "x" }, jobsPP, []);
+  assert.equal(pay.advisor, 13);
+  assert.equal(pay.crew.advisorId, "x");
+});
 
 const packages = [
   { id: "syn", name: "Valvoline Full Synthetic Oil Change", commission: 0 },

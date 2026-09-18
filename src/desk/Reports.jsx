@@ -497,7 +497,7 @@ function CommissionReport({ data, shop, cfg, techName, nav }) {
               </tr>
             )}
             {tickets.map((o) => {
-              const { items } = commissionForOrder(o, shop.jobs, cfg.oilPackages);
+              const { items } = commissionForOrder(o, shop.jobs, cfg.oilPackages, split);
               const pay = orderPayout(o, shop.jobs, cfg.oilPackages, split);
               return (
                 <tr key={o.id} className="row" onClick={() => nav.openOrder(o.id)}>
