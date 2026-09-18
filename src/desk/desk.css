@@ -191,6 +191,20 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .baySvc .bayLabel { color:#cbd5e1; }
 .baySvc ul { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
 .baySvc li { font-size:26px; font-weight:700; color:#e2e8f0; }
+/* several bays side by side on one screen */
+.bayGrid { flex:1; display:grid; gap:16px; padding:16px; align-content:start; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); overflow:auto; }
+.bayPanel.compact { background:#111c33; border:1px solid #1f2937; border-radius:16px; padding:16px 18px; display:flex; flex-direction:column; min-height:220px; }
+.bayPanelName { font-size:20px; font-weight:800; letter-spacing:.04em; color:#93c5fd; text-transform:uppercase; margin-bottom:12px; }
+.bayPanel.compact .bayCar { flex:1; padding:0; gap:14px; }
+.bayPanel.compact .bayVeh { font-size:22px; }
+.bayPanel.compact .bayOil { padding:14px 16px; }
+.bayPanel.compact .bayBig { font-size:clamp(28px, 4vw, 54px); }
+.bayPanel.compact .bayOilStats { gap:10px 28px; margin-top:12px; }
+.bayPanel.compact .bayStat b { font-size:clamp(24px, 3.4vw, 38px); }
+.bayPanel.compact .bayLabel { font-size:14px; }
+.bayPanel.compact .baySvc li { font-size:19px; }
+.bayPanel.compact .bayIdle { min-height:0; padding:24px 8px; }
+.bayPanel.compact .bayIdle p { font-size:20px; }
 .miniLine { display:grid; grid-template-columns:100px 1fr 80px 100px 36px; gap:8px; align-items:center; }
 .miniLine.unit { grid-template-columns:100px 1fr 80px 100px 84px 36px; }
 .miniLine .perUnit { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); white-space:nowrap; }

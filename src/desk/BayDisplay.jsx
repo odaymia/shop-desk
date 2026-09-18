@@ -5,21 +5,31 @@ import { bayCard } from "../lib/bay.js";
 import { vehicleName } from "./useShop.js";
 import defaultLogo from "../assets/genie-logo.png";
 
-/* The shop-floor bay screen. A tablet by the bays runs this, picks which bay
-   it is (remembered on the device), and shows — in big letters — the work on
-   whatever car the front desk sent to that bay. */
-const LS_KEY = "sd.bayDisplayId";
-const readBay = () => {
+/* The shop-floor bay screen. A tablet by the bays runs this and shows — in
+   big letters — the work on whatever car the front desk sent. One screen can
+   watch a single bay full-size, or several bays side by side (say a big TV
+   over the shop floor). The choice is remembered on the device. */
+const LS_KEY = "sd.bayDisplayIds"; // JSON array of bay ids
+const OLD_KEY = "sd.bayDisplayId"; // the earlier single-bay key, migrated in
+
+const readBays = () => {
   try {
-    return localStorage.getItem(LS_KEY) || "";
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr.filter(Boolean);
+    }
+    const old = localStorage.getItem(OLD_KEY);
+    return old ? [old] : [];
   } catch {
-    return "";
+    return [];
   }
 };
-const writeBay = (id) => {
+const writeBays = (ids) => {
   try {
-    if (id) localStorage.setItem(LS_KEY, id);
+    if (ids && ids.length) localStorage.setItem(LS_KEY, JSON.stringify(ids));
     else localStorage.removeItem(LS_KEY);
+    localStorage.removeItem(OLD_KEY);
   } catch {
     /* private window / blocked storage — the choice just won't persist */
   }
@@ -27,24 +37,41 @@ const writeBay = (id) => {
 
 export function BayDisplay({ shop, cfg }) {
   const bays = cfg.bays || [];
-  const [bayId, setBayId] = useState(readBay);
-  const bay = bays.find((b) => b.id === bayId);
-  const curBayId = bay ? bay.id : null;
-  const [reqId, setReqId] = useState(null);
+  const [chosenIds, setChosenIds] = useState(readBays);
+  /* keep the order the bays are listed in settings, and drop any that were
+     removed there since this device last chose */
+  const chosen = bays.filter((b) => chosenIds.includes(b.id)).map((b) => b.id);
+  const [picking, setPicking] = useState(false);
+  const [temp, setTemp] = useState([]);
+  const [reqIds, setReqIds] = useState({}); // bayId -> orderId on that bay
+
+  const watchKey = chosen.join(",");
 
   useEffect(() => {
-    if (!curBayId) return;
-    const key = bayReqKey(curBayId);
-    const load = () => sGet(key, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
+    const ids = watchKey ? watchKey.split(",") : [];
+    if (!ids.length) return;
+    const mine = {};
+    ids.forEach((id) => (mine[bayReqKey(id)] = true));
+    const load = () =>
+      Promise.all(
+        ids.map((id) => sGet(bayReqKey(id), null).then((r) => [id, r && r.orderId ? r.orderId : null])),
+      ).then((pairs) => setReqIds(Object.fromEntries(pairs)));
     load();
     return cloud.subscribe((e) => {
-      if (e.type === "data" && (e.keys || []).some((k) => k === key)) load();
+      if (e.type === "data" && (e.keys || []).some((k) => mine[k])) load();
     });
-  }, [curBayId]);
+  }, [watchKey]);
 
-  const pick = (id) => {
-    writeBay(id);
-    setBayId(id);
+  const startPick = () => {
+    setTemp(chosen);
+    setPicking(true);
+  };
+  const toggle = (id) => setTemp((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
+  const confirm = () => {
+    const ordered = bays.filter((b) => temp.includes(b.id)).map((b) => b.id);
+    writeBays(ordered);
+    setChosenIds(ordered);
+    setPicking(false);
   };
 
   if (!bays.length)
@@ -57,38 +84,75 @@ export function BayDisplay({ shop, cfg }) {
       </div>
     );
 
-  if (!bay)
+  if (picking || !chosen.length)
     return (
       <div className="deskBody">
         <div className="bayPick">
-          <h1>Which screen is this?</h1>
-          <p className="muted">Pick the bay this tablet sits in. It's remembered on this device.</p>
+          <h1>Which bays should this screen show?</h1>
+          <p className="muted">
+            Pick one for a full-screen bay, or several to watch side by side. Remembered on this device.
+          </p>
           <div className="bayPickGrid">
-            {bays.map((b) => (
-              <button key={b.id} className="btn primary lg" onClick={() => pick(b.id)}>
-                {b.name}
+            {bays.map((b) => {
+              const on = temp.includes(b.id);
+              return (
+                <button key={b.id} className={`btn lg ${on ? "primary" : ""}`} onClick={() => toggle(b.id)}>
+                  {on ? "✓ " : ""}
+                  {b.name}
+                </button>
+              );
+            })}
+          </div>
+          <div className="rowBtns" style={{ marginTop: 18 }}>
+            <button className="btn primary" disabled={!temp.length} onClick={confirm}>
+              {temp.length > 1 ? `Show these ${temp.length} bays` : "Show bay"}
+            </button>
+            {!!chosen.length && (
+              <button className="btn" onClick={() => setPicking(false)}>
+                Cancel
               </button>
-            ))}
+            )}
           </div>
         </div>
       </div>
     );
 
-  const order = reqId ? shop.orders[reqId] : null;
+  const chosenBays = bays.filter((b) => chosen.includes(b.id));
+  const multi = chosenBays.length > 1;
+  const orderFor = (b) => (reqIds[b.id] ? shop.orders[reqIds[b.id]] : null);
+
+  return (
+    <div className={`bayScreen ${multi ? "bayMulti" : ""}`}>
+      <div className="bayTop">
+        <span className="bayName">{multi ? `${chosenBays.length} bays` : chosenBays[0].name}</span>
+        <button className="linkish" onClick={startPick}>
+          Change
+        </button>
+      </div>
+      {multi ? (
+        <div className="bayGrid">
+          {chosenBays.map((b) => (
+            <BayPanel key={b.id} bay={b} shop={shop} order={orderFor(b)} compact />
+          ))}
+        </div>
+      ) : (
+        <BayPanel bay={chosenBays[0]} shop={shop} order={orderFor(chosenBays[0])} cfg={cfg} />
+      )}
+    </div>
+  );
+}
+
+/* One bay's card — full-screen on its own, or a tile in the grid (compact). */
+function BayPanel({ bay, shop, order, compact, cfg }) {
   const card = order ? bayCard(order) : null;
   const veh = order ? shop.vehicles[order.vehicleId] : null;
 
   return (
-    <div className="bayScreen">
-      <div className="bayTop">
-        <span className="bayName">{bay.name}</span>
-        <button className="linkish" onClick={() => pick("")}>
-          Change bay
-        </button>
-      </div>
+    <div className={`bayPanel ${compact ? "compact" : ""}`}>
+      {compact && <div className="bayPanelName">{bay.name}</div>}
       {!order || !card ? (
         <div className="bayIdle">
-          <img src={cfg.logo || defaultLogo} alt="" />
+          {!compact && <img src={(cfg && cfg.logo) || defaultLogo} alt="" />}
           <p>Waiting for the next car…</p>
         </div>
       ) : (
