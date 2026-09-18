@@ -54,12 +54,18 @@ export function matchesAuto(auto, text) {
 
 /* Was this item's part or service sold on the ticket? Each line is
    matched on its own, so "-cabin" on a cabin filter line doesn't hide
-   an engine air filter on another. */
-export function replacedOnTicket(item, lines) {
+   an engine air filter on another. A part line also matches on its
+   inventory category (passed in `parts`), so a blade filed under "Wipers"
+   marks the wipers item even when its description is a brand or part
+   number that doesn't say "wiper". */
+export function replacedOnTicket(item, lines, parts) {
   if (!item || !item.auto) return false;
-  return (lines || []).some(
-    (l) => l && (l.kind === "part" || l.kind === "labor" || l.kind === "sublet") && matchesAuto(item.auto, `${l.description || ""} ${l.job || ""}`)
-  );
+  return (lines || []).some((l) => {
+    if (!l || !(l.kind === "part" || l.kind === "labor" || l.kind === "sublet")) return false;
+    const p = l.partId && parts ? parts[l.partId] : null;
+    const cat = p ? ` ${p.category || ""}` : "";
+    return matchesAuto(item.auto, `${l.description || ""} ${l.job || ""}${cat}`);
+  });
 }
 
 /* Keep an already-filled checklist in step with the ticket as services
@@ -70,7 +76,7 @@ export function replacedOnTicket(item, lines) {
    manual choice on an item the ticket doesn't drive is left untouched.
    Returns the same array when nothing changed, so the caller can skip a
    save. */
-export function syncChecklist(items, lines, cfgItems) {
+export function syncChecklist(items, lines, cfgItems, parts) {
   if (!Array.isArray(items) || !items.length) return items;
   const cfg = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
   const autoOf = (id) => (cfg.find((x) => x.id === id) || {}).auto || "";
@@ -80,7 +86,7 @@ export function syncChecklist(items, lines, cfgItems) {
     if (!it || it.kind !== "choice") return it;
     const words = autoOf(it.id);
     if (!words) return it; // item the ticket can't drive: leave the manual value
-    const onTicket = replacedOnTicket({ auto: words }, lines);
+    const onTicket = replacedOnTicket({ auto: words }, lines, parts);
     if (onTicket) {
       if (it.value === REPLACED && it.auto) return it; // already right
       changed = true;
@@ -120,7 +126,7 @@ export function optionsOf(item, cfgItems) {
 
 /* A fresh checklist for a ticket: defaults, ticket lines marking what
    was replaced, and the car's last values for remembered items. */
-export function startChecklist(cfgItems, lines, prior) {
+export function startChecklist(cfgItems, lines, prior, parts) {
   const src = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
   return src
     .filter((it) => it && it.label && it.active !== false)
@@ -128,7 +134,7 @@ export function startChecklist(cfgItems, lines, prior) {
       /* older configs saved tire pressure as free text; show it as the
          front/rear number pair now */
       const kind = it.id === "tirePsi" && (it.kind || "text") === "text" ? "pressure" : it.kind || "choice";
-      const auto = kind === "choice" && replacedOnTicket(it, lines);
+      const auto = kind === "choice" && replacedOnTicket(it, lines, parts);
       let value = auto ? REPLACED : it.value || "";
       if (!auto && it.remember && prior) {
         const p = prior.find((x) => x.id === it.id);

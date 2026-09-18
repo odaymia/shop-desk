@@ -6,10 +6,10 @@ import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parse
    answer and moves on, Space (or the arrows) picks a different one,
    1–9 jumps straight to a choice, Backspace goes back. Items whose
    part or service is on the ticket start at Replaced. Closing saves. */
-export function ChecklistModal({ cfg, order, prior, onSave, onCancel }) {
+export function ChecklistModal({ cfg, order, prior, parts, onSave, onCancel }) {
   const cfgItems = cfg.checklist && cfg.checklist.length ? cfg.checklist : undefined;
   const [items, setItems] = useState(() =>
-    order.checklist && order.checklist.items && order.checklist.items.length ? order.checklist.items.map((x) => ({ ...x })) : startChecklist(cfgItems, order.lines, prior)
+    order.checklist && order.checklist.items && order.checklist.items.length ? order.checklist.items.map((x) => ({ ...x })) : startChecklist(cfgItems, order.lines, prior, parts)
   );
   const [idx, setIdx] = useState(0);
   const inputRef = useRef(null);

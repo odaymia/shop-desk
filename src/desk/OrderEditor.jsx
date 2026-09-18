@@ -137,7 +137,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
          a service added flips its item to Replaced, a service removed puts
          it back where it was */
       if (next.lines !== cur.lines && next.checklist && next.checklist.items) {
-        const items = syncChecklist(next.checklist.items, next.lines, cfg.checklist);
+        const items = syncChecklist(next.checklist.items, next.lines, cfg.checklist, shop.parts);
         if (items !== next.checklist.items) next = { ...next, checklist: { ...next.checklist, items } };
       }
       draftRef.current = next;
@@ -146,7 +146,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       clearTimeout(timer.current);
       timer.current = setTimeout(flushNow, 600);
     },
-    [flushNow, cfg.checklist]
+    [flushNow, cfg.checklist, shop.parts]
   );
 
   /* A parts cart sent back by a catalog lands as its own record; when
@@ -1078,6 +1078,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <ChecklistModal
           cfg={cfg}
           order={o}
+          parts={shop.parts}
           prior={priorChecklist(shop.orders, o.vehicleId, o.id)}
           onCancel={closeChecklist}
           onSave={(items) => {

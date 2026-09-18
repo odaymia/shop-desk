@@ -140,6 +140,21 @@ test("optionsOf offers Recommend on a serviceable item even when a saved config 
   assert.ok(!optionsOf(oil, [oil]).includes("Recommend"));
 });
 
+test("replacedOnTicket also matches a part by its inventory category, not just its text", () => {
+  const wipers = byId(DEFAULT_CHECKLIST, "wipers");
+  const line = [{ kind: "part", partId: "b1", description: "Bosch ICON 22A", job: "" }];
+  assert.equal(replacedOnTicket(wipers, line), false); // "Bosch ICON 22A" alone doesn't say wiper
+  assert.equal(replacedOnTicket(wipers, line, { b1: { category: "Wipers" } }), true); // filed under Wipers
+});
+
+test("syncChecklist flips wipers to Replaced from a brand-named blade's category", () => {
+  const items = startChecklist(DEFAULT_CHECKLIST, [], null);
+  const lines = [{ kind: "part", partId: "b1", description: "Bosch 22A", job: "" }];
+  const next = syncChecklist(items, lines, DEFAULT_CHECKLIST, { b1: { category: "Wipers" } });
+  assert.equal(byId(next, "wipers").value, "Replaced");
+  assert.equal(byId(next, "wipers").auto, true);
+});
+
 test("recommendedServices lists the items marked Recommend with their label and estimated price", () => {
   const items = startChecklist(DEFAULT_CHECKLIST, [], null).map((it) =>
     it.id === "airFilter" || it.id === "cabinFilter" ? { ...it, value: "Recommend" } : it
