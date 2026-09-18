@@ -119,7 +119,12 @@ export function BayDisplay({ shop, cfg }) {
 
   const chosenBays = bays.filter((b) => chosen.includes(b.id));
   const multi = chosenBays.length > 1;
-  const orderFor = (b) => (reqIds[b.id] ? shop.orders[reqIds[b.id]] : null);
+  /* show the car only while its ticket is live — a deleted or voided ticket
+     leaves the bay, back to "waiting for the next car" */
+  const orderFor = (b) => {
+    const o = reqIds[b.id] ? shop.orders[reqIds[b.id]] : null;
+    return o && o.status !== "deleted" && o.status !== "void" ? o : null;
+  };
 
   return (
     <div className={`bayScreen ${multi ? "bayMulti" : ""}`}>

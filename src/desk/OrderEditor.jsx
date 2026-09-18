@@ -454,6 +454,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                     const bay = (cfg.bays || []).find((b) => b.id === e.target.value);
                     if (!bay) return;
                     await flushNow();
+                    /* a car is in one bay at a time — clear it off any other
+                       bay before parking it on this one */
+                    for (const b of cfg.bays || []) {
+                      if (b.id === bay.id) continue;
+                      const cur = await sGet(bayReqKey(b.id), null);
+                      if (cur && cur.orderId === o.id) await sSet(bayReqKey(b.id), { orderId: null, at: Date.now() });
+                    }
                     await sSet(bayReqKey(bay.id), { orderId: o.id, at: Date.now() });
                     flash(`Sent to ${bay.name}`);
                     e.target.value = "";
