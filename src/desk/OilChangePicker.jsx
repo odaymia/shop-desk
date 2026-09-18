@@ -4,6 +4,51 @@ import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilTy
 import { matchOil, matchFilter } from "../lib/specs.js";
 import { OilSpecLookup } from "./OilSpecLookup.jsx";
 import { uid } from "../lib/ids.js";
+import { searchText } from "./useShop.js";
+
+/* The oil / filter list, with a search box on top: type a part number (or
+   any of its text) and press Enter to pick the top match. Spec matches are
+   listed first. */
+function PickList({ items, suggested, onPick, kind }) {
+  const [q, setQ] = useState("");
+  const base = [...suggested, ...items.filter((i) => !suggested.includes(i))];
+  const list = q ? base.filter((p) => searchText(q, p.number, p.description, p.category)) : base;
+  return (
+    <>
+      <input
+        className="search"
+        style={{ width: "100%", boxSizing: "border-box", margin: "8px 0" }}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Type a part number, then Enter to pick it"
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && list.length) onPick(list[0]);
+        }}
+      />
+      <ul className="pickList">
+        {list.length === 0 && (
+          <li className="emptyNote">{q ? "No match in inventory." : `Nothing in inventory yet that looks like ${kind}. Add it under Inventory, or choose later.`}</li>
+        )}
+        {list.map((p) => (
+          <li key={p.id} className={toNum(p.onHand) <= 0 ? "low" : ""} onClick={() => onPick(p)}>
+            <div className="main">
+              <strong>
+                {p.number ? `${p.number} — ` : ""}
+                {p.description}
+                {suggested.includes(p) ? " · matches the spec" : ""}
+              </strong>
+              <span>{[p.category, p.location].filter(Boolean).join(" · ")}</span>
+            </div>
+            <div className="side">
+              <strong>{toNum(p.onHand)} on hand</strong>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 /* Oil change, three taps: the package, the quarts (from the car's spec
    when known), then which oil and filter off the shelf. Each pick can
@@ -103,30 +148,6 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
         </button>
       </Modal>
     );
-
-  const PickList = ({ items, suggested, onPick, kind }) => {
-    const list = [...suggested, ...items.filter((i) => !suggested.includes(i))];
-    return (
-      <ul className="pickList">
-        {list.length === 0 && <li className="emptyNote">Nothing in inventory yet that looks like {kind}. Add it under Inventory, or choose later.</li>}
-        {list.map((p) => (
-          <li key={p.id} className={toNum(p.onHand) <= 0 ? "low" : ""} onClick={() => onPick(p)}>
-            <div className="main">
-              <strong>
-                {p.number ? `${p.number} — ` : ""}
-                {p.description}
-                {suggested.includes(p) ? " · matches the spec" : ""}
-              </strong>
-              <span>{[p.category, p.location].filter(Boolean).join(" · ")}</span>
-            </div>
-            <div className="side">
-              <strong>{toNum(p.onHand)} on hand</strong>
-            </div>
-          </li>
-        ))}
-      </ul>
-    );
-  };
 
   if (step === "oil")
     return (
