@@ -85,6 +85,9 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
         .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart), commission: commFromForm(p.commission) })),
       checklist: normalizeChecklist(d.checklist),
       serviceMenu: normalizeMenu(d.serviceMenu),
+      bays: (d.bays || [])
+        .filter((b) => String(b.name || "").trim())
+        .map((b, i) => ({ id: b.id || "bay" + (i + 1), name: String(b.name).trim() })),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
       commission: { ...(d.commission || {}), split: { advisor: toNum(split.advisor), top: toNum(split.top), pit: toNum(split.pit) } },
       reminderMonths: Math.max(0, Math.floor(toNum(d.reminderMonths)) || 3),
@@ -466,6 +469,30 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <Field label="Invoice footer (warranty, thank-you)">
             <textarea className="ta" value={d.invoiceFooter} onChange={(e) => set("invoiceFooter")(e.target.value)} />
           </Field>
+
+          <h3 className="subhead" style={{ marginTop: 36 }}>
+            Work areas
+          </h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Name your bays or work areas (Bay 1, Bay 2, Alignment…). A ticket can be sent to a bay with the “Send to
+            bay” button, and a tablet by the bays — opened to the <strong>Bay display</strong> page — shows the tech
+            what's being done on that car.
+          </p>
+          <div className="miniLines">
+            {(d.bays || []).map((b, i) => (
+              <div key={b.id || i} className="miniLine" style={{ gridTemplateColumns: "1fr 36px" }}>
+                <input value={b.name || ""} onChange={(e) => set("bays")((d.bays || []).map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="Bay 1" />
+                <button className="lineX" onClick={() => set("bays")((d.bays || []).filter((_, k) => k !== i))} aria-label="Remove">
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="addBar">
+            <button className="btn tiny" onClick={() => set("bays")([...(d.bays || []), { id: "bay" + Date.now().toString(36), name: "" }])}>
+              + Work area
+            </button>
+          </div>
           </>
           )}
           {show("pricing") && (

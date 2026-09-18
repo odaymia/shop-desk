@@ -37,7 +37,7 @@ import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
-import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY } from "../lib/keys.js";
+import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, bayReqKey } from "../lib/keys.js";
 import { OrderSign } from "./Signing.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
@@ -445,6 +445,28 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               >
                 Send to pad
               </button>
+              {(cfg.bays || []).length > 0 && (
+                <select
+                  className="btn"
+                  value=""
+                  title="Show this car's work on a bay display"
+                  onChange={async (e) => {
+                    const bay = (cfg.bays || []).find((b) => b.id === e.target.value);
+                    if (!bay) return;
+                    await flushNow();
+                    await sSet(bayReqKey(bay.id), { orderId: o.id, at: Date.now() });
+                    flash(`Sent to ${bay.name}`);
+                    e.target.value = "";
+                  }}
+                >
+                  <option value="">Send to bay…</option>
+                  {(cfg.bays || []).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               {customer && (
                 <button
                   className="btn"
