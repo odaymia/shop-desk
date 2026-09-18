@@ -153,6 +153,12 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .fld.inline { flex-direction:row; align-items:center; gap:10px; }
 .fld.inline > span { color:var(--ink); }
 .subhead { margin:18px 0 10px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.subhead:first-child { margin-top:0; }
+/* settings section tabs */
+.settingsNav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; border-bottom:1px solid var(--line); padding-bottom:12px; }
+.settingsNav button { appearance:none; border:1px solid var(--line); background:var(--panel, #fff); color:var(--ink, #1a1a1a); padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; }
+.settingsNav button:hover { border-color:var(--muted); }
+.settingsNav button.on { background:var(--signal); border-color:var(--signal); color:#fff; }
 .miniLines { display:flex; flex-direction:column; gap:8px; }
 .miniLine { display:grid; grid-template-columns:100px 1fr 80px 100px 36px; gap:8px; align-items:center; }
 .miniLine.unit { grid-template-columns:100px 1fr 80px 100px 84px 36px; }

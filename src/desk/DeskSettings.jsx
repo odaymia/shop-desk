@@ -35,8 +35,20 @@ function readLogo(file) {
    account. */
 const portalUrl = () => new URL("portal/", window.location.href).toString();
 
+const SETTINGS_SECTIONS = [
+  ["company", "Company info"],
+  ["customers", "Customers"],
+  ["pricing", "Pricing & parts"],
+  ["menus", "Service menu"],
+  ["oilchange", "Oil change"],
+  ["commissions", "Commissions"],
+  ["data", "Data & backup"],
+];
+
 export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) {
   const [d, setD] = useState(cfg);
+  const [section, setSection] = useState("company");
+  const show = (id) => section === id;
   useEffect(() => setD(cfg), [cfg]);
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
   const setMenu = (i, patch) => setD((x) => ({ ...x, serviceMenu: (x.serviceMenu || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
@@ -85,7 +97,16 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
         <h1>Front desk settings</h1>
       </header>
       <div className="deskBody">
+        <nav className="settingsNav">
+          {SETTINGS_SECTIONS.map(([id, label]) => (
+            <button key={id} className={section === id ? "on" : ""} onClick={() => setSection(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
         <div className="settingsGrid">
+          {show("company") && (
+          <>
           <h3 className="subhead">On the invoice header</h3>
           <div className="fld">
             <span>Logo (shown in the menu and printed on tickets)</span>
@@ -139,6 +160,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             the header once it's filled in.
           </p>
 
+          </>
+          )}
+          {show("customers") && (
+          <>
           <h3 className="subhead">Plate lookup</h3>
           <Field label={`${PLATE_PROVIDER.name} API key`}>
             <Text value={d.plateApiKey || ""} onChange={set("plateApiKey")} type="password" placeholder="sk_live_…" autoComplete="off" />
@@ -163,6 +188,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             number in the name. A walk-in with no customer is still fine; this only checks a name once one is typed.
           </p>
 
+          </>
+          )}
+          {show("pricing") && (
+          <>
           <h3 className="subhead">Pricing</h3>
           <div className="fldRow">
             <Field label="Labor rate ($/hour)">
@@ -216,6 +245,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </select>
           </Field>
 
+          </>
+          )}
+          {show("menus") && (
+          <>
           <h3 className="subhead">Service menu</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             The buttons on a ticket, in this order. Oil change opens the oil change packages below; every other
@@ -257,6 +290,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </button>
           </div>
 
+          </>
+          )}
+          {show("oilchange") && (
+          <>
           <h3 className="subhead">Oil change menu</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             What the Oil change button on a ticket offers. Each package includes the quarts shown, the filter, and a fluid
@@ -289,6 +326,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </button>
           </div>
 
+          </>
+          )}
+          {show("commissions") && (
+          <>
           <h3 className="subhead">Commissions</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             Set a commission amount on each oil package above and on each canned job (under Canned jobs). When a ticket
@@ -313,6 +354,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             {toNum(split.advisor)} / {toNum(split.top)} / {toNum(split.pit)} (advisor / top / pit).
           </p>
 
+          </>
+          )}
+          {show("oilchange") && (
+          <>
           <h3 className="subhead">Oil-change reminder sticker</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             When an oil-change ticket is posted, the reminder sticker pops up to print — vehicle, next service date and mileage, and the oil used, with your shop name and address. Set how far out the next service is.
@@ -387,6 +432,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </button>
           </div>
 
+          </>
+          )}
+          {show("company") && (
+          <>
           <h3 className="subhead">Printed text</h3>
           <Field label="Authorization line (estimates and repair orders)">
             <textarea className="ta" value={d.authorizationText} onChange={(e) => set("authorizationText")(e.target.value)} />
@@ -394,6 +443,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <Field label="Invoice footer (warranty, thank-you)">
             <textarea className="ta" value={d.invoiceFooter} onChange={(e) => set("invoiceFooter")(e.target.value)} />
           </Field>
+          </>
+          )}
+          {show("pricing") && (
+          <>
           <h3 className="subhead" style={{ marginTop: 36 }}>
             Parts catalogs
           </h3>
@@ -440,6 +493,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             one-step switch-on when that arrives.
           </p>
 
+          </>
+          )}
+          {show("customers") && (
+          <>
           <h3 className="subhead" style={{ marginTop: 36 }}>
             Customer portal
           </h3>
@@ -480,12 +537,18 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </p>
 
           <CarfaxPanel cfg={cfg} shop={shop} d={d} set={set} flash={flash} />
+          </>
+          )}
 
-          <button className="btn primary lg" onClick={save} style={{ marginTop: 18 }}>
-            Save settings
-          </button>
+          {section !== "data" && (
+            <button className="btn primary lg" onClick={save} style={{ marginTop: 18 }}>
+              Save settings
+            </button>
+          )}
 
-          <h3 className="subhead" style={{ marginTop: 36 }}>
+          {show("data") && (
+          <>
+          <h3 className="subhead" style={{ marginTop: 0 }}>
             Cloud account
           </h3>
           <CloudSync />
@@ -495,6 +558,8 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Posting an invoice freezes the tax rate and supplies rule on that ticket. Changing them here affects new
             tickets and open estimates only.
           </p>
+          </>
+          )}
         </div>
       </div>
     </>
