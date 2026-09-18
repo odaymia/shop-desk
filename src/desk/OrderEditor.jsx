@@ -918,7 +918,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         </div>
       </div>
 
-      {pick === "customer" && <CustomerPicker shop={shop} onPick={pickCustomer} onClose={() => setPick(null)} />}
+      {pick === "customer" && <CustomerPicker shop={shop} cfg={cfg} onPick={pickCustomer} onClose={() => setPick(null)} />}
       {signing && <OrderSign order={o} shop={shop} cfg={cfg} flash={flash} onDone={() => setSigning(false)} />}
       {showQR && <PortalQR customer={customer} onClose={() => setShowQR(false)} />}
       {sticker && shop.orders[sticker.id] && (
@@ -965,6 +965,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       {custEdit && customer && (
         <CustomerForm
           initial={customer}
+          cfg={cfg}
           onClose={() => setCustEdit(false)}
           onSave={async (c) => {
             await shop.saveCustomer(c);

@@ -154,6 +154,15 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             signed in to this shop can see it.
           </p>
 
+          <h3 className="subhead">Customers</h3>
+          <Field label="Customer names">
+            {onOff("requireRealName", "Must be a real name", "Allow anything")}
+          </Field>
+          <p className="legalNote" style={{ marginTop: -6, marginBottom: 18 }}>
+            When on, a customer's name has to be actual letters — the desk won't save a placeholder like “.”, “,”, or a
+            number in the name. A walk-in with no customer is still fine; this only checks a name once one is typed.
+          </p>
+
           <h3 className="subhead">Pricing</h3>
           <div className="fldRow">
             <Field label="Labor rate ($/hour)">

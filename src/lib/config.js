@@ -40,6 +40,7 @@ export const DEFAULT_CFG = {
   reminderMonths: 3, // oil-change reminder sticker: months until the next service
   reminderMiles: 3000, // oil-change reminder sticker: miles until the next service
   oilSticker: true, // pop the reminder sticker to print when an oil-change ticket is posted
+  requireRealName: true, // a customer's name must be actual letters, not placeholder symbols or numbers
   invoiceFooter:
     "Thank you for your business. Parts and labor are warranted for 12 months or 12,000 miles, whichever comes first. Returned parts are subject to a restocking fee.",
   authorizationText:

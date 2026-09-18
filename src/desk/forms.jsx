@@ -5,6 +5,7 @@ import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
 import { loadValvolineSpecs, vvMakeList, vvModelList, vvEngineList } from "../lib/valvolineSpecs.js";
 import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
+import { realNameError } from "../lib/names.js";
 
 /* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
 function mergeOpts(a, b) {
@@ -95,12 +96,16 @@ export const blankCustomer = () => ({
   active: true,
 });
 
-export function CustomerForm({ initial, onSave, onClose }) {
+export function CustomerForm({ initial, onSave, onClose, cfg }) {
   const [d, setD] = useState(() => ({ ...blankCustomer(), ...(initial || {}) }));
   const [err, setErr] = useState("");
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
   const save = () => {
     if (!d.first.trim() && !d.last.trim() && !d.company.trim()) return setErr("Give them a name or a company.");
+    if (!cfg || cfg.requireRealName !== false) {
+      const e = realNameError(d);
+      if (e) return setErr(e);
+    }
     onSave({ ...d, first: d.first.trim(), last: d.last.trim(), company: d.company.trim() });
   };
   return (
@@ -358,7 +363,7 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
 }
 
 /* Search everyone; pick one, or add a new customer on the spot. */
-export function CustomerPicker({ shop, onPick, onClose }) {
+export function CustomerPicker({ shop, cfg, onPick, onClose }) {
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
   /* Index the cars by owner in one pass, and sort the customers once — a
@@ -390,6 +395,7 @@ export function CustomerPicker({ shop, onPick, onClose }) {
   if (adding)
     return (
       <CustomerForm
+        cfg={cfg}
         onClose={() => setAdding(false)}
         onSave={async (c) => {
           const saved = await shop.saveCustomer(c);

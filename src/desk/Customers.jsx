@@ -157,6 +157,7 @@ export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
       {editing && (
         <CustomerForm
           initial={editing}
+          cfg={cfg}
           onClose={() => setEditing(null)}
           onSave={async (c) => {
             const saved = await shop.saveCustomer(c);
@@ -345,6 +346,7 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
       {editing && (
         <CustomerForm
           initial={c}
+          cfg={cfg}
           onClose={() => setEditing(false)}
           onSave={async (next) => {
             await shop.saveCustomer(next);
