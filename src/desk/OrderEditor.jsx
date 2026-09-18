@@ -59,7 +59,8 @@ const MENU_PART_CATS = {
 };
 function menuPartCat(m) {
   if (m.partCat) return m.partCat;
-  return MENU_PART_CATS[String(m.category || m.name || "").trim().toLowerCase()] || "";
+  const key = String(m.category || m.name || "").trim().toLowerCase();
+  return MENU_PART_CATS[key] || (/wiper/.test(key) ? "Wipers" : "");
 }
 
 /* One ticket: estimate → repair order → invoice. Edits save themselves a
