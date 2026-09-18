@@ -79,7 +79,6 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const [quarts, setQuarts] = useState(spec && spec.oilCapacityQt ? spec.oilCapacityQt : "");
   const [oil, setOil] = useState(null);
   const [step, setStep] = useState("package"); // package | quarts | oil | filter
-  const [allOils, setAllOils] = useState(false); // show every oil, past the package's type
   const [lookup, setLookup] = useState(false); // the Valvoline grade/capacity lookup
   const [lookedGrade, setLookedGrade] = useState(""); // grade the lookup filled in
   const oils = oilItems(shop.parts);
@@ -171,26 +170,19 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
 
   if (step === "oil")
     return (
-      <Modal title={`Which ${wantType && !allOils ? `${wantType} ` : ""}oil?${grade ? ` (spec: ${grade})` : ""}`} onClose={onClose} size="wide">
+      <Modal title={`Which ${wantType ? `${wantType} ` : ""}oil?${grade ? ` (spec: ${grade})` : ""}`} onClose={onClose} size="wide">
         <div className="rowBtns">
           <button className="btn" onClick={() => setStep("filter")}>
             Choose later
           </button>
-          {wantType && (
-            <button className="btn ghost" onClick={() => setAllOils((x) => !x)}>
-              {allOils ? `Only ${wantType} oils` : "Show all oils"}
-            </button>
-          )}
         </div>
-        {wantType && !allOils && (
-          <p className="muted" style={{ margin: "8px 0 0" }}>
-            Showing {wantType} oils to match the {pkg.name}.
-          </p>
-        )}
+        <p className="muted" style={{ margin: "8px 0 0" }}>
+          Only oils that fit the {pkg.name}. To offer another oil here, set its packages under Inventory.
+        </p>
         <PickList
-          items={allOils ? oils : oilsForPackage(oils, pkg)}
-          suggested={allOils ? suggestedOils : oilsForPackage(suggestedOils, pkg)}
-          kind={`${wantType && !allOils ? `${wantType} ` : ""}motor oil`}
+          items={oilsForPackage(oils, pkg)}
+          suggested={oilsForPackage(suggestedOils, pkg)}
+          kind={`${wantType ? `${wantType} ` : ""}motor oil`}
           onPick={(p) => {
             setOil(p);
             setStep("filter");
