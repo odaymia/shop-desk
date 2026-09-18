@@ -12,7 +12,24 @@ import { searchText } from "./useShop.js";
 function PickList({ items, suggested, onPick, kind }) {
   const [q, setQ] = useState("");
   const base = [...suggested, ...items.filter((i) => !suggested.includes(i))];
-  const list = q ? base.filter((p) => searchText(q, p.number, p.description, p.category)) : base;
+  const needle = q.trim().toLowerCase();
+  /* rank part-number matches ahead of description matches, so typing a
+     number like "CO" picks part CO, not an oil whose description says
+     "conv". Lower score = better; ties keep the base order (spec first). */
+  const score = (p) => {
+    const num = String(p.number || "").trim().toLowerCase();
+    if (num && num === needle) return 0; // exact part number
+    if (num && num.startsWith(needle)) return 1; // part number prefix
+    if (num && num.includes(needle)) return 2; // part number contains
+    return searchText(needle, p.number, p.description, p.category) ? 3 : 99; // text
+  };
+  const list = needle
+    ? base
+        .map((p) => [p, score(p)])
+        .filter(([, s]) => s < 99)
+        .sort((a, b) => a[1] - b[1])
+        .map(([p]) => p)
+    : base;
   return (
     <>
       <input
