@@ -189,16 +189,18 @@ export function oilsForPackage(oils, pkg) {
   });
 }
 
-/* Inventory items that are motor oil: category says oil, or the
-   description reads like a grade — but never a filter ("Oil Filters"
-   category contains the word "oil", so guard against it). */
+/* Engine (crankcase) oils that belong on an oil change: category says
+   oil, or the description reads like a motor-oil grade — but never a
+   filter, and never gear/differential/transmission/other fluids, which
+   share the "oil" word and a viscosity grade but aren't motor oil. */
+const NOT_MOTOR_OIL = /filter|\bgear\b|g[il]-?[45]\b|hypoid|differential|\bdiff\b|axle|transmission|\btrans\b|\batf\b|transfer case|\bcvt\b|power steering|brake fluid|coolant|antifreeze|washer/i;
+const GEAR_GRADE = /\b(7|8|9)\dw[-\s]?\d{2,3}\b|\bsae\s?(90|110|140)\b/i; // 75W-90, 80W-90, 85W-140, SAE 90/140
 export function oilItems(parts) {
   return Object.values(parts || {}).filter((p) => {
     if (p.active === false || p.tire) return false;
-    const cat = String(p.category || "");
-    const desc = String(p.description || "");
-    if (/filter/i.test(cat) || /filter/i.test(desc)) return false;
-    return /\boil\b/i.test(cat) || /\b\d{1,2}W-?\d{2}\b/i.test(desc);
+    const text = `${p.description || ""} ${p.category || ""}`;
+    if (NOT_MOTOR_OIL.test(text) || GEAR_GRADE.test(text)) return false;
+    return /\boil\b/i.test(String(p.category || "")) || /\b\d{1,2}W-?\d{2}\b/i.test(String(p.description || ""));
   });
 }
 /* Every filter, any kind. */

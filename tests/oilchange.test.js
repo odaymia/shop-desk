@@ -72,6 +72,18 @@ test("oil items are found by category or grade", () => {
   assert.deepEqual(oilItems(parts).map((p) => p.id), ["a", "b"]);
 });
 
+test("gear, differential, and transmission fluids are not motor oil", () => {
+  const parts = {
+    m: { id: "m", category: "Oil", description: "Valvoline Conventional 5W-30" }, // engine oil
+    d: { id: "d", category: "Oil", description: "Valvoline Diesel 15W-40" }, // engine oil (heavy)
+    g1: { id: "g1", category: "Fluids", description: "75W90 GI5 Synthetic" }, // gear
+    g2: { id: "g2", category: "Fluids", description: "80W90 GI5 Gear Oil" }, // gear
+    diff: { id: "diff", category: "Oil", description: "Differential fluid 75W-140" },
+    atf: { id: "atf", category: "Fluids", description: "MaxLife ATF" },
+  };
+  assert.deepEqual(oilItems(parts).map((p) => p.id), ["m", "d"]);
+});
+
 test("the package's service, oil, and filter lines are marked to fold into one receipt line at the package price; extra quarts aren't", () => {
   const oil = { id: "o1", description: "oil qt", price: 6.99, cost: 3.1 };
   const filt = { id: "f1", description: "filter", price: 9.99, cost: 4 };
