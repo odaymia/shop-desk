@@ -4,7 +4,7 @@ import { fmtMoney, orderTotals, lineAmount, laborQtyText, conditionLabel, status
 import { customerName, vehicleName } from "./useShop.js";
 import { parseAuthText } from "../lib/authForm.js";
 import { cloud, sGet, sDel } from "../storage/index.js";
-import { SIGNREQ_KEY, INFOREQ_KEY } from "../lib/keys.js";
+import { SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY } from "../lib/keys.js";
 import { QR, portalUrl } from "./QR.jsx";
 import { matchExistingCustomer, customerToForm } from "../lib/checkin.js";
 import defaultLogo from "../assets/genie-logo.png";
@@ -293,21 +293,26 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
   const [checkin, setCheckin] = useState(false); // customer is filling in their own info
   const [checkedIn, setCheckedIn] = useState(false); // just-saved confirmation
   const [infoReqId, setInfoReqId] = useState(null); // customer the desk sent to verify their info
+  const [intakeOrderId, setIntakeOrderId] = useState(null); // new car the desk sent for the customer to fill in their own info
   const load = () => {
     sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
     sGet(INFOREQ_KEY, null).then((r) => setInfoReqId(r && r.customerId ? r.customerId : null));
+    sGet(INTAKEREQ_KEY, null).then((r) => setIntakeOrderId(r && r.orderId ? r.orderId : null));
   };
   useEffect(() => {
     load();
     return cloud.subscribe((e) => {
-      if (e.type === "data" && (e.keys || []).some((k) => k === SIGNREQ_KEY || k === INFOREQ_KEY)) load();
+      if (e.type === "data" && (e.keys || []).some((k) => k === SIGNREQ_KEY || k === INFOREQ_KEY || k === INTAKEREQ_KEY)) load();
     });
   }, []);
 
   const order = reqId ? shop.orders[reqId] : null;
   const infoCust = infoReqId ? shop.customers[infoReqId] : null;
+  const intakeOrder = intakeOrderId ? shop.orders[intakeOrderId] : null;
+  const intakeVeh = intakeOrder && intakeOrder.vehicleId ? shop.vehicles[intakeOrder.vehicleId] : null;
   const clearReq = () => sDel(SIGNREQ_KEY);
   const clearInfo = () => sDel(INFOREQ_KEY);
+  const clearIntake = () => sDel(INTAKEREQ_KEY);
 
   /* Right after they sign, the tablet shows a QR to the portal so the
      customer can pull up all their receipts before handing it back. */
@@ -380,6 +385,29 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
     );
   }
 
+  /* The desk sent a new car over for its customer to fill in their own info.
+     Blank form; on save the new customer is linked straight to that car. */
+  if (intakeOrder) {
+    return (
+      <CheckInForm
+        shop={shop}
+        cfg={cfg}
+        flash={flash}
+        linkVehicleId={intakeOrder.vehicleId || null}
+        carLabel={intakeVeh ? [vehicleName(intakeVeh), intakeVeh.plate].filter(Boolean).join(" · ") : ""}
+        onCancel={() => {
+          clearIntake();
+          setIntakeOrderId(null);
+        }}
+        onDone={() => {
+          clearIntake();
+          setIntakeOrderId(null);
+          setCheckedIn(true);
+        }}
+      />
+    );
+  }
+
   /* Self-serve intake: the customer types their own name, phone, email and address. */
   if (checkin && !order) {
     return (
@@ -440,7 +468,7 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
    returning one by phone + name. With `initial`/`lockToId` the desk has sent a
    known customer to verify, so it starts pre-filled and always saves back onto
    that same record. */
-function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, onCancel, onDone }) {
+function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, linkVehicleId, carLabel, onCancel, onDone }) {
   const [d, setD] = useState(() => initial || { first: "", last: "", phone: "", email: "", street: "", city: "", state: "CA", zip: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -473,12 +501,13 @@ function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, onCancel, on
          on phone AND name so we update instead of duplicating — and don't
          merge two people who share a phone (a household). */
       const existing = (lockToId && shop.customers[lockToId]) || matchExistingCustomer(shop.customers, entered);
+      let saved;
       if (existing) {
         const merged = { ...existing };
         for (const [k, v] of Object.entries(entered)) if (v) merged[k] = v;
-        await shop.saveCustomer({ ...merged, active: true, selfCheckIn: true, checkedInAt: now });
+        saved = await shop.saveCustomer({ ...merged, active: true, selfCheckIn: true, checkedInAt: now });
       } else {
-        await shop.saveCustomer({
+        saved = await shop.saveCustomer({
           ...entered,
           state: entered.state || "CA",
           company: "",
@@ -489,6 +518,12 @@ function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, onCancel, on
           selfCheckIn: true,
           checkedInAt: now,
         });
+      }
+      /* The desk sent a specific car over: put this customer on it so the
+         ticket links up on its own back at the counter. */
+      if (linkVehicleId && saved && saved.id) {
+        const veh = shop.vehicles[linkVehicleId];
+        if (veh && veh.customerId !== saved.id) await shop.saveVehicle({ ...veh, customerId: saved.id });
       }
       onDone();
     } catch (e) {
@@ -506,6 +541,7 @@ function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, onCancel, on
         <p className="muted">
           {verify ? "Update anything that's changed, then tap Save and hand the tablet back." : "Fill in your details and hand the tablet back to our team."}
         </p>
+        {carLabel ? <p className="checkInCar">For your {carLabel}</p> : null}
         <div className="fldRow">
           <label className="fld">
             <span>First name</span>

@@ -37,7 +37,7 @@ import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
-import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, bayReqKey } from "../lib/keys.js";
+import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, bayReqKey } from "../lib/keys.js";
 import { OrderSign } from "./Signing.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
@@ -184,6 +184,15 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     }
     window.open(url, "catalog-" + key, "noopener");
   };
+
+  /* When a walk-in fills in their details on the pad, the new customer lands
+     on the car. Adopt that owner onto this ticket automatically so the
+     counter doesn't have to re-link it by hand. */
+  const draftCustomerId = draft ? draft.customerId : null;
+  const draftVehCustomerId = draft && shop.vehicles[draft.vehicleId] ? shop.vehicles[draft.vehicleId].customerId : null;
+  useEffect(() => {
+    if (!draftCustomerId && draftVehCustomerId) update({ customerId: draftVehCustomerId });
+  }, [draftCustomerId, draftVehCustomerId, update]);
 
   if (!draft)
     return (
@@ -577,9 +586,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                   </div>
                 </>
               ) : (
-                <button className="pick" onClick={() => setPick("customer")} disabled={locked}>
-                  + Add the customer when they're ready
-                </button>
+                <div className="rowBtns" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                  <button className="pick" onClick={() => setPick("customer")} disabled={locked}>
+                    + Add the customer, or connect an existing one
+                  </button>
+                  {vehicle && !locked && (
+                    <button
+                      className="btn"
+                      title="The customer fills in their own name, phone, and address on the signature tablet; it links to this car"
+                      onClick={async () => {
+                        await flushNow();
+                        await sSet(INTAKEREQ_KEY, { orderId: o.id, at: Date.now() });
+                        flash("Sent to the pad — hand the tablet to the customer.");
+                      }}
+                    >
+                      Add info on pad
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <div className="card">

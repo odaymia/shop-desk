@@ -331,6 +331,7 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .checkIn { max-width:620px; margin:0 auto; padding:32px 20px 48px; text-align:center; }
 .checkIn .checkInLogo { height:56px; margin-bottom:10px; }
 .checkIn h1 { margin:0 0 4px; }
+.checkIn .checkInCar { display:inline-block; margin:6px auto 0; padding:6px 14px; border-radius:999px; background:var(--tint, #eef2ff); color:var(--ink); font-weight:700; }
 .checkIn .fldRow { display:flex; gap:14px; }
 .checkIn .fld { display:flex; flex-direction:column; gap:6px; flex:1; margin-top:14px; text-align:left; }
 .checkIn .fld > span { font-size:14px; color:var(--muted); }
