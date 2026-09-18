@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Money, toNum } from "./ui.jsx";
+import { Modal, Money, toNum, Field } from "./ui.jsx";
 import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
 import { OilSpecLookup } from "./OilSpecLookup.jsx";
@@ -76,14 +76,16 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
         <p className="muted" style={{ marginTop: 0 }}>
           How many quarts does this engine take?{spec && spec.oilCapacityQt ? ` The spec on file says ${spec.oilCapacityQt} qt${grade ? ` of ${grade}` : ""}.` : " Check the cap or the specs card."}
         </p>
-        <div className="countRow">
-          {[4, 5, 6, 7, 8].map((n) => (
-            <button key={n} className={`btn ${q === n ? "primary" : ""}`} onClick={() => setQuarts(n)}>
-              {n}
-            </button>
-          ))}
-          <input className="search" style={{ minWidth: 0, width: 90 }} inputMode="decimal" value={quarts} onChange={(e) => setQuarts(e.target.value)} placeholder="qt" />
-        </div>
+        <Field label="Quarts">
+          <input
+            inputMode="decimal"
+            value={quarts}
+            onChange={(e) => setQuarts(e.target.value)}
+            placeholder={spec && spec.oilCapacityQt ? String(spec.oilCapacityQt) : "quarts"}
+            autoFocus
+            style={{ width: "100%", boxSizing: "border-box" }}
+          />
+        </Field>
         <p className="muted">
           {q > pkg.quarts ? (
             <>
