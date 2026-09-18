@@ -100,6 +100,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       cost: oilPart ? Number(oilPart.cost) || 0 : 0,
       condition: "new",
       taxable: true,
+      oil: true, // still oil going in the car — counts toward the bay display's quart total
       job,
     });
   }

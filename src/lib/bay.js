@@ -27,13 +27,26 @@ export function bayCard(order) {
   /* the oil-change highlights */
   let oil = null;
   if (hasOilChange(order)) {
+    const isFilter = (l) => /filter/i.test(`${l.description || ""} ${l.number || ""}`);
     const parts = lines.filter((l) => l.kind === "part" && (l.oil || l.packaged));
-    const oilParts = parts.filter((l) => !/filter/i.test(`${l.description || ""} ${l.number || ""}`));
+    const oilParts = parts.filter((l) => !isFilter(l));
     const oilLine = oilParts.length ? oilParts.reduce((a, b) => (Number(b.qty) > Number(a.qty) ? b : a)) : null;
-    const filterLine = parts.find((l) => /filter/i.test(`${l.description || ""} ${l.number || ""}`));
+    const filterLine = parts.find(isFilter);
     /* Cars that take more than the package's included quarts get the overage
-       on its own line, so add up every oil line to show the total on the car. */
-    const totalQuarts = oilParts.reduce((sum, l) => sum + (Number(l.qty) > 0 ? Number(l.qty) : 0), 0);
+       on its own line — the same oil part, just not folded into the package.
+       Match it back by part id / number so its quarts count toward the total,
+       even on tickets written before that line carried the oil flag. */
+    const oilIds = new Set();
+    for (const l of oilParts) {
+      if (l.partId) oilIds.add(`id:${l.partId}`);
+      if (l.number) oilIds.add(`no:${String(l.number).toLowerCase()}`);
+    }
+    const countsAsOil = (l) => {
+      if (l.kind !== "part" || isFilter(l)) return false;
+      if (l.oil || l.packaged) return true;
+      return (l.partId && oilIds.has(`id:${l.partId}`)) || (l.number && oilIds.has(`no:${String(l.number).toLowerCase()}`));
+    };
+    const totalQuarts = lines.reduce((sum, l) => (countsAsOil(l) && Number(l.qty) > 0 ? sum + Number(l.qty) : sum), 0);
     oil = {
       type: lastOilUsed(order) || (oilLine ? clean(oilLine.description) : ""),
       quarts: totalQuarts > 0 ? Math.round(totalQuarts * 100) / 100 : null,

@@ -25,7 +25,7 @@ test("bayCard sums the oil across split lines when a car takes over the included
     lines: [
       { kind: "labor", oil: true, packaged: true, job: "Valvoline Euro Full Synthetic Oil Change", description: "Full synthetic oil change" },
       { kind: "part", oil: true, packaged: true, qty: 5, number: "VR1EU", description: "Valvoline Full Synthetic European 5W-40", job: "Valvoline Euro Full Synthetic Oil Change" },
-      { kind: "part", oil: true, packaged: true, qty: 0.8, number: "VR1EU", description: "Valvoline Full Synthetic European 5W-40 (extra)", job: "Valvoline Euro Full Synthetic Oil Change" },
+      { kind: "part", qty: 0.8, partId: "p-vr1eu", number: "VR1EU", description: "Extra oil over 5 qt — Valvoline Full Synthetic European 5W-40", job: "Valvoline Euro Full Synthetic Oil Change" },
       { kind: "part", packaged: true, qty: 1, number: "COF", description: "Oil filter", job: "Valvoline Euro Full Synthetic Oil Change" },
     ],
   });
