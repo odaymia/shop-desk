@@ -175,7 +175,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "customers" && (
             <Customers shop={shop} cfg={cfg} nav={nav} flash={flash} customerId={customerId} onNew={newTicket} />
           )}
-          {page === "inventory" && <Inventory shop={shop} flash={flash} />}
+          {page === "inventory" && <Inventory shop={shop} cfg={cfg} flash={flash} />}
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
           {page === "jobs" && <Jobs shop={shop} cfg={cfg} flash={flash} />}
           {page === "coupons" && <Coupons shop={shop} cfg={cfg} flash={flash} />}

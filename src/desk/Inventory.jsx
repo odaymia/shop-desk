@@ -31,7 +31,7 @@ const PART_CATS = ["Oil", "Oil Filters", "Engine Air Filters", "Cabin Air Filter
    measured in quarts; a case of filters in units. */
 const isOilPart = (p) => !!(p && p.oilType) || (/\boil\b/i.test(String((p && p.category) || "")) && !/filter/i.test(String((p && p.category) || "")));
 
-export function Inventory({ shop, flash }) {
+export function Inventory({ shop, cfg, flash }) {
   const [q, setQ] = useState("");
   const [only, setOnly] = useState("all"); // all | low
   const [cat, setCat] = useState("all");
@@ -162,6 +162,7 @@ export function Inventory({ shop, flash }) {
         <PartForm
           part={edit}
           vendors={vendors}
+          cfg={cfg}
           onClose={() => setEdit(null)}
           onSave={async (p) => {
             await shop.savePart(p);
@@ -174,7 +175,7 @@ export function Inventory({ shop, flash }) {
   );
 }
 
-export function PartForm({ part, vendors, onClose, onSave }) {
+export function PartForm({ part, vendors, cfg, onClose, onSave }) {
   const [d, setD] = useState(part);
   const [err, setErr] = useState("");
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v }));
@@ -219,6 +220,31 @@ export function PartForm({ part, vendors, onClose, onSave }) {
           <option key={c} value={c} />
         ))}
       </datalist>
+      {isOilPart(d) && (cfg?.oilPackages || []).filter((p) => p.active !== false).length > 0 && (
+        <Field label="Offered in these oil-change packages">
+          <div className="oilPkgChecks" style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
+            {(cfg.oilPackages || [])
+              .filter((p) => p.active !== false)
+              .map((pkg) => {
+                const on = Array.isArray(d.packages) && d.packages.includes(pkg.id);
+                return (
+                  <label key={pkg.id} className="fld inline" style={{ marginRight: 16 }}>
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={(e) => {
+                        const cur = Array.isArray(d.packages) ? d.packages : [];
+                        set("packages")(e.target.checked ? [...cur, pkg.id] : cur.filter((x) => x !== pkg.id));
+                      }}
+                    />
+                    <span>{pkg.name}</span>
+                  </label>
+                );
+              })}
+          </div>
+          <p className="legalNote" style={{ marginTop: 4 }}>Leave all unchecked to auto-match this oil to packages by the oil type above.</p>
+        </Field>
+      )}
       <Field label="Description">
         <Text value={d.description} onChange={set("description")} placeholder="Engine oil filter" />
       </Field>

@@ -121,6 +121,21 @@ test("a package with no type word in its name filters nothing", () => {
   assert.deepEqual(oilsForPackage(oils, generic).map((o) => o.id), ["s", "c"]);
 });
 
+test("an oil's explicit package list wins over type matching", () => {
+  const convPkg = { id: "conv", name: "Conventional Oil Change", quarts: 5, price: 40, extraQuart: 5 };
+  const synPkg = { id: "synthetic", name: "Full Synthetic Oil Change", quarts: 5, price: 90, extraQuart: 9 };
+  const oils = [
+    { id: "a", description: "Valvoline Full Synthetic 5W-30", packages: ["conv"] }, // a synthetic the shop offers in the conventional package
+    { id: "b", description: "Valvoline Conventional 5W-30" }, // no list → type match
+  ];
+  // "a" shows in conv despite being synthetic, and not in synthetic (not listed)
+  assert.deepEqual(oilsForPackage(oils, convPkg).map((o) => o.id), ["a", "b"]);
+  assert.deepEqual(oilsForPackage(oils, synPkg).map((o) => o.id), []);
+  // even a generic (no-type) package respects an explicit list
+  const generic = { id: "x", name: "Oil Change", quarts: 5 };
+  assert.deepEqual(oilsForPackage(oils, generic).map((o) => o.id), ["b"]); // only "b" (no list); "a" listed for conv only
+});
+
 test("a filter with a surcharge adds its own taxable line on top of the package", () => {
   const oil = { id: "o1", description: "conventional qt", price: 6.99, cost: 3.1 };
   const canister = { id: "f9", number: "CANISTER1", description: "Canister oil filter", price: 12.99, cost: 6, surcharge: 15, surchargeLabel: "Canister filter charge" };

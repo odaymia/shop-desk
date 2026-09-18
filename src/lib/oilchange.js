@@ -175,14 +175,18 @@ const OIL_COMPAT = {
   maxlife: ["maxlife", "blend", "synthetic"],
   diesel: ["diesel"],
 };
-/* The oils that fit a package: only the matching type(s). A conventional
-   package won't list synthetic or blend; a synthetic package won't list
-   conventional. */
+/* The oils that fit a package. An oil that lists the packages it's offered
+   in (`part.packages`, set in Inventory) shows only in those; otherwise it
+   falls back to matching by oil type — a conventional package won't list
+   synthetic or blend, a synthetic package won't list conventional. */
 export function oilsForPackage(oils, pkg) {
   const want = packageOilType(pkg);
-  if (!want) return oils;
-  const ok = OIL_COMPAT[want] || [want];
-  return (oils || []).filter((p) => ok.includes(oilTypeOf(p)));
+  const ok = want ? OIL_COMPAT[want] || [want] : null;
+  return (oils || []).filter((p) => {
+    if (Array.isArray(p.packages) && p.packages.length) return p.packages.includes(pkg.id);
+    if (!ok) return true; // a generic package with no type takes any oil
+    return ok.includes(oilTypeOf(p));
+  });
 }
 
 /* Inventory items that are motor oil: category says oil, or the
