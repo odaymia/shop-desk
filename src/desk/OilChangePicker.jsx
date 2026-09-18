@@ -11,7 +11,10 @@ import { searchText } from "./useShop.js";
    listed first. */
 function PickList({ items, suggested, onPick, kind }) {
   const [q, setQ] = useState("");
-  const base = [...suggested, ...items.filter((i) => !suggested.includes(i))];
+  /* alphanumeric by part number, natural order (VO46 before VO161); spec
+     matches stay on top, each group sorted */
+  const byNum = (a, b) => String(a.number || "").localeCompare(String(b.number || ""), undefined, { numeric: true, sensitivity: "base" });
+  const base = [...[...suggested].sort(byNum), ...items.filter((i) => !suggested.includes(i)).sort(byNum)];
   const needle = q.trim().toLowerCase();
   /* rank part-number matches ahead of description matches, so typing a
      number like "CO" picks part CO, not an oil whose description says
