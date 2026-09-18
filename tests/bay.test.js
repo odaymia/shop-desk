@@ -26,10 +26,11 @@ test("bayCard sums the oil across split lines when a car takes over the included
       { kind: "labor", oil: true, packaged: true, job: "Valvoline Euro Full Synthetic Oil Change", description: "Full synthetic oil change" },
       { kind: "part", oil: true, packaged: true, qty: 5, number: "VR1EU", description: "Valvoline Full Synthetic European 5W-40", job: "Valvoline Euro Full Synthetic Oil Change" },
       { kind: "part", qty: 0.8, partId: "p-vr1eu", number: "VR1EU", description: "Extra oil over 5 qt — Valvoline Full Synthetic European 5W-40", job: "Valvoline Euro Full Synthetic Oil Change" },
+      { kind: "part", qty: 1, number: "VR1EU", description: "Bottled oil charge", surchargeForId: "p-vr1eu", surchargeKind: "oil", job: "Valvoline Euro Full Synthetic Oil Change" },
       { kind: "part", packaged: true, qty: 1, number: "COF", description: "Oil filter", job: "Valvoline Euro Full Synthetic Oil Change" },
     ],
   });
-  assert.equal(c.oil.quarts, 5.8); // 5 included + 0.8 overage, combined
+  assert.equal(c.oil.quarts, 5.8); // 5 included + 0.8 overage; the bottled-oil surcharge line is NOT a quart
   assert.equal(c.oil.filter, "COF");
 });
 

@@ -43,6 +43,7 @@ export function bayCard(order) {
     }
     const countsAsOil = (l) => {
       if (l.kind !== "part" || isFilter(l)) return false;
+      if (l.surchargeForId || l.surchargeKind) return false; // a dollar surcharge, not quarts
       if (l.oil || l.packaged) return true;
       return (l.partId && oilIds.has(`id:${l.partId}`)) || (l.number && oilIds.has(`no:${String(l.number).toLowerCase()}`));
     };
