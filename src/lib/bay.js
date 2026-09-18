@@ -31,9 +31,12 @@ export function bayCard(order) {
     const oilParts = parts.filter((l) => !/filter/i.test(`${l.description || ""} ${l.number || ""}`));
     const oilLine = oilParts.length ? oilParts.reduce((a, b) => (Number(b.qty) > Number(a.qty) ? b : a)) : null;
     const filterLine = parts.find((l) => /filter/i.test(`${l.description || ""} ${l.number || ""}`));
+    /* Cars that take more than the package's included quarts get the overage
+       on its own line, so add up every oil line to show the total on the car. */
+    const totalQuarts = oilParts.reduce((sum, l) => sum + (Number(l.qty) > 0 ? Number(l.qty) : 0), 0);
     oil = {
       type: lastOilUsed(order) || (oilLine ? clean(oilLine.description) : ""),
-      quarts: oilLine && Number(oilLine.qty) > 0 ? Number(oilLine.qty) : null,
+      quarts: totalQuarts > 0 ? Math.round(totalQuarts * 100) / 100 : null,
       filter: filterLine ? clean(filterLine.number) || clean(filterLine.description) : "",
     };
   }

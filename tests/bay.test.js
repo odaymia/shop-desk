@@ -20,6 +20,19 @@ test("bayCard highlights the oil, quarts, and filter, and lists the services", (
   assert.deepEqual(c.services, ["Valvoline Full Synthetic Oil Change", "Engine air filter replacement"]);
 });
 
+test("bayCard sums the oil across split lines when a car takes over the included quarts", () => {
+  const c = bayCard({
+    lines: [
+      { kind: "labor", oil: true, packaged: true, job: "Valvoline Euro Full Synthetic Oil Change", description: "Full synthetic oil change" },
+      { kind: "part", oil: true, packaged: true, qty: 5, number: "VR1EU", description: "Valvoline Full Synthetic European 5W-40", job: "Valvoline Euro Full Synthetic Oil Change" },
+      { kind: "part", oil: true, packaged: true, qty: 0.8, number: "VR1EU", description: "Valvoline Full Synthetic European 5W-40 (extra)", job: "Valvoline Euro Full Synthetic Oil Change" },
+      { kind: "part", packaged: true, qty: 1, number: "COF", description: "Oil filter", job: "Valvoline Euro Full Synthetic Oil Change" },
+    ],
+  });
+  assert.equal(c.oil.quarts, 5.8); // 5 included + 0.8 overage, combined
+  assert.equal(c.oil.filter, "COF");
+});
+
 test("bayCard on a non-oil ticket has no oil block", () => {
   const c = bayCard({ lines: [{ kind: "labor", job: "Front brake pads replacement", description: "Replace pads" }] });
   assert.equal(c.oil, null);
