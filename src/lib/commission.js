@@ -37,6 +37,57 @@ export function serviceCommission(commission, revenue, split) {
   return { ...splitCommission(total, split), total };
 }
 
+export const COMM_ROLES = [
+  ["advisor", "Advisor"],
+  ["top", "Top tech"],
+  ["pit", "Pit tech"],
+];
+
+/* A service's stored commission → the per-role form shape the editor uses.
+   A legacy flat number becomes fixed per-role amounts split by the shop's
+   global split, so an existing service's payout is preserved on first edit. */
+export function commToForm(commission, split) {
+  const blank = () => ({ advisor: { mode: "amt", value: "" }, top: { mode: "amt", value: "" }, pit: { mode: "amt", value: "" } });
+  if (commission && typeof commission === "object") {
+    const out = {};
+    for (const [r] of COMM_ROLES) out[r] = { mode: commission[r] && commission[r].mode === "pct" ? "pct" : "amt", value: commission[r] && commission[r].value != null ? commission[r].value : "" };
+    return out;
+  }
+  const n = Number(commission) || 0;
+  if (n > 0) {
+    const s = { advisor: Number(split && split.advisor) || 0, top: Number(split && split.top) || 0, pit: Number(split && split.pit) || 0 };
+    const sum = s.advisor + s.top + s.pit;
+    if (sum > 0)
+      return {
+        advisor: { mode: "amt", value: round2((n * s.advisor) / sum) },
+        top: { mode: "amt", value: round2((n * s.top) / sum) },
+        pit: { mode: "amt", value: round2((n * s.pit) / sum) },
+      };
+    return { ...blank(), advisor: { mode: "amt", value: round2(n) } };
+  }
+  return blank();
+}
+
+/* The editor's shape back to storage: a per-role object, or null when every
+   role is blank/zero. An untouched legacy number or string passes through as
+   its number (or null). */
+export function commFromForm(c) {
+  if (c == null) return null;
+  if (typeof c === "number") return c || null;
+  if (typeof c === "string") return Number(c.replace(/[^0-9.]/g, "")) || null;
+  const out = {};
+  let any = false;
+  for (const [r] of COMM_ROLES) {
+    const raw = c[r] ? c[r].value : "";
+    const num = raw === "" || raw == null ? 0 : Number(String(raw).replace(/[^0-9.]/g, "")) || 0;
+    if (num > 0) {
+      out[r] = { mode: c[r].mode === "pct" ? "pct" : "amt", value: num };
+      any = true;
+    }
+  }
+  return any ? out : null;
+}
+
 /* The three people on a ticket, newest field names first and the older
    single-tech fields as a fallback so tickets written before this feature
    still resolve. */

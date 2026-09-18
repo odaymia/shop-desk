@@ -8,6 +8,7 @@ import { CarfaxPanel } from "./CarfaxPanel.jsx";
 import { CATALOGS } from "../lib/parts.js";
 import { NAME_MODES } from "../lib/names.js";
 import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
+import { COMM_ROLES, commToForm, commFromForm } from "../lib/commission.js";
 import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
 import { sGetAll, sSet, cloud } from "../storage/index.js";
 
@@ -81,7 +82,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       oilChangeLaborPrice: toNum(d.oilChangeLaborPrice),
       oilPackages: (d.oilPackages || [])
         .filter((p) => String(p.name || "").trim())
-        .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart), commission: toNum(p.commission) })),
+        .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart), commission: commFromForm(p.commission) })),
       checklist: normalizeChecklist(d.checklist),
       serviceMenu: normalizeMenu(d.serviceMenu),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
@@ -301,15 +302,37 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </p>
           <div className="miniLines">
             {(d.oilPackages || []).map((p, i) => (
-              <div key={p.id || i} className="miniLine" style={{ gridTemplateColumns: "2fr 84px 56px 84px 84px 36px" }}>
+              <div key={p.id || i} className="miniLine" style={{ gridTemplateColumns: "2fr 84px 56px 84px 36px" }}>
                 <input value={p.name} onChange={(e) => setPkg(i, { name: e.target.value })} placeholder="Valvoline Full Synthetic Oil Change" />
                 <input inputMode="decimal" value={p.price} onChange={(e) => setPkg(i, { price: e.target.value })} placeholder="Price" title="Package price" />
                 <input inputMode="decimal" value={p.quarts} onChange={(e) => setPkg(i, { quarts: e.target.value })} placeholder="Qt" title="Quarts included" />
                 <input inputMode="decimal" value={p.extraQuart} onChange={(e) => setPkg(i, { extraQuart: e.target.value })} placeholder="$/qt over" title="Per quart past the included amount" />
-                <input inputMode="decimal" value={p.commission == null ? "" : p.commission} onChange={(e) => setPkg(i, { commission: e.target.value })} placeholder="Comm $" title="Commission paid when this package sells" />
                 <button className="lineX" onClick={() => set("oilPackages")(d.oilPackages.filter((_, k) => k !== i))} aria-label="Remove">
                   ✕
                 </button>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span className="pkgCommLabel">Commission</span>
+                  <div className="commGrid">
+                    {COMM_ROLES.map(([role, label]) => {
+                      const fc = commToForm(p.commission, split);
+                      return (
+                        <div key={role} className="commRow">
+                          <span>{label}</span>
+                          <input
+                            inputMode="decimal"
+                            value={fc[role].value == null ? "" : fc[role].value}
+                            onChange={(e) => setPkg(i, { commission: { ...fc, [role]: { ...fc[role], value: e.target.value.replace(/[^0-9.]/g, "") } } })}
+                            placeholder="0"
+                          />
+                          <select value={fc[role].mode} onChange={(e) => setPkg(i, { commission: { ...fc, [role]: { ...fc[role], mode: e.target.value } } })}>
+                            <option value="amt">$</option>
+                            <option value="pct">% of pkg</option>
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 <textarea
                   className="ta"
                   style={{ gridColumn: "1 / -1", minHeight: 44 }}
@@ -332,10 +355,10 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <>
           <h3 className="subhead">Commissions</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
-            Set a commission amount on each oil package above and on each canned job (under Canned jobs). When a ticket
-            sells one of those services, that amount is split among the three people on the ticket by the shares below —
-            the advisor on the computer, the top tech over the hood, and the pit tech under the car. Leave a service's
-            amount blank to pay nothing on it (so the base oil change can pay $0). See who earned what under Reports →
+            Commission is set per service, per position — a fixed dollar amount or a percent of that service's price —
+            on each oil package (under Oil change) and each canned job (under Canned jobs), for the advisor on the
+            computer, the top tech over the hood, and the pit tech under the car. The shares below are only a fallback,
+            used to divide any older service still set to a single flat amount. See who earned what under Reports →
             Commissions.
           </p>
           <div className="fldRow">

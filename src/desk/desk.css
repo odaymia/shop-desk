@@ -165,6 +165,7 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .commRow > span { min-width:64px; font-size:13px; font-weight:600; color:var(--muted); }
 .commRow input { width:84px; }
 .commRow select { width:96px; }
+.pkgCommLabel { display:block; font-size:12px; font-weight:600; color:var(--muted); margin:2px 0 6px; }
 .miniLine { display:grid; grid-template-columns:100px 1fr 80px 100px 36px; gap:8px; align-items:center; }
 .miniLine.unit { grid-template-columns:100px 1fr 80px 100px 84px 36px; }
 .miniLine .perUnit { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); white-space:nowrap; }

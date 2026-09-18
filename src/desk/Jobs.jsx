@@ -4,6 +4,7 @@ import { Modal, Field, Text, Money, toNum, ConfirmModal } from "./ui.jsx";
 import { PartPicker } from "./pickers.jsx";
 
 import { jobLines, orderTotals, PART_CONDITIONS } from "../lib/invoice.js";
+import { COMM_ROLES, commToForm, commFromForm } from "../lib/commission.js";
 import { uid } from "../lib/ids.js";
 
 /* Canned jobs: a bundle of parts and labor that drops onto a ticket in one
@@ -160,53 +161,8 @@ export function Jobs({ shop, cfg, flash }) {
   );
 }
 
-const COMM_ROLES = [
-  ["advisor", "Advisor"],
-  ["top", "Top tech"],
-  ["pit", "Pit tech"],
-];
-const round2c = (n) => Math.round((Number(n) || 0) * 100) / 100;
-/* Commission stored on a job → the per-role form shape. A legacy flat number
-   is converted to fixed per-role amounts using the shop's global split, so an
-   existing job's payout is preserved when it's first opened. */
-function toCommObj(commission, split) {
-  const blank = () => ({ advisor: { mode: "amt", value: "" }, top: { mode: "amt", value: "" }, pit: { mode: "amt", value: "" } });
-  if (commission && typeof commission === "object") {
-    const out = {};
-    for (const [r] of COMM_ROLES) out[r] = { mode: commission[r] && commission[r].mode === "pct" ? "pct" : "amt", value: commission[r] && commission[r].value != null ? commission[r].value : "" };
-    return out;
-  }
-  const n = Number(commission) || 0;
-  if (n > 0) {
-    const s = { advisor: Number(split && split.advisor) || 0, top: Number(split && split.top) || 0, pit: Number(split && split.pit) || 0 };
-    const sum = s.advisor + s.top + s.pit;
-    if (sum > 0)
-      return {
-        advisor: { mode: "amt", value: round2c((n * s.advisor) / sum) },
-        top: { mode: "amt", value: round2c((n * s.top) / sum) },
-        pit: { mode: "amt", value: round2c((n * s.pit) / sum) },
-      };
-    return { ...blank(), advisor: { mode: "amt", value: round2c(n) } };
-  }
-  return blank();
-}
-/* The form shape back to storage, or null when every role is blank/zero. */
-function fromCommObj(c) {
-  const out = {};
-  let any = false;
-  for (const [r] of COMM_ROLES) {
-    const raw = c && c[r] ? c[r].value : "";
-    const num = raw === "" || raw == null ? 0 : Number(String(raw).replace(/[^0-9.]/g, "")) || 0;
-    if (num > 0) {
-      out[r] = { mode: c[r].mode === "pct" ? "pct" : "amt", value: num };
-      any = true;
-    }
-  }
-  return any ? out : null;
-}
-
 function JobForm({ job, shop, cfg, onClose, onSave }) {
-  const [d, setD] = useState(() => ({ ...job, commission: toCommObj(job.commission, cfg.commission && cfg.commission.split) }));
+  const [d, setD] = useState(() => ({ ...job, commission: commToForm(job.commission, cfg.commission && cfg.commission.split) }));
   const [pickFor, setPickFor] = useState(null); // line index
   const setComm = (role, patch) => setD((x) => ({ ...x, commission: { ...x.commission, [role]: { ...x.commission[role], ...patch } } }));
   const [err, setErr] = useState("");
@@ -396,7 +352,7 @@ function JobForm({ job, shop, cfg, onClose, onSave }) {
                 ? { ...l, qty: toNum(l.qty) || 1, price: toNum(l.price) }
                 : { ...l, qty: toNum(l.qty) || 1, price: numOrNull(l.price), cost: numOrNull(l.cost) }
             );
-            onSave({ ...d, name: d.name.trim(), commission: fromCommObj(d.commission), packagePrice: numOrNull(d.packagePrice), lines });
+            onSave({ ...d, name: d.name.trim(), commission: commFromForm(d.commission), packagePrice: numOrNull(d.packagePrice), lines });
           }}
         >
           Save job
