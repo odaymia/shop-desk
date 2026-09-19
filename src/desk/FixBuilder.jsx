@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Modal } from "./ui.jsx";
-import { composeFinding, fixLaborDescription, FIX_ACTIONS, SYSTEM_FOR_CATEGORY } from "../lib/findings.js";
+import { composeFinding, fixLaborDescription, findingsForCategories, FIX_ACTIONS, SYSTEM_FOR_CATEGORY } from "../lib/findings.js";
 import { concernCategories } from "../lib/repairs.js";
 
 /* The fix builder. After inspecting the car, the tech fills in what was
@@ -11,7 +11,8 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
   const concernLines = useMemo(() => String(concern || "").split("\n").map((l) => l.trim()).filter(Boolean), [concern]);
   const [picked, setPicked] = useState(() => new Set(concernLines.map((l) => l.toLowerCase())));
   const [inspected, setInspected] = useState("");
-  const [found, setFound] = useState("");
+  const [foundPicked, setFoundPicked] = useState(() => new Set());
+  const [otherFound, setOtherFound] = useState("");
   const [action, setAction] = useState("Replace");
   const [component, setComponent] = useState("");
   const [hours, setHours] = useState("");
@@ -19,8 +20,8 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
 
   const selectedConcerns = concernLines.filter((l) => picked.has(l.toLowerCase()));
   const concernText = selectedConcerns.join("; ");
+  const cats = useMemo(() => concernCategories(selectedConcerns.join("\n"), cfg), [concernText, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
   const systems = useMemo(() => {
-    const cats = concernCategories(selectedConcerns.join("\n"), cfg);
     const seen = new Set();
     const out = [];
     for (const c of cats) {
@@ -31,11 +32,28 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
       }
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [concernText, cfg]);
+  }, [cats]);
+  const findingGroups = useMemo(() => findingsForCategories(cats), [cats]);
+
+  /* selected findings in the taxonomy's order, plus any "other" text */
+  const foundList = useMemo(() => {
+    const inOrder = findingGroups.flatMap(([, items]) => items).filter((i) => foundPicked.has(i.toLowerCase()));
+    const other = otherFound.trim();
+    return other ? [...inOrder, other] : inOrder;
+  }, [findingGroups, foundPicked, otherFound]);
+  const found = foundList.join("; ");
 
   const finding = composeFinding({ inspected, concern: concernText, found, action, component });
   const laborDesc = fixLaborDescription({ action, component });
+
+  const toggleFound = (item) =>
+    setFoundPicked((prev) => {
+      const next = new Set(prev);
+      const k = item.toLowerCase();
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
 
   const toggleConcern = (line) =>
     setPicked((prev) => {
@@ -89,7 +107,29 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
           <input className="in" value={inspected} onChange={(e) => setInspected(e.target.value)} placeholder="e.g. the front brakes" />
 
           <label className="fixLbl">Found</label>
-          <input className="in" value={found} onChange={(e) => setFound(e.target.value)} placeholder="e.g. front pads worn to 2mm, rotors scored" />
+          {findingGroups.map(([cat, items]) => (
+            <div key={cat} className="findGroup">
+              <div className="findCat">{cat}</div>
+              <div className="symChips">
+                {items.map((item) => {
+                  const on = foundPicked.has(item.toLowerCase());
+                  return (
+                    <button key={item} type="button" className={`symChip findChip ${on ? "on" : ""}`} onClick={() => toggleFound(item)}>
+                      {on ? "✓ " : ""}
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <input
+            className="in"
+            style={{ marginTop: 8 }}
+            value={otherFound}
+            onChange={(e) => setOtherFound(e.target.value)}
+            placeholder="Other — type anything not on the list…"
+          />
 
           <label className="fixLbl">Recommend</label>
           <div className="symChips" style={{ marginBottom: 6 }}>

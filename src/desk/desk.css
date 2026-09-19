@@ -446,6 +446,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .fixFinding { margin:8px 0 0; padding:10px 12px; background:#fff; border:1px solid var(--line); border-radius:8px; font-size:14px; line-height:1.4; }
 .fixLine { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; background:#fff; border:1px solid var(--line); border-radius:8px; font-size:14px; }
 .fixLine b { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.findGroup { margin:6px 0 4px; }
+.findCat { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; margin:6px 0 5px; }
+.findChip::first-letter { text-transform:uppercase; }
 .symChip.on:hover { background:var(--brand, #7f1d1d); }
 /* concern builder layout: symptom groups + a live preview of what prints */
 .concernBody { display:flex; gap:18px; align-items:flex-start; }
