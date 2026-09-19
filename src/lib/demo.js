@@ -25,12 +25,26 @@ const DAY = 86400000;
 
 /* The fictional shop and its records. Ids are stable so a reseed is a
    clean rebuild. */
+/* A placeholder Bolt Badger mark for the demo/sales build — a dark badge with
+   an amber lightning bolt. Inlined as an SVG data URL so no asset import is
+   needed; the shop can replace it with their real logo in Settings. */
+const BOLT_BADGER_LOGO =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'>" +
+      "<rect x='4' y='4' width='112' height='112' rx='28' fill='#111827'/>" +
+      "<rect x='4' y='4' width='112' height='112' rx='28' fill='none' stroke='#f59e0b' stroke-width='3' opacity='0.55'/>" +
+      "<path d='M68 20 L38 64 H56 L50 100 L86 52 H66 Z' fill='#f59e0b'/>" +
+      "</svg>",
+  );
+
 function sampleData() {
   const config = {
-    shopName: "Summit Auto Care",
+    shopName: "BOLT BADGER SHOP",
+    logo: BOLT_BADGER_LOGO,
     shopAddress: "482 Foothill Blvd, Denver, CO 80204",
     shopPhone: "3035550142",
-    shopEmail: "service@summitautocare.example",
+    shopEmail: "service@boltbadger.example",
     ardNumber: "DEMO-000000",
     laborRate: 150,
     taxRate: 8,
