@@ -6,6 +6,7 @@ import { buildYmme, modelYears } from "../lib/ymme.js";
 import { loadValvolineSpecs, vvMakeList, vvModelList, vvEngineList } from "../lib/valvolineSpecs.js";
 import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
 import { realNameError } from "../lib/names.js";
+import { AddressField } from "./AddressField.jsx";
 
 /* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
 function mergeOpts(a, b) {
@@ -78,7 +79,7 @@ function PickOrType({ label, value, onChange, options, placeholder, numeric }) {
 /* Customer and vehicle forms, plus the customer picker a ticket uses.
    Shared by the Customers page and the ticket editor. */
 
-const US_STATES = "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
+const US_STATES = "AL AK AZ AR CA CO CT DC DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 
 export const blankCustomer = () => ({
   first: "",
@@ -135,7 +136,11 @@ export function CustomerForm({ initial, onSave, onClose, cfg }) {
         </Field>
       </div>
       <Field label="Street">
-        <Text value={d.street} onChange={set("street")} />
+        <AddressField
+          value={d.street}
+          onChange={set("street")}
+          onPick={(a) => setD((x) => ({ ...x, street: a.street, city: a.city || x.city, state: a.state || x.state, zip: a.zip || x.zip }))}
+        />
       </Field>
       <div className="fldRow">
         <Field label="City">

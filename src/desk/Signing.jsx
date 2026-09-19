@@ -7,6 +7,7 @@ import { cloud, sGet, sDel } from "../storage/index.js";
 import { SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY } from "../lib/keys.js";
 import { QR, portalUrl } from "./QR.jsx";
 import { matchExistingCustomer, customerToForm } from "../lib/checkin.js";
+import { AddressField } from "./AddressField.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* Electronic signatures. A signing view shows the whole estimate or
@@ -564,7 +565,16 @@ function CheckInForm({ shop, cfg, flash, initial, lockToId, verify, linkVehicleI
         </div>
         <label className="fld">
           <span>Home address</span>
-          <input value={d.street} onChange={set("street")} autoComplete="street-address" placeholder="Street address" />
+          <AddressField
+            value={d.street}
+            onChange={(v) => {
+              setD((x) => ({ ...x, street: v }));
+              setErr("");
+            }}
+            onPick={(a) => setD((x) => ({ ...x, street: a.street, city: a.city || x.city, state: a.state || x.state, zip: a.zip || x.zip }))}
+            placeholder="Start typing your street address…"
+            inputProps={{ autoComplete: "street-address" }}
+          />
         </label>
         <div className="fldRow">
           <label className="fld grow">
