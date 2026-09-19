@@ -8,6 +8,7 @@ import { serviceCodes } from "../lib/serviceCodes.js";
 import { orderPayout } from "../lib/commission.js";
 import { applicableCoupons, couponDiscount, couponValueText, orderJobNames, orderSubtotalBase } from "../lib/coupons.js";
 import { ConcernBuilder } from "./ConcernBuilder.jsx";
+import { suggestedWork } from "../lib/repairs.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
@@ -205,6 +206,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const customer = shop.customers[o.customerId];
   const vehicle = shop.vehicles[o.vehicleId];
   const vehicles = o.customerId ? vehiclesOf(shop.vehicles, o.customerId) : [];
+  /* from the stated concern, the BAR-safe first step (diagnose/inspect) and the
+     shop's repair categories that address it */
+  const workSuggest = suggestedWork(o.concern, cfg);
   /* the shop's own spec if entered, otherwise Valvoline's — so the oil
      change prefills quarts and grade either way */
   const shopSpec = vehicle ? (findSpec(shop.specs, vehicle) || {}).spec : null;
@@ -266,6 +270,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const pickVehicle = (id) => {
     update((d) => ({ ...d, vehicleId: id || null }));
   };
+
+  /* Open the right picker for a service-menu button — oil, a filter part
+     category, or the canned jobs in that category. Used by the top menu and
+     by the concern's suggested-work chips. */
+  const openServiceMenu = (m) => {
+    if (m.oil) return setPick("oil");
+    const pc = menuPartCat(m);
+    if (pc) {
+      setPartCat(pc);
+      return setPick("part");
+    }
+    setJobCat(m.category || m.name);
+    setPick("job");
+  };
+  /* Add a diagnosis/inspection labor line for the stated concern — the
+     BAR-safe first step before quoting the repair. */
+  const addDiagnosis = (d) =>
+    update((cur) => ({ ...cur, lines: [...cur.lines, makeLine("labor", cfg, { id: uid(), description: d.label, hours: d.hours, taxable: false })] }));
 
   /* ---------- status ---------- */
   const moveTo = async (to) => {
@@ -672,20 +694,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             {!locked && (
               <div className="addBar">
                 {(cfg.serviceMenu || []).map((m) => (
-                  <button
-                    key={m.id}
-                    className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`}
-                    onClick={() => {
-                      if (m.oil) return setPick("oil");
-                      const pc = menuPartCat(m);
-                      if (pc) {
-                        setPartCat(pc);
-                        return setPick("part");
-                      }
-                      setJobCat(m.category || m.name);
-                      setPick("job");
-                    }}
-                  >
+                  <button key={m.id} className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`} onClick={() => openServiceMenu(m)}>
                     {m.name}
                   </button>
                 ))}
@@ -757,6 +766,35 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               placeholder="Grinding noise from the front when braking…"
               readOnly={locked}
             />
+            {!locked && (workSuggest.diagnostics.length > 0 || workSuggest.menu.length > 0) && (
+              <div className="workSuggest">
+                <div className="workSuggestHd">Add the work to fix it</div>
+                {workSuggest.diagnostics.length > 0 && (
+                  <div className="workSuggestRow">
+                    <span className="workSuggestLbl">Start with</span>
+                    {workSuggest.diagnostics.map((d) => {
+                      const added = (o.lines || []).some((l) => l.kind === "labor" && String(l.description || "").toLowerCase() === d.label.toLowerCase());
+                      return (
+                        <button key={d.label} className="btn tiny" disabled={added} onClick={() => addDiagnosis(d)} title={`${d.hours} hr at your labor rate`}>
+                          {added ? "✓ " : "+ "}
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {workSuggest.menu.length > 0 && (
+                  <div className="workSuggestRow">
+                    <span className="workSuggestLbl">Repair</span>
+                    {workSuggest.menu.map((m) => (
+                      <button key={m.id || m.name} className="btn tiny" onClick={() => openServiceMenu(m)}>
+                        {m.name} ↗
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="tkLines">
               <table className="lines">

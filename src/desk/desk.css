@@ -434,6 +434,11 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .symChip { border:1px solid var(--line); border-radius:999px; padding:7px 13px; background:var(--panel); cursor:pointer; font-size:13px; color:var(--ink); }
 .symChip:hover { border-color:var(--signal); background:#fff; }
 .symChip.on { border-color:var(--brand, #7f1d1d); background:var(--brand, #7f1d1d); color:#fff; font-weight:600; }
+/* concern → suggested work (parts & labor to fix the stated concern) */
+.workSuggest { margin-top:10px; padding:12px 14px; background:var(--tint, #eef2ff); border:1px solid var(--line); border-radius:10px; }
+.workSuggestHd { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; margin-bottom:8px; }
+.workSuggestRow { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:6px; }
+.workSuggestLbl { font-size:12px; font-weight:600; color:var(--muted); min-width:56px; }
 .symChip.on:hover { background:var(--brand, #7f1d1d); }
 /* concern builder layout: symptom groups + a live preview of what prints */
 .concernBody { display:flex; gap:18px; align-items:flex-start; }
