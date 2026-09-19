@@ -40,7 +40,8 @@ import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
-import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, bayReqKey } from "../lib/keys.js";
+import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
+import { composeConcern } from "../lib/symptoms.js";
 import { OrderSign } from "./Signing.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
@@ -172,6 +173,30 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       for (const k of e.keys || []) if (k.startsWith(CART_PREFIX)) applyCart(k);
     });
   }, [applyCart]);
+
+  /* The customer built their concern on the tablet; when the result names this
+     ticket, merge it into the "Customer states" box (union, deduped) so nothing
+     the desk already typed is lost. Mirrors the parts-cart flow above. */
+  const applySymptomResult = useCallback(
+    async (key) => {
+      const r = await sGet(key, null);
+      if (!r || r.applied || r.orderId !== orderId) return;
+      if (r.concern) {
+        const lines = (s) => String(s || "").split("\n").map((l) => l.trim()).filter(Boolean);
+        update((d) => ({ ...d, concern: composeConcern([...lines(d.concern), ...lines(r.concern)], "") }));
+      }
+      await sSet(key, { ...r, applied: true, appliedAt: Date.now() });
+      flash("Customer added what's wrong from the tablet.");
+    },
+    [orderId, update, flash]
+  );
+  useEffect(() => {
+    const key = symptomResultKey(orderId);
+    applySymptomResult(key);
+    return cloud.subscribe((e) => {
+      if (e.type === "data" && (e.keys || []).some((k) => k === key)) applySymptomResult(key);
+    });
+  }, [applySymptomResult, orderId]);
 
   const openCatalog = async (key, url) => {
     await flushNow();
@@ -756,9 +781,22 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             <div className="cardHead" style={{ marginBottom: 6 }}>
               <h3 style={{ fontSize: 14 }}>Customer states (prints on the ticket)</h3>
               {!locked && (
-                <button className="btn tiny primary" onClick={() => setPick("symptom")} title="Build the concern from a guided list of symptoms, in plain language">
-                  Symptom builder
-                </button>
+                <span className="rowBtns">
+                  <button
+                    className="btn tiny"
+                    title="Send to the signature tablet for the customer to pick what's wrong themselves"
+                    onClick={async () => {
+                      await flushNow();
+                      await sSet(SYMPTOMREQ_KEY, { orderId: o.id, at: Date.now() });
+                      flash("Sent to the tablet — hand it to the customer.");
+                    }}
+                  >
+                    Ask on pad
+                  </button>
+                  <button className="btn tiny primary" onClick={() => setPick("symptom")} title="Build the concern from a guided list of symptoms, in plain language">
+                    Symptom builder
+                  </button>
+                </span>
               )}
             </div>
             <textarea

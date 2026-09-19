@@ -34,5 +34,8 @@ export const SHARED_KEYS = [ROSTER_KEY];
 export const SIGNREQ_KEY = "sd:signreq"; // the estimate the front desk has sent to the signature tablet
 export const INFOREQ_KEY = "sd:inforeq"; // a customer the front desk has sent to the tablet to verify/update their info
 export const INTAKEREQ_KEY = "sd:intakereq"; // a new car sent to the pad for the customer to fill in their own info, linked back to the ticket
+export const SYMPTOMREQ_KEY = "sd:symptomreq"; // a ticket sent to the pad for the customer to pick their symptoms (the concern)
+export const SYMPTOMRESULT_PREFIX = "sd:symptomresult:"; // the concern the customer built on the pad, merged back onto the ticket
+export const symptomResultKey = (orderId) => SYMPTOMRESULT_PREFIX + orderId;
 export const BAYREQ_PREFIX = "sd:bayreq:"; // the ticket the front desk sent to a bay's shop-floor display
 export const bayReqKey = (bayId) => BAYREQ_PREFIX + bayId;

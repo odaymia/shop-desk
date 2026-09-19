@@ -3,8 +3,9 @@ import { fmtDate } from "./ui.jsx";
 import { fmtMoney, orderTotals, lineAmount, laborQtyText, conditionLabel, statusLabel, owesBalance } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
 import { parseAuthText } from "../lib/authForm.js";
-import { cloud, sGet, sDel } from "../storage/index.js";
-import { SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY } from "../lib/keys.js";
+import { cloud, sGet, sSet, sDel } from "../storage/index.js";
+import { SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey } from "../lib/keys.js";
+import { ConcernBuilder } from "./ConcernBuilder.jsx";
 import { QR, portalUrl } from "./QR.jsx";
 import { matchExistingCustomer, customerToForm } from "../lib/checkin.js";
 import { AddressField } from "./AddressField.jsx";
@@ -295,15 +296,17 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
   const [checkedIn, setCheckedIn] = useState(false); // just-saved confirmation
   const [infoReqId, setInfoReqId] = useState(null); // customer the desk sent to verify their info
   const [intakeOrderId, setIntakeOrderId] = useState(null); // new car the desk sent for the customer to fill in their own info
+  const [symptomOrderId, setSymptomOrderId] = useState(null); // ticket the desk sent for the customer to pick their symptoms
   const load = () => {
     sGet(SIGNREQ_KEY, null).then((r) => setReqId(r && r.orderId ? r.orderId : null));
     sGet(INFOREQ_KEY, null).then((r) => setInfoReqId(r && r.customerId ? r.customerId : null));
     sGet(INTAKEREQ_KEY, null).then((r) => setIntakeOrderId(r && r.orderId ? r.orderId : null));
+    sGet(SYMPTOMREQ_KEY, null).then((r) => setSymptomOrderId(r && r.orderId ? r.orderId : null));
   };
   useEffect(() => {
     load();
     return cloud.subscribe((e) => {
-      if (e.type === "data" && (e.keys || []).some((k) => k === SIGNREQ_KEY || k === INFOREQ_KEY || k === INTAKEREQ_KEY)) load();
+      if (e.type === "data" && (e.keys || []).some((k) => k === SIGNREQ_KEY || k === INFOREQ_KEY || k === INTAKEREQ_KEY || k === SYMPTOMREQ_KEY)) load();
     });
   }, []);
 
@@ -311,9 +314,11 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
   const infoCust = infoReqId ? shop.customers[infoReqId] : null;
   const intakeOrder = intakeOrderId ? shop.orders[intakeOrderId] : null;
   const intakeVeh = intakeOrder && intakeOrder.vehicleId ? shop.vehicles[intakeOrder.vehicleId] : null;
+  const symptomOrder = symptomOrderId ? shop.orders[symptomOrderId] : null;
   const clearReq = () => sDel(SIGNREQ_KEY);
   const clearInfo = () => sDel(INFOREQ_KEY);
   const clearIntake = () => sDel(INTAKEREQ_KEY);
+  const clearSymptom = () => sDel(SYMPTOMREQ_KEY);
 
   /* Right after they sign, the tablet shows a QR to the portal so the
      customer can pull up all their receipts before handing it back. */
@@ -403,6 +408,29 @@ export function SignatureStation({ shop, cfg, flash, onLock }) {
         onDone={() => {
           clearIntake();
           setIntakeOrderId(null);
+          setCheckedIn(true);
+        }}
+      />
+    );
+  }
+
+  /* The desk sent a ticket over for the customer to pick what's wrong. Their
+     picks are written back to a result key the ticket merges in — the pad never
+     touches the order directly, so it can't clobber the desk's edits. */
+  if (symptomOrder) {
+    return (
+      <ConcernBuilder
+        cfg={cfg}
+        value={symptomOrder.concern}
+        forCustomer
+        onClose={() => {
+          clearSymptom();
+          setSymptomOrderId(null);
+        }}
+        onSave={(text) => {
+          sSet(symptomResultKey(symptomOrder.id), { orderId: symptomOrder.id, concern: text, at: Date.now(), applied: false });
+          clearSymptom();
+          setSymptomOrderId(null);
           setCheckedIn(true);
         }}
       />
