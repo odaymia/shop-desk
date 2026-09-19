@@ -188,7 +188,7 @@ export const blankVehicle = (customerId) => ({
   active: true,
 });
 
-export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLookup, shop }) {
+export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, cfg, autoLookup, shop }) {
   const [d, setD] = useState(() => ({ ...blankVehicle(customerId), ...(initial || {}) }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -363,6 +363,16 @@ export function VehicleForm({ initial, customerId, onSave, onClose, cfg, autoLoo
       <button className="btn primary lg full" onClick={save}>
         Save vehicle
       </button>
+      {onRelease && d.id && d.active !== false && (
+        <button
+          className="btn full"
+          style={{ marginTop: 8 }}
+          onClick={onRelease}
+          title="Move this car to the customer's Former cars — kept on file for the service history"
+        >
+          No longer owned by customer
+        </button>
+      )}
     </Modal>
   );
 }

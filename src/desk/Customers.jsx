@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { cloud, sSet } from "../storage/index.js";
 import { INFOREQ_KEY } from "../lib/keys.js";
 import { Money, fmtDate, fmtPhone } from "./ui.jsx";
@@ -174,11 +174,18 @@ export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
 function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
   const [editing, setEditing] = useState(false);
   const [vehEdit, setVehEdit] = useState(null); // vehicle draft or {} for new
+  const [histVeh, setHistVeh] = useState(null); // when set, the History card shows just this car's receipts
+  const histRef = useRef(null);
+  const showCarHistory = (id) => {
+    setHistVeh(id);
+    setTimeout(() => histRef.current && histRef.current.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
   const vehs = vehiclesOf(shop.vehicles, c.id);
   /* cars they no longer own — kept on file for the service history, shown
      apart from their current cars */
   const formerVehs = Object.values(shop.vehicles).filter((v) => v.customerId === c.id && v.active === false);
   const history = ordersOf(shop.orders, { customerId: c.id });
+  const shownHistory = histVeh ? history.filter((o) => o.vehicleId === histVeh) : history;
   const releaseVehicle = async (v) => {
     await shop.saveVehicle({ ...v, active: false });
     flash(`${vehicleName(v)} moved to former cars`);
@@ -255,12 +262,8 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
                           <button className="btn tiny" onClick={() => setVehEdit(v)}>
                             Edit
                           </button>
-                          <button
-                            className="btn tiny"
-                            title="They no longer own this car — move it to Former cars (kept on file)"
-                            onClick={() => releaseVehicle(v)}
-                          >
-                            No longer theirs
+                          <button className="btn tiny" onClick={() => showCarHistory(v.id)} title="Show this car's receipts">
+                            History
                           </button>
                           <button className="btn tiny primary" onClick={() => onNew({ customerId: c.id, vehicleId: v.id })}>
                             Ticket
@@ -290,9 +293,14 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
                       </td>
                       <td className="num">{v.plate || "—"}</td>
                       <td className="r">
-                        <button className="btn tiny" title="They own this car again — move it back to their cars" onClick={() => restoreVehicle(v)}>
-                          Still theirs
-                        </button>
+                        <span className="rowActs">
+                          <button className="btn tiny" title="Show this car's receipts" onClick={() => showCarHistory(v.id)}>
+                            History
+                          </button>
+                          <button className="btn tiny" title="They own this car again — move it back to their cars" onClick={() => restoreVehicle(v)}>
+                            Still theirs
+                          </button>
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -301,13 +309,21 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
             </div>
           )}
 
-          <div className="card">
+          <div className="card" ref={histRef}>
             <div className="cardHead">
               <h3>History</h3>
+              {histVeh && (
+                <span className="rowActs">
+                  <span className="muted sub">Showing {vehicleName(shop.vehicles[histVeh]) || "one car"}</span>
+                  <button className="btn tiny" onClick={() => setHistVeh(null)}>
+                    Show all cars
+                  </button>
+                </span>
+              )}
             </div>
-            {history.length === 0 ? (
+            {shownHistory.length === 0 ? (
               <p className="muted" style={{ margin: 0 }}>
-                No tickets yet.
+                {histVeh ? "No receipts for this car." : "No tickets yet."}
               </p>
             ) : (
               <table className="dk">
@@ -322,7 +338,7 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((o) => {
+                  {shownHistory.map((o) => {
                     const t = orderTotals(o, cfg, c);
                     return (
                       <tr key={o.id} className="row" onClick={() => nav.openOrder(o.id)}>
@@ -411,6 +427,10 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
             await shop.saveVehicle(v);
             setVehEdit(null);
             flash("Vehicle saved");
+          }}
+          onRelease={async () => {
+            await releaseVehicle(vehEdit);
+            setVehEdit(null);
           }}
         />
       )}
