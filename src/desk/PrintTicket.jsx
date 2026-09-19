@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel, owesBalance } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
-import { fmtDate, fmtPhone } from "./ui.jsx";
+import { fmtDate, fmtDateTime, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { staffLabel } from "../lib/names.js";
 import { checklistSummary, recommendedServices } from "../lib/checklist.js";
 import { parseAuthText } from "../lib/authForm.js";
+import { isHazmatFee, authRecordText, reauthText } from "../lib/compliance.js";
 
 /* The paper copy. Black on white, one page for most tickets. */
 export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
@@ -124,7 +125,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
             </thead>
             <tbody>
               {groups.map((g, gi) => (
-                <GroupRows key={gi} g={g} />
+                <GroupRows key={gi} g={g} shop={shop} cfg={cfg} />
               ))}
             </tbody>
           </table>
@@ -196,11 +197,13 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
           {isInvoice ? (
             <>
               {cfg.invoiceFooter && <AuthNote text={cfg.invoiceFooter} fill={o.authFill} />}
+              <AuthRecord order={o} />
               <SignBlock sig={(o.signatures || {}).delivery} label="Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty" />
             </>
           ) : (
             <>
               {cfg.authorizationText && <AuthNote text={cfg.authorizationText} fill={o.authFill} />}
+              <AuthRecord order={o} />
               <SignBlock sig={(o.signatures || {}).authorization} label="Customer signature" />
             </>
           )}
@@ -234,6 +237,23 @@ function AuthNote({ text, fill }) {
 
 /* The signature line, with the captured e-signature drawn on it when the
    customer has signed. */
+/* The record of how/when the customer authorized the work (a recorded oral or
+   electronic approval, plus any additional approvals for added work). The
+   in-person signature prints in its own block below. */
+function AuthRecord({ order }) {
+  const auth = order.auth && order.auth.name ? authRecordText(order.auth, fmtDateTime) : "";
+  const reauths = (order.reauths || []).map((r) => reauthText(r, fmtDateTime)).filter(Boolean);
+  if (!auth && reauths.length === 0) return null;
+  return (
+    <div className="shAuthRec">
+      {auth && <div>{auth}</div>}
+      {reauths.map((s, i) => (
+        <div key={i}>{s}</div>
+      ))}
+    </div>
+  );
+}
+
 function SignBlock({ sig, label }) {
   if (sig && sig.img)
     return (
@@ -282,13 +302,17 @@ function CrewLine({ o, cfg, name }) {
   );
 }
 
-function LineRow({ l }) {
+function LineRow({ l, shop, cfg }) {
+  const vendor = l.kind === "sublet" && l.vendorId && shop && shop.vendors ? shop.vendors[l.vendorId] : null;
+  const epaId = isHazmatFee(l) ? String((cfg && cfg.epaId) || "").trim() : "";
   return (
     <tr>
       <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>
       <td>
         {l.description}
         {l.kind === "part" ? <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span> : null}
+        {vendor ? <span style={{ color: "#777" }}> · Sublet to {vendor.name}{vendor.city ? `, ${vendor.city}` : ""}</span> : null}
+        {epaId ? <span style={{ color: "#777" }}> · EPA ID {epaId}</span> : null}
         {l.kind === "labor" && l.details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{l.details}</div> : null}
       </td>
       <td className="r">{l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : l.qty}</td>
@@ -302,7 +326,7 @@ function LineRow({ l }) {
    then each included part itemized at $0 (it's covered by the package
    price). The parts still carry their taxable value in the totals. Extra
    quarts and a canister-filter charge print as their own priced lines. */
-function GroupRows({ g }) {
+function GroupRows({ g, shop, cfg }) {
   const packaged = g.lines.filter((l) => l.packaged);
   const rest0 = g.lines.filter((l) => !l.packaged);
   const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
@@ -354,7 +378,7 @@ function GroupRows({ g }) {
         )
       )}
       {rest.map((l) => (
-        <LineRow key={l.id} l={l} />
+        <LineRow key={l.id} l={l} shop={shop} cfg={cfg} />
       ))}
     </>
   );

@@ -176,7 +176,10 @@ export function OrderSign({ order, shop, cfg, onDone, flash }) {
     try {
       const at = Date.now();
       const signatures = { ...(order.signatures || {}), [slot]: { img, name: name.trim(), at } };
-      await shop.saveOrder({ ...order, signatures, authFill: { checks, blanks }, history: [...(order.history || []), { at, what: `signed: ${slot === "delivery" ? "vehicle received" : "estimate approved"}` }] });
+      /* signing the estimate/RO authorizes it — stamp the approved total so a
+         later increase is flagged for re-authorization */
+      const authStamp = slot === "authorization" ? { authorizedTotal: t.total } : {};
+      await shop.saveOrder({ ...order, signatures, authFill: { checks, blanks }, ...authStamp, history: [...(order.history || []), { at, what: `signed: ${slot === "delivery" ? "vehicle received" : "estimate approved"}` }] });
       flash("Signature saved");
       onDone(true);
     } catch (e) {

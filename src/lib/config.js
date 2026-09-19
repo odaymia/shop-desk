@@ -16,6 +16,7 @@ export const DEFAULT_CFG = {
   partsTechUser: "", // the shop's PartsTech login (email) and API key, from PartsTech → My Account → API
   partsTechKey: "",
   ardNumber: "", // California BAR registration (ARD) number, printed on every estimate and invoice
+  epaId: "", // EPA ID number, printed next to a hazardous-waste disposal fee (BAR requires it)
   logo: "", // data URL of the shop logo; blank shows the bundled Genie logo
   printStaffNames: "full", // off | full | first-initial | initials — writer and tech on printed tickets
   plateApiKey: "", // PlateToVIN key for plate → VIN lookups; blank hides the button

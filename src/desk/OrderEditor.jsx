@@ -11,6 +11,7 @@ import { ConcernBuilder } from "./ConcernBuilder.jsx";
 import { FixBuilder } from "./FixBuilder.jsx";
 import { addFinding } from "../lib/findings.js";
 import { suggestedWork } from "../lib/repairs.js";
+import { needsReauth, complianceWarnings } from "../lib/compliance.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
@@ -316,6 +317,32 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const addDiagnosis = (d) =>
     update((cur) => ({ ...cur, lines: [...cur.lines, makeLine("labor", cfg, { id: uid(), description: d.label, hours: d.hours, taxable: false })] }));
 
+  /* Record a phone / verbal authorization (no signature), stamping the total
+     the customer approved so we can catch later increases. */
+  const recordPhoneAuth = ({ name, contact, advisor, note }) => {
+    const at = Date.now();
+    const total = orderTotals(draftRef.current, cfg, customer).total;
+    update((d) => ({
+      ...d,
+      auth: { method: "phone", name, contact, advisor, at, total },
+      authorizedTotal: total,
+      history: [...(d.history || []), { at, what: `authorized by phone — ${name}` }],
+    }));
+    flash("Phone authorization recorded.");
+  };
+  /* Record additional approval for work added after the first authorization. */
+  const recordReauth = ({ name, contact, advisor, note }) => {
+    const at = Date.now();
+    const total = orderTotals(draftRef.current, cfg, customer).total;
+    update((d) => ({
+      ...d,
+      reauths: [...(d.reauths || []), { method: "phone", name, contact, advisor, note, at, priorTotal: d.authorizedTotal || 0, newTotal: total }],
+      authorizedTotal: total,
+      history: [...(d.history || []), { at, what: `additional work authorized — ${name}` }],
+    }));
+    flash("Additional authorization recorded.");
+  };
+
   /* ---------- status ---------- */
   const moveTo = async (to) => {
     const latest = await flushNow();
@@ -324,6 +351,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     if (to === STATUS.invoiced && hasOilChange(latest) && !crewAssigned(latest)) {
       setSticker({ id: latest.id });
       return flash("Assign the advisor, top tech, and pit tech before posting an oil change.", "out");
+    }
+    /* soft BAR compliance check before posting — flags the common gaps but
+       never blocks; the writer can fix or knowingly proceed */
+    if (to === STATUS.invoiced) {
+      const warns = complianceWarnings(latest, cfg, orderTotals(latest, cfg, customer).total);
+      if (warns.length && !window.confirm(`Before posting, note:\n\n• ${warns.join("\n• ")}\n\nPost the invoice anyway?`)) return;
     }
     try {
       const saved = await shop.setStatus(latest, to, customer);
@@ -433,6 +466,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             <>
               <button className="btn" onClick={async () => (await flushNow(), setSigning(true))}>
                 Get signature
+              </button>
+              <button
+                className="btn"
+                title="Record a phone or verbal OK when the customer isn't here to sign — BAR requires the authorization on record"
+                onClick={() => setPick("phoneauth")}
+              >
+                By phone
               </button>
               {customer && (
                 <button
@@ -603,6 +643,17 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 : o.status === STATUS.void
                 ? `This invoice was voided ${fmtDateTime(o.voidedAt)}. It stays on file; nothing on it can change.`
                 : `Posted ${fmtDateTime(o.invoicedAt)}. Lines are locked, but you can still add a coupon. To change anything else, use Back to repair order, fix it, and post again — the number stays the same.`}
+            </div>
+          )}
+          {!locked && needsReauth(o, t.total) && (
+            <div className="warnBox reauthBox" style={{ marginBottom: 14 }}>
+              <span>
+                The total is now <strong>{fmtMoney(t.total)}</strong>, above the <strong>{fmtMoney(o.authorizedTotal)}</strong> the customer approved. BAR requires the
+                customer's OK for the added work before it's done.
+              </span>
+              <button className="btn tiny" onClick={() => setPick("reauth")}>
+                Record approval
+              </button>
             </div>
           )}
 
@@ -1174,6 +1225,29 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           value={o.concern}
           onClose={() => setPick(null)}
           onSave={(text) => update({ concern: text })}
+        />
+      )}
+      {pick === "phoneauth" && (
+        <AuthPhoneModal
+          customer={customer}
+          advisorName={(employees.find((e) => e.id === (o.advisorId || o.writerId)) || {}).name || ""}
+          onClose={() => setPick(null)}
+          onSave={(rec) => {
+            recordPhoneAuth(rec);
+            setPick(null);
+          }}
+        />
+      )}
+      {pick === "reauth" && (
+        <AuthPhoneModal
+          reauth
+          customer={customer}
+          advisorName={(employees.find((e) => e.id === (o.advisorId || o.writerId)) || {}).name || ""}
+          onClose={() => setPick(null)}
+          onSave={(rec) => {
+            recordReauth(rec);
+            setPick(null);
+          }}
         />
       )}
       {pick === "fix" && (
@@ -1758,6 +1832,46 @@ function CouponPicker({ shop, order, onClose, onApply }) {
           ))}
         </div>
       )}
+    </Modal>
+  );
+}
+
+/* Record a phone / verbal authorization (or additional approval) when the
+   customer isn't present to sign — who OK'd it, the number reached, and who
+   took the call. BAR requires the authorization on record. */
+function AuthPhoneModal({ customer, advisorName, reauth, onClose, onSave }) {
+  const [name, setName] = useState(() => (customer ? customerName(customer) : ""));
+  const [contact, setContact] = useState(() => (customer && customer.phone ? fmtPhone(customer.phone) : ""));
+  const [advisor, setAdvisor] = useState(advisorName || "");
+  const [note, setNote] = useState("");
+  const save = () => {
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), contact: contact.trim(), advisor: advisor.trim(), note: note.trim() });
+  };
+  return (
+    <Modal title={reauth ? "Record additional authorization" : "Record phone authorization"} onClose={onClose}>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {reauth
+          ? "The customer approved the added work. Record who approved it and how, so the extra work is authorized."
+          : "The customer OK'd the work by phone. Recording it keeps you covered under BAR when there's no signature."}
+      </p>
+      <Field label="Who authorized it">
+        <Text value={name} onChange={setName} placeholder="Customer name" autoFocus />
+      </Field>
+      <Field label="Phone number reached">
+        <Text value={contact} onChange={setContact} inputMode="tel" placeholder="(619) 555-0100" />
+      </Field>
+      <Field label="Recorded by (advisor)">
+        <Text value={advisor} onChange={setAdvisor} placeholder="Who took the call" />
+      </Field>
+      {reauth && (
+        <Field label="What was added (optional)">
+          <Text value={note} onChange={setNote} placeholder="e.g. approved rear brakes and rotors too" />
+        </Field>
+      )}
+      <button className="btn primary lg full" onClick={save} disabled={!name.trim()}>
+        {reauth ? "Record approval" : "Record authorization"}
+      </button>
     </Modal>
   );
 }

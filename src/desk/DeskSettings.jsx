@@ -159,6 +159,13 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <Field label="BAR registration number (ARD)">
             <Text value={d.ardNumber || ""} onChange={set("ardNumber")} placeholder="ARD00123456" />
           </Field>
+          <Field label="EPA ID number (hazardous waste)">
+            <Text value={d.epaId || ""} onChange={set("epaId")} placeholder="CAL000123456" />
+          </Field>
+          <p className="legalNote" style={{ marginTop: -6, marginBottom: 18 }}>
+            Only needed if you charge a hazardous-waste / disposal fee — BAR requires the fee to print with your EPA ID number. It fills in
+            automatically on any disposal fee line.
+          </p>
           <p className="legalNote" style={{ marginTop: -6, marginBottom: 18 }}>
             California requires the shop's Automotive Repair Dealer number, name, and address on every invoice. It prints in
             the header once it's filled in.
