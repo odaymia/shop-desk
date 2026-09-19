@@ -16,6 +16,7 @@ import { PrintTicket } from "./PrintTicket.jsx";
 import { StartTicket } from "./StartTicket.jsx";
 import { SignatureStation } from "./Signing.jsx";
 import { BayDisplay } from "./BayDisplay.jsx";
+import { DEMO } from "../lib/demo.js";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
@@ -155,6 +156,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
             <img className="brandLogo" src={cfg.logo || defaultLogo} alt="" />
             <strong>{cfg.shopName}</strong>
             <span>Front desk</span>
+            {DEMO && <span className="brandDemoNote">Your shop's logo &amp; name go here — set them in Settings</span>}
           </div>
           {PAGES.map(([k, label]) => (
             <button key={k} className={`deskNavBtn ${page === k ? "on" : ""}`} onClick={() => nav.go(k)}>
