@@ -156,19 +156,34 @@ const nounFor = (action) => {
 
 const clean = (s) => String(s || "").trim().replace(/[.\s]+$/, "");
 
-/* Build the finding sentence from the parts the tech filled in. Only the
-   pieces present are included, so a half-filled builder still reads well. */
+/* Lowercase the first letter for mid-sentence use, unless the first word looks
+   like an acronym or code (A/C, TPMS, ABS) — keep those as written. */
+export function lowerFirst(s) {
+  const t = String(s || "");
+  if (!t) return t;
+  return /^[a-z]/.test(t[1] || "") ? t[0].toLowerCase() + t.slice(1) : t;
+}
+
+/* Join a list as prose with an Oxford comma: "a", "a and b", "a, b, and c". */
+export function oxfordJoin(items) {
+  const list = (items || []).map((s) => String(s || "").trim()).filter(Boolean);
+  if (list.length <= 1) return list[0] || "";
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  return `${list.slice(0, -1).join(", ")}, and ${list[list.length - 1]}`;
+}
+
+/* Build the finding sentence from the parts the tech filled in. `concern` and
+   `found` come in already joined as prose. Only the pieces present are
+   included, so a half-filled builder still reads well. */
 export function composeFinding({ inspected, concern, found, action, component } = {}) {
-  const insp = clean(inspected);
-  const con = clean(concern).replace(/\n+/g, "; ");
-  const fnd = clean(found);
+  const insp = clean(inspected) || "the vehicle";
+  const con = clean(concern).replace(/\s*[;\n]+\s*/g, ", ");
+  const fnd = clean(found).replace(/\s*[;\n]+\s*/g, ", ");
   const comp = clean(component);
   const act = clean(action);
 
-  let s = "";
-  if (insp) s += `Inspected ${insp}`;
-  else s += "Inspected the vehicle";
-  if (con) s += ` because the customer stated: ${con}`;
+  let s = `Inspected ${insp}`;
+  if (con) s += ` for the customer's concern of ${con}`;
   s += ".";
   if (fnd) s += ` Found ${fnd}.`;
   if (act) {

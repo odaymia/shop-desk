@@ -274,7 +274,10 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .sheet .shNote { margin-top:16px; font-size:11px; color:#333; }
 .sheet .shSign { margin-top:34px; display:flex; gap:30px; }
 .sheet .shSign div { flex:1; border-top:1px solid #111; padding-top:4px; font-size:10px; color:#555; }
-.sheet .shConcern { margin:0 0 8px; padding:5px 8px; background:#f4f4f4; border-radius:4px; }
+.sheet .shConcern { margin:0 0 8px; padding:6px 10px; background:#f4f4f4; border-radius:4px; }
+.sheet .shConcern > strong { display:block; text-transform:uppercase; letter-spacing:.06em; font-size:9px; color:#555; margin-bottom:3px; }
+.sheet .shConcern .shList { list-style:disc; margin:0; padding:0 0 0 16px; }
+.sheet .shConcern .shList li { margin:1px 0; line-height:1.35; }
 .sheet .shCrew { display:flex; flex-wrap:wrap; gap:4px 14px; margin:0 0 8px; padding:5px 8px; background:#f4f4f4; border-radius:4px; font-size:10px; color:#333; }
 .sheet .shCrew .shCrewLabel { text-transform:uppercase; letter-spacing:.06em; color:#555; font-size:9px; align-self:center; }
 .sheet .shNote { margin-top:10px; font-size:9.5px; line-height:1.35; }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Modal } from "./ui.jsx";
-import { composeFinding, fixLaborDescription, findingsForCategories, FIX_ACTIONS, SYSTEM_FOR_CATEGORY } from "../lib/findings.js";
+import { composeFinding, fixLaborDescription, findingsForCategories, oxfordJoin, lowerFirst, FIX_ACTIONS, SYSTEM_FOR_CATEGORY } from "../lib/findings.js";
 import { concernCategories } from "../lib/repairs.js";
 
 /* The fix builder. After inspecting the car, the tech fills in what was
@@ -9,7 +9,7 @@ import { concernCategories } from "../lib/repairs.js";
    the writer puts parts and a labor time against. */
 export function FixBuilder({ cfg, concern, onSave, onClose }) {
   const concernLines = useMemo(() => String(concern || "").split("\n").map((l) => l.trim()).filter(Boolean), [concern]);
-  const [picked, setPicked] = useState(() => new Set(concernLines.map((l) => l.toLowerCase())));
+  const [picked, setPicked] = useState(() => new Set()); // pick the concern(s) this specific fix addresses
   const [inspected, setInspected] = useState("");
   const [foundPicked, setFoundPicked] = useState(() => new Set());
   const [otherFound, setOtherFound] = useState("");
@@ -19,7 +19,7 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
   const [addLabor, setAddLabor] = useState(true);
 
   const selectedConcerns = concernLines.filter((l) => picked.has(l.toLowerCase()));
-  const concernText = selectedConcerns.join("; ");
+  const concernText = oxfordJoin(selectedConcerns.map((c) => lowerFirst(c.replace(/[.;\s]+$/, ""))));
   const cats = useMemo(() => concernCategories(selectedConcerns.join("\n"), cfg), [concernText, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
   const systems = useMemo(() => {
     const seen = new Set();
@@ -41,7 +41,7 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
     const other = otherFound.trim();
     return other ? [...inOrder, other] : inOrder;
   }, [findingGroups, foundPicked, otherFound]);
-  const found = foundList.join("; ");
+  const found = oxfordJoin(foundList);
 
   const finding = composeFinding({ inspected, concern: concernText, found, action, component });
   const laborDesc = fixLaborDescription({ action, component });

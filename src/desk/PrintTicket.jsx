@@ -96,14 +96,20 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
           <CrewLine o={o} cfg={cfg} name={techName} />
 
           {o.concern && (
-            <p className="shConcern">
-              <strong>Customer states:</strong> {o.concern}
-            </p>
+            <div className="shConcern">
+              <strong>Customer states</strong>
+              <ul className="shList">
+                {o.concern.split("\n").map((l, i) => (l.trim() ? <li key={i}>{l.trim()}</li> : null))}
+              </ul>
+            </div>
           )}
           {o.findings && (
-            <p className="shConcern">
-              <strong>Inspection findings:</strong> {o.findings}
-            </p>
+            <div className="shConcern">
+              <strong>Inspection findings</strong>
+              <ul className="shList">
+                {o.findings.split("\n").map((l, i) => (l.trim() ? <li key={i}>{l.trim()}</li> : null))}
+              </ul>
+            </div>
           )}
 
           <table>
