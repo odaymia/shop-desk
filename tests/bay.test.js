@@ -98,6 +98,12 @@ test("bayCard on a non-oil ticket has no oil block", () => {
 });
 
 test("bayCard is safe on an empty or missing ticket", () => {
-  assert.deepEqual(bayCard(null), { services: [], oil: null, visits: [] });
-  assert.deepEqual(bayCard({ lines: [] }), { services: [], oil: null, visits: [] });
+  assert.deepEqual(bayCard(null), { services: [], oil: null, visits: [], mileage: null });
+  assert.deepEqual(bayCard({ lines: [] }), { services: [], oil: null, visits: [], mileage: null });
+});
+
+test("bayCard reports today's mileage from the ticket (mileage out wins over in)", () => {
+  assert.equal(bayCard({ lines: [], mileageIn: 61200 }).mileage, 61200);
+  assert.equal(bayCard({ lines: [], mileageIn: 61200, mileageOut: 61210 }).mileage, 61210);
+  assert.equal(bayCard({ lines: [] }).mileage, null);
 });

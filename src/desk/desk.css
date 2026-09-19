@@ -190,6 +190,11 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .bayPickGrid .btn { min-width:180px; font-size:20px; }
 .bayCar { flex:1; padding:24px 28px 40px; display:flex; flex-direction:column; gap:24px; }
 .bayVeh { font-size:30px; font-weight:800; color:#e2e8f0; }
+.bayMiles { display:flex; align-items:baseline; gap:10px; margin-top:-8px; }
+.bayMiles span { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:#93c5fd; }
+.bayMiles b { font-size:26px; font-weight:900; color:#fff; font-variant-numeric:tabular-nums; }
+.bayPanel.compact .bayMiles b { font-size:20px; }
+.bayPanel.compact .bayMiles span { font-size:12px; }
 .bayLabel { font-size:16px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#7dd3fc; margin-bottom:6px; }
 .bayOil { background:#0b2447; border:2px solid #1d4ed8; border-radius:14px; padding:20px 24px; }
 .bayBig { font-size:clamp(40px, 9vw, 96px); font-weight:900; line-height:1.02; color:#fff; }

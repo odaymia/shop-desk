@@ -3,7 +3,7 @@
    type, how many quarts, and which filter — plus the car's last few visits
    the way the invoice's service history reads (date, mileage, codes).
    Pure — no React, DOM, or storage. */
-import { hasOilChange, lastOilUsed, readsOil } from "./sticker.js";
+import { hasOilChange, lastOilUsed, readsOil, currentMileage } from "./sticker.js";
 import { serviceCodes } from "./serviceCodes.js";
 
 const clean = (s) =>
@@ -88,5 +88,5 @@ export function bayCard(order, ctx = {}) {
     };
   }
 
-  return { services, oil, visits };
+  return { services, oil, visits, mileage: currentMileage(order) || null };
 }

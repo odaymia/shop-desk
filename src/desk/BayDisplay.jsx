@@ -172,6 +172,12 @@ function BayPanel({ bay, shop, order, compact, cfg }) {
             {veh ? vehicleName(veh) : "Vehicle"}
             {veh && veh.plate ? ` · ${veh.plate}` : ""}
           </div>
+          {card.mileage != null && (
+            <div className="bayMiles">
+              <span>Mileage today</span>
+              <b>{card.mileage.toLocaleString()}</b>
+            </div>
+          )}
           {card.oil && (
             <div className="bayOil">
               <div className="bayLabel">OIL CHANGE — OIL</div>
