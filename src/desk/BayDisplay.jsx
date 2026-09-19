@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cloud, sGet } from "../storage/index.js";
 import { bayReqKey } from "../lib/keys.js";
 import { bayCard } from "../lib/bay.js";
 import { vehicleName } from "./useShop.js";
+import { fmtDate } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The shop-floor bay screen. A tablet by the bays runs this and shows — in
@@ -149,7 +150,12 @@ export function BayDisplay({ shop, cfg }) {
 
 /* One bay's card — full-screen on its own, or a tile in the grid (compact). */
 function BayPanel({ bay, shop, order, compact, cfg }) {
-  const card = order ? bayCard(order) : null;
+  const vehicleId = order ? order.vehicleId : null;
+  const priorOrders = useMemo(() => {
+    if (!vehicleId) return [];
+    return Object.values(shop.orders).filter((o) => o.vehicleId === vehicleId);
+  }, [shop.orders, vehicleId]);
+  const card = order ? bayCard(order, { parts: shop.parts, priorOrders }) : null;
   const veh = order ? shop.vehicles[order.vehicleId] : null;
 
   return (
@@ -190,6 +196,22 @@ function BayPanel({ bay, shop, order, compact, cfg }) {
                   <li key={i}>{s}</li>
                 ))}
               </ul>
+            </div>
+          )}
+          {card.visits.length > 0 && (
+            <div className="bayHist">
+              <div className="bayLabel">Service history · last {card.visits.length}</div>
+              <table className="bayHistTbl">
+                <tbody>
+                  {card.visits.map((v, i) => (
+                    <tr key={i}>
+                      <td className="bayHistDate">{v.date ? fmtDate(v.date) : "—"}</td>
+                      <td className="bayHistMiles">{v.miles ? `${v.miles.toLocaleString()} mi` : "—"}</td>
+                      <td className="bayHistCodes">{v.codes.length ? v.codes.join(", ") : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

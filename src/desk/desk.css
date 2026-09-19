@@ -191,6 +191,13 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .baySvc .bayLabel { color:#cbd5e1; }
 .baySvc ul { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
 .baySvc li { font-size:26px; font-weight:700; color:#e2e8f0; }
+.bayHist { margin-top:4px; }
+.bayHistTbl { width:100%; border-collapse:collapse; }
+.bayHistTbl td { padding:8px 0; border-top:1px solid #1f2937; font-size:20px; color:#cbd5e1; vertical-align:top; }
+.bayHistTbl tr:first-child td { border-top:none; }
+.bayHistTbl .bayHistDate { white-space:nowrap; width:120px; color:#e2e8f0; font-weight:700; }
+.bayHistTbl .bayHistMiles { white-space:nowrap; width:120px; text-align:right; font-variant-numeric:tabular-nums; padding-right:18px; }
+.bayHistTbl .bayHistCodes { font-weight:800; color:#7dd3fc; letter-spacing:.02em; }
 /* several bays side by side on one screen */
 .bayGrid { flex:1; display:grid; gap:16px; padding:16px; align-content:start; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); overflow:auto; }
 .bayPanel.compact { background:#111c33; border:1px solid #1f2937; border-radius:16px; padding:16px 18px; display:flex; flex-direction:column; min-height:220px; }
@@ -203,6 +210,9 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .bayPanel.compact .bayStat b { font-size:clamp(24px, 3.4vw, 38px); }
 .bayPanel.compact .bayLabel { font-size:14px; }
 .bayPanel.compact .baySvc li { font-size:19px; }
+.bayPanel.compact .bayHistTbl td { font-size:15px; padding:5px 0; }
+.bayPanel.compact .bayHistTbl .bayHistDate { width:96px; }
+.bayPanel.compact .bayHistTbl .bayHistMiles { width:88px; padding-right:10px; }
 .bayPanel.compact .bayIdle { min-height:0; padding:24px 8px; }
 .bayPanel.compact .bayIdle p { font-size:20px; }
 .miniLine { display:grid; grid-template-columns:100px 1fr 80px 100px 36px; gap:8px; align-items:center; }

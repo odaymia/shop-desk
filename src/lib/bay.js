@@ -1,7 +1,10 @@
 /* What the shop-floor bay display shows a tech about the car on the ticket:
    the services being done, and for an oil change the big three — the oil
-   type, how many quarts, and which filter. Pure — no React, DOM, or storage. */
+   type, how many quarts, and which filter — plus the car's last few visits
+   the way the invoice's service history reads (date, mileage, codes).
+   Pure — no React, DOM, or storage. */
 import { hasOilChange, lastOilUsed, readsOil } from "./sticker.js";
+import { serviceCodes } from "./serviceCodes.js";
 
 const clean = (s) =>
   String(s || "")
@@ -22,8 +25,9 @@ const partLabel = (l) => {
   return clean(l.description) || "Service";
 };
 
-export function bayCard(order) {
+export function bayCard(order, ctx = {}) {
   const lines = (order && order.lines) || [];
+  const parts = ctx.parts || {};
 
   /* Everything being done to the car, in the order it was added: each canned
      job by name, plus any loose part (a wiper, an air filter) added on its
@@ -50,6 +54,20 @@ export function bayCard(order) {
     if (l.kind === "part" && !l.oil && !l.packaged && !isSurcharge(l)) add(partLabel(l));
   }
 
+  /* The car's last 10 completed visits, newest first — the same date /
+     mileage / service-code read as the invoice's service history. */
+  const vehId = order && order.vehicleId;
+  const visits = (ctx.priorOrders || [])
+    .filter((o) => o && o.status === "invoiced" && o.id !== (order && order.id) && (!vehId || o.vehicleId === vehId))
+    .sort((a, b) => (b.invoicedAt || b.createdAt || 0) - (a.invoicedAt || a.createdAt || 0))
+    .slice(0, 10)
+    .map((o) => ({
+      number: o.number,
+      date: o.invoicedAt || o.createdAt || null,
+      miles: Number(o.mileageOut || o.mileageIn) || null,
+      codes: serviceCodes(o, parts),
+    }));
+
   /* The oil-change highlights — only the oil that's part of the oil change,
      never the fluid from a transmission service or radiator flush (those
      ride on their own package line and must not add to the quart count). An
@@ -70,5 +88,5 @@ export function bayCard(order) {
     };
   }
 
-  return { services, oil };
+  return { services, oil, visits };
 }

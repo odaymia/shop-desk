@@ -69,6 +69,28 @@ test("bayCard lists loose parts added on their own — air filter, cabin filter,
   assert.equal(c.oil.quarts, 5); // the loose parts don't touch the quart total
 });
 
+test("bayCard returns the car's last invoiced visits with date, mileage, and codes", () => {
+  const order = { id: "cur", vehicleId: "v1", lines: [{ kind: "labor", oil: true, job: "Oil change", description: "Oil change" }] };
+  const priorOrders = [
+    { id: "cur", vehicleId: "v1", status: "invoiced", invoicedAt: 9, number: 3000, lines: [] }, // the current ticket — excluded
+    { id: "p1", vehicleId: "v1", status: "invoiced", invoicedAt: 300, number: 2050, mileageOut: 60000, lines: [{ kind: "labor", oil: true, job: "Oil change", description: "Oil change" }, { kind: "labor", job: "Transmission service", description: "Trans" }] },
+    { id: "p2", vehicleId: "v1", status: "invoiced", invoicedAt: 100, number: 2040, mileageIn: 55000, lines: [{ kind: "labor", oil: true, job: "Oil change", description: "Oil change" }] },
+    { id: "p3", vehicleId: "v1", status: "estimate", invoicedAt: 400, number: 2060, lines: [] }, // not invoiced — excluded
+    { id: "other", vehicleId: "v2", status: "invoiced", invoicedAt: 500, number: 2070, lines: [] }, // another car — excluded
+  ];
+  const c = bayCard(order, { priorOrders, parts: {} });
+  assert.equal(c.visits.length, 2);
+  assert.equal(c.visits[0].number, 2050); // newest first
+  assert.equal(c.visits[0].miles, 60000);
+  assert.deepEqual(c.visits[0].codes, ["OIL", "ATF"]);
+  assert.equal(c.visits[1].number, 2040);
+  assert.deepEqual(c.visits[1].codes, ["OIL"]);
+});
+
+test("bayCard visits is empty when no history is passed", () => {
+  assert.deepEqual(bayCard({ lines: [] }).visits, []);
+});
+
 test("bayCard on a non-oil ticket has no oil block", () => {
   const c = bayCard({ lines: [{ kind: "labor", job: "Front brake pads replacement", description: "Replace pads" }] });
   assert.equal(c.oil, null);
@@ -76,6 +98,6 @@ test("bayCard on a non-oil ticket has no oil block", () => {
 });
 
 test("bayCard is safe on an empty or missing ticket", () => {
-  assert.deepEqual(bayCard(null), { services: [], oil: null });
-  assert.deepEqual(bayCard({ lines: [] }), { services: [], oil: null });
+  assert.deepEqual(bayCard(null), { services: [], oil: null, visits: [] });
+  assert.deepEqual(bayCard({ lines: [] }), { services: [], oil: null, visits: [] });
 });
