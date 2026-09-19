@@ -433,6 +433,19 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .symChips { display:flex; flex-wrap:wrap; gap:7px; }
 .symChip { border:1px solid var(--line); border-radius:999px; padding:7px 13px; background:var(--panel); cursor:pointer; font-size:13px; color:var(--ink); }
 .symChip:hover { border-color:var(--signal); background:#fff; }
+.symChip.on { border-color:var(--brand, #7f1d1d); background:var(--brand, #7f1d1d); color:#fff; font-weight:600; }
+.symChip.on:hover { background:var(--brand, #7f1d1d); }
+/* concern builder layout: symptom groups + a live preview of what prints */
+.concernBody { display:flex; gap:18px; align-items:flex-start; }
+.concernGroups { flex:1 1 auto; min-width:0; max-height:60vh; overflow:auto; padding-right:4px; }
+.concernPreview { flex:0 0 260px; position:sticky; top:0; background:var(--tint, #f3f4f6); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+.concernList { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.concernList li { font-size:14px; line-height:1.35; padding:7px 10px; background:#fff; border:1px solid var(--line); border-radius:8px; }
+@media (max-width:720px) {
+  .concernBody { flex-direction:column; }
+  .concernPreview { position:static; flex-basis:auto; width:100%; }
+  .concernGroups { max-height:none; }
+}
 
 /* revisions */
 .revNew { display:flex; gap:10px; align-items:center; }

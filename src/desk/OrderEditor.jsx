@@ -7,7 +7,7 @@ import { customerName, vehicleName, vehiclesOf, ordersOf } from "./useShop.js";
 import { serviceCodes } from "../lib/serviceCodes.js";
 import { orderPayout } from "../lib/commission.js";
 import { applicableCoupons, couponDiscount, couponValueText, orderJobNames, orderSubtotalBase } from "../lib/coupons.js";
-import { symptomGroups, addSymptom } from "../lib/symptoms.js";
+import { ConcernBuilder } from "./ConcernBuilder.jsx";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
@@ -745,8 +745,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             <div className="cardHead" style={{ marginBottom: 6 }}>
               <h3 style={{ fontSize: 14 }}>Customer states (prints on the ticket)</h3>
               {!locked && (
-                <button className="btn tiny" onClick={() => setPick("symptom")}>
-                  + Common symptom
+                <button className="btn tiny primary" onClick={() => setPick("symptom")} title="Build the concern from a guided list of symptoms, in plain language">
+                  Symptom builder
                 </button>
               )}
             </div>
@@ -1075,10 +1075,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         />
       )}
       {pick === "symptom" && (
-        <SymptomPicker
+        <ConcernBuilder
           cfg={cfg}
+          value={o.concern}
           onClose={() => setPick(null)}
-          onPick={(text) => update((d) => ({ ...d, concern: addSymptom(d.concern, text) }))}
+          onSave={(text) => update({ concern: text })}
         />
       )}
       {pick === "oil" && (
@@ -1543,29 +1544,6 @@ function VisitHistory({ shop, order, vehicle, customer, nav }) {
         </table>
       )}
     </div>
-  );
-}
-
-/* Quick-fill for "Customer states": tap common complaints to drop them into
-   the concern box. Stays open so several can be added. */
-function SymptomPicker({ cfg, onClose, onPick }) {
-  const groups = symptomGroups(cfg);
-  return (
-    <Modal title="Common symptoms" onClose={onClose} size="wide">
-      <p className="muted" style={{ marginTop: 0 }}>Tap to add to “Customer states.” Add as many as apply, then close.</p>
-      {groups.map(([cat, items]) => (
-        <div key={cat} className="symGroup">
-          <div className="symCat">{cat}</div>
-          <div className="symChips">
-            {items.map((s) => (
-              <button key={s} className="symChip" onClick={() => onPick(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </Modal>
   );
 }
 
