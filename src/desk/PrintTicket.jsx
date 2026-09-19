@@ -100,6 +100,11 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               <strong>Customer states:</strong> {o.concern}
             </p>
           )}
+          {o.findings && (
+            <p className="shConcern">
+              <strong>Inspection findings:</strong> {o.findings}
+            </p>
+          )}
 
           <table>
             <thead>

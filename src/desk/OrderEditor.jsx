@@ -8,6 +8,8 @@ import { serviceCodes } from "../lib/serviceCodes.js";
 import { orderPayout } from "../lib/commission.js";
 import { applicableCoupons, couponDiscount, couponValueText, orderJobNames, orderSubtotalBase } from "../lib/coupons.js";
 import { ConcernBuilder } from "./ConcernBuilder.jsx";
+import { FixBuilder } from "./FixBuilder.jsx";
+import { addFinding } from "../lib/findings.js";
 import { suggestedWork } from "../lib/repairs.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
@@ -796,6 +798,22 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               </div>
             )}
 
+            <div className="cardHead" style={{ margin: "14px 0 6px" }}>
+              <h3 style={{ fontSize: 14 }}>Inspection findings (prints on the ticket)</h3>
+              {!locked && (
+                <button className="btn tiny primary" onClick={() => setPick("fix")} title="Document what you found after inspecting the car, tied to the concern">
+                  Fix builder
+                </button>
+              )}
+            </div>
+            <textarea
+              className="ta"
+              value={o.findings || ""}
+              onChange={(e) => update({ findings: e.target.value })}
+              placeholder="What the inspection found and what's recommended — the Fix builder writes this for you…"
+              readOnly={locked}
+            />
+
             <div className="tkLines">
               <table className="lines">
                 <thead>
@@ -1118,6 +1136,20 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           value={o.concern}
           onClose={() => setPick(null)}
           onSave={(text) => update({ concern: text })}
+        />
+      )}
+      {pick === "fix" && (
+        <FixBuilder
+          cfg={cfg}
+          concern={o.concern}
+          onClose={() => setPick(null)}
+          onSave={({ finding, labor }) =>
+            update((d) => {
+              const next = { ...d, findings: addFinding(d.findings, finding) };
+              if (labor) next.lines = [...d.lines, makeLine("labor", cfg, { id: uid(), description: labor.description, hours: labor.hours, taxable: false, techId: d.topTechId || d.techId || null })];
+              return next;
+            })
+          }
         />
       )}
       {pick === "oil" && (

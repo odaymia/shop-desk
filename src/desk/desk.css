@@ -439,6 +439,13 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .workSuggestHd { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; margin-bottom:8px; }
 .workSuggestRow { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:6px; }
 .workSuggestLbl { font-size:12px; font-weight:600; color:var(--muted); min-width:56px; }
+/* fix builder form */
+.fixFields .fixLbl { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; margin:14px 0 6px; }
+.fixFields .fixLbl:first-child { margin-top:0; }
+.fixFields .in { width:100%; font-size:15px; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); }
+.fixFinding { margin:8px 0 0; padding:10px 12px; background:#fff; border:1px solid var(--line); border-radius:8px; font-size:14px; line-height:1.4; }
+.fixLine { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; background:#fff; border:1px solid var(--line); border-radius:8px; font-size:14px; }
+.fixLine b { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .symChip.on:hover { background:var(--brand, #7f1d1d); }
 /* concern builder layout: symptom groups + a live preview of what prints */
 .concernBody { display:flex; gap:18px; align-items:flex-start; }
