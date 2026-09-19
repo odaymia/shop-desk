@@ -65,7 +65,7 @@ test("bayCard lists loose parts added on their own — air filter, cabin filter,
       { kind: "part", qty: 2, number: "26A", description: "Bosch wiper blade" },
     ],
   });
-  assert.deepEqual(c.services, ["Valvoline Conventional Oil Change", "Air filter", "Cabin air filter", "Wiper blades"]);
+  assert.deepEqual(c.services, ["Valvoline Conventional Oil Change", "Air filter · CA10755", "Cabin air filter · CF10285", "Wiper blades"]);
   assert.equal(c.oil.quarts, 5); // the loose parts don't touch the quart total
 });
 

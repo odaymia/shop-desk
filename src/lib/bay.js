@@ -14,9 +14,10 @@ const isSurcharge = (l) => !!(l.surchargeForId || l.surchargeKind);
 /* A friendly label for a standalone part added straight to the ticket (no
    canned job), so the tech reads "Cabin air filter" instead of a part number. */
 const partLabel = (l) => {
+  const num = clean(l.number);
   const t = `${l.description || ""} ${l.number || ""}`;
-  if (/cabin/i.test(t)) return "Cabin air filter";
-  if (/air\s*filter/i.test(t)) return "Air filter";
+  if (/cabin/i.test(t)) return num ? `Cabin air filter · ${num}` : "Cabin air filter";
+  if (/air\s*filter/i.test(t)) return num ? `Air filter · ${num}` : "Air filter";
   if (/wiper/i.test(t)) return "Wiper blades";
   return clean(l.description) || "Service";
 };
