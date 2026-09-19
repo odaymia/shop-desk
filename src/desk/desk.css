@@ -71,6 +71,13 @@ table.dk td .sub { display:block; font-size:12px; color:var(--muted); margin-top
 /* cards */
 .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
 .card + .card { margin-top:14px; }
+/* former (no-longer-owned) cars — kept on file but visually recessed */
+.card.formerCars { background:var(--tint, #f3f4f6); border-style:dashed; box-shadow:none; }
+.card.formerCars .cardHead { margin-bottom:8px; }
+.card.formerCars h3 { color:var(--muted); font-weight:600; }
+.card.formerCars .cardHead .sub { font-size:12px; }
+.card.formerCars td { color:var(--muted); }
+.card.formerCars td strong { font-weight:600; color:var(--muted); }
 .cardHead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
 .cardHead h3 { margin:0; font-size:15px; font-weight:600; }
 .kv { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:14px; }

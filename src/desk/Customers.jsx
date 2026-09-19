@@ -135,7 +135,7 @@ export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
                     {c.company && c.first ? <span className="sub">{c.company}</span> : null}
                   </td>
                   <td className="num">{fmtPhone(c.phone)}</td>
-                  <td className="muted">{vehs.map(vehicleName).join(", ") || "—"}</td>
+                  <td className="muted">{vehs.filter((v) => v.active !== false).map(vehicleName).join(", ") || "—"}</td>
                   <td className="r num">{visits}</td>
                   <td className="muted">{fmtDate(last)}</td>
                   <td className="r num">
@@ -175,7 +175,18 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
   const [editing, setEditing] = useState(false);
   const [vehEdit, setVehEdit] = useState(null); // vehicle draft or {} for new
   const vehs = vehiclesOf(shop.vehicles, c.id);
+  /* cars they no longer own — kept on file for the service history, shown
+     apart from their current cars */
+  const formerVehs = Object.values(shop.vehicles).filter((v) => v.customerId === c.id && v.active === false);
   const history = ordersOf(shop.orders, { customerId: c.id });
+  const releaseVehicle = async (v) => {
+    await shop.saveVehicle({ ...v, active: false });
+    flash(`${vehicleName(v)} moved to former cars`);
+  };
+  const restoreVehicle = async (v) => {
+    await shop.saveVehicle({ ...v, active: true });
+    flash(`${vehicleName(v)} is theirs again`);
+  };
   const address = [c.street, [c.city, c.state].filter(Boolean).join(", "), c.zip].filter(Boolean).join(" ");
 
   return (
@@ -244,6 +255,13 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
                           <button className="btn tiny" onClick={() => setVehEdit(v)}>
                             Edit
                           </button>
+                          <button
+                            className="btn tiny"
+                            title="They no longer own this car — move it to Former cars (kept on file)"
+                            onClick={() => releaseVehicle(v)}
+                          >
+                            No longer theirs
+                          </button>
                           <button className="btn tiny primary" onClick={() => onNew({ customerId: c.id, vehicleId: v.id })}>
                             Ticket
                           </button>
@@ -255,6 +273,33 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
               </table>
             )}
           </div>
+
+          {formerVehs.length > 0 && (
+            <div className="card formerCars">
+              <div className="cardHead">
+                <h3>Former cars</h3>
+                <span className="muted sub">No longer owned — kept for service history</span>
+              </div>
+              <table className="dk">
+                <tbody>
+                  {formerVehs.map((v) => (
+                    <tr key={v.id}>
+                      <td>
+                        <strong>{vehicleName(v)}</strong>
+                        {v.engine || v.color ? <span className="sub">{[v.engine, v.color].filter(Boolean).join(" · ")}</span> : null}
+                      </td>
+                      <td className="num">{v.plate || "—"}</td>
+                      <td className="r">
+                        <button className="btn tiny" title="They own this car again — move it back to their cars" onClick={() => restoreVehicle(v)}>
+                          Still theirs
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="card">
             <div className="cardHead">
