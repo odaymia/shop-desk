@@ -34,6 +34,41 @@ test("bayCard sums the oil across split lines when a car takes over the included
   assert.equal(c.oil.filter, "COF");
 });
 
+test("bayCard does not count transmission or radiator fluid as oil quarts", () => {
+  const c = bayCard({
+    lines: [
+      { kind: "labor", oil: true, packaged: true, job: "Valvoline Conventional Oil Change", description: "Full service oil change" },
+      { kind: "part", oil: true, packaged: true, qty: 5, number: "5/20", description: "Valvoline Conventional 5W-20", job: "Valvoline Conventional Oil Change" },
+      { kind: "part", packaged: true, qty: 1, number: "VO106", description: "Oil filter (included)", job: "Valvoline Conventional Oil Change" },
+      // a transmission service, package-priced: its fluid rides on a packaged part line
+      { kind: "labor", packaged: true, job: "Transmission service", description: "Drain and fill" },
+      { kind: "part", packaged: true, qty: 4, description: "ATF full synthetic" },
+      // a radiator flush, likewise
+      { kind: "labor", packaged: true, job: "Radiator flush", description: "Flush and refill" },
+      { kind: "part", packaged: true, qty: 2, description: "Extended life coolant" },
+    ],
+  });
+  assert.equal(c.oil.quarts, 5); // only the oil-change oil, not the ATF or coolant
+  assert.equal(c.oil.filter, "VO106");
+  assert.deepEqual(c.services, ["Valvoline Conventional Oil Change", "Transmission service", "Radiator flush"]);
+});
+
+test("bayCard lists loose parts added on their own — air filter, cabin filter, wipers", () => {
+  const c = bayCard({
+    lines: [
+      { kind: "labor", oil: true, packaged: true, job: "Valvoline Conventional Oil Change", description: "Full service oil change" },
+      { kind: "part", oil: true, packaged: true, qty: 5, number: "5/20", description: "Valvoline Conventional 5W-20", job: "Valvoline Conventional Oil Change" },
+      { kind: "part", packaged: true, qty: 1, number: "VO106", description: "Oil filter (included)", job: "Valvoline Conventional Oil Change" },
+      // added straight from the part picker, no canned job on them
+      { kind: "part", qty: 1, number: "CA10755", description: "FRAM Engine Air Filter" },
+      { kind: "part", qty: 1, number: "CF10285", description: "Cabin air filter" },
+      { kind: "part", qty: 2, number: "26A", description: "Bosch wiper blade" },
+    ],
+  });
+  assert.deepEqual(c.services, ["Valvoline Conventional Oil Change", "Air filter", "Cabin air filter", "Wiper blades"]);
+  assert.equal(c.oil.quarts, 5); // the loose parts don't touch the quart total
+});
+
 test("bayCard on a non-oil ticket has no oil block", () => {
   const c = bayCard({ lines: [{ kind: "labor", job: "Front brake pads replacement", description: "Replace pads" }] });
   assert.equal(c.oil, null);

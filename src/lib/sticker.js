@@ -8,7 +8,7 @@
    tickets, before the flag) a packaged line reads like an oil change.
    Other fluid packages (transmission, coolant…) fold the same way but are
    not oil, so they must not trigger the sticker. */
-const readsOil = (l) => /oil change|\blof\b|lube, oil/i.test(`${(l && l.job) || ""} ${(l && l.description) || ""}`);
+export const readsOil = (l) => /oil change|\blof\b|lube, oil/i.test(`${(l && l.job) || ""} ${(l && l.description) || ""}`);
 export function hasOilChange(order) {
   return (((order && order.lines) || []).some((l) => l.oil || (l.packaged && readsOil(l))));
 }
