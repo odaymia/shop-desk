@@ -482,6 +482,22 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .builderRow { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
 .builderRow input { flex:1; min-width:0; }
 @media (max-width:720px) { .builderCols { grid-template-columns:1fr; } }
+/* record-a-payment modal */
+.payMethods { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.payMethod { display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px; border:1px solid var(--line); border-radius:10px; background:var(--panel); cursor:pointer; font-size:14px; color:var(--ink); }
+.payMethod:hover { border-color:var(--signal); background:#fff; }
+.payMethod.on { border-color:var(--brand, #7f1d1d); background:var(--brand, #7f1d1d); color:#fff; font-weight:600; }
+.payMethod .payIcon { font-size:22px; line-height:1; }
+.chipRow { display:flex; flex-wrap:wrap; gap:8px; }
+.payChip { border:1px solid var(--line); border-radius:999px; padding:8px 14px; background:var(--panel); cursor:pointer; font-size:14px; color:var(--ink); }
+.payChip:hover { border-color:var(--signal); background:#fff; }
+.payChip.on { border-color:var(--brand, #7f1d1d); background:var(--brand, #7f1d1d); color:#fff; font-weight:600; }
+.changeBox { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:6px 0 4px; padding:12px 16px; border-radius:10px; background:var(--tint, #f0fdf4); border:1px solid #86efac; }
+.changeBox span { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
+.changeBox b { font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; color:#166534; }
+.changeBox.short { background:#fef2f2; border-color:#fca5a5; }
+.changeBox.short b { color:#b91c1c; }
+@media (max-width:520px) { .payMethods { grid-template-columns:repeat(2,1fr); } }
 @media (max-width:720px) {
   .concernBody { flex-direction:column; }
   .concernPreview { position:static; flex-basis:auto; width:100%; }

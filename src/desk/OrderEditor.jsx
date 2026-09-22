@@ -28,6 +28,10 @@ import {
   jobLines,
   owesBalance,
   fmtMoney,
+  round2,
+  CARD_TYPES,
+  cashTenders,
+  paymentDesc,
   PART_CONDITIONS,
   crewAssigned,
 } from "../lib/invoice.js";
@@ -1019,8 +1023,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 {o.payments.map((p) => (
                   <li key={p.id}>
                     <span>
-                      {p.method}
-                      {p.ref ? ` · ${p.ref}` : ""} · {fmtDateTime(p.at)}
+                      {paymentDesc(p)} · {fmtDateTime(p.at)}
                     </span>
                     <span>
                       <Money v={p.amount} />
@@ -1506,40 +1509,109 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
   );
 }
 
+const PAY_ICONS = { cash: "💵", card: "💳", check: "🧾", other: "•" };
+
 function PaymentModal({ balance, onClose, onSave }) {
+  const due = balance > 0 ? round2(balance) : 0;
   const [method, setMethod] = useState("card");
-  const [amount, setAmount] = useState(balance > 0 ? balance.toFixed(2) : "");
+  const [amount, setAmount] = useState(due ? due.toFixed(2) : "");
   const [ref, setRef] = useState("");
+  const [cardType, setCardType] = useState("Visa");
+  const [cash, setCash] = useState("");
   const [err, setErr] = useState("");
+
+  const amt = toNum(amount);
+  const cashGiven = toNum(cash);
+  const hasCash = String(cash).trim() !== "";
+  const short = method === "cash" && hasCash && cashGiven < amt;
+  const change = method === "cash" ? round2(Math.max(0, cashGiven - amt)) : 0;
+
+  const save = () => {
+    if (!amt) return setErr("Enter an amount. Use a negative number for a refund.");
+    if (short) return setErr("Cash given is less than the amount owed.");
+    const p = { method, amount: amt, ref: ref.trim() };
+    if (method === "card") p.cardType = cardType;
+    if (method === "cash" && hasCash) {
+      p.cashGiven = cashGiven;
+      p.change = change;
+    }
+    onSave(p);
+  };
+
   return (
     <Modal title="Record a payment" onClose={onClose}>
       <Field label="How">
-        <select value={method} onChange={(e) => setMethod(e.target.value)}>
+        <div className="payMethods">
           {PAY_METHODS.map((m) => (
-            <option key={m} value={m}>
+            <button key={m} type="button" className={`payMethod ${method === m ? "on" : ""}`} onClick={() => setMethod(m)}>
+              <span className="payIcon">{PAY_ICONS[m]}</span>
               {m[0].toUpperCase() + m.slice(1)}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </Field>
-      <Field label="Amount">
-        <Num value={amount} onChange={setAmount} autoFocus />
+
+      <Field label={method === "cash" ? "Amount owed" : "Amount"}>
+        <Num value={amount} onChange={setAmount} autoFocus={method !== "cash"} />
       </Field>
-      <Field label={method === "check" ? "Check number" : method === "card" ? "Last 4 or approval code" : "Reference (optional)"}>
-        <Text value={ref} onChange={setRef} />
-      </Field>
+
+      {method === "card" && (
+        <>
+          <Field label="Card type">
+            <div className="chipRow">
+              {CARD_TYPES.map((t) => (
+                <button key={t} type="button" className={`payChip ${cardType === t ? "on" : ""}`} onClick={() => setCardType(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Last 4 or approval code">
+            <Text value={ref} onChange={setRef} inputMode="numeric" placeholder="1234" />
+          </Field>
+        </>
+      )}
+
+      {method === "cash" && (
+        <>
+          <Field label="Cash given">
+            <Num value={cash} onChange={setCash} autoFocus />
+          </Field>
+          <div className="chipRow" style={{ marginTop: -6, marginBottom: 12 }}>
+            {cashTenders(amt).map((v) => (
+              <button key={v} type="button" className="payChip" onClick={() => setCash(String(v))}>
+                ${v}
+              </button>
+            ))}
+            {amt > 0 && (
+              <button type="button" className="payChip" onClick={() => setCash(amt.toFixed(2))}>
+                Exact
+              </button>
+            )}
+          </div>
+          <div className={`changeBox ${short ? "short" : change > 0 ? "due" : ""}`}>
+            <span>{short ? "Still owed" : "Change owed"}</span>
+            <b>{!hasCash ? "—" : short ? fmtMoney(amt - cashGiven) : fmtMoney(change)}</b>
+          </div>
+        </>
+      )}
+
+      {method === "check" && (
+        <Field label="Check number">
+          <Text value={ref} onChange={setRef} inputMode="numeric" />
+        </Field>
+      )}
+      {method === "other" && (
+        <Field label="Reference (optional)">
+          <Text value={ref} onChange={setRef} />
+        </Field>
+      )}
+
       {err && <p className="fldErr">{err}</p>}
-      <button
-        className="btn primary lg full"
-        onClick={() => {
-          const a = toNum(amount);
-          if (!a) return setErr("Enter an amount. Use a negative number for a refund.");
-          onSave({ method, amount: a, ref: ref.trim() });
-        }}
-      >
+      <button className="btn primary lg full" onClick={save}>
         Save payment
       </button>
-      <p className="legalNote">Card processing isn't wired in yet — run the card on your terminal and record it here.</p>
+      {method === "card" && <p className="legalNote">Card processing isn't wired in yet — run the card on your terminal and record it here.</p>}
     </Modal>
   );
 }

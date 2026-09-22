@@ -24,6 +24,31 @@ export const PART_CONDITIONS = [
 ];
 export const conditionLabel = (c) => (PART_CONDITIONS.find(([k]) => k === (c || "new")) || PART_CONDITIONS[0])[1];
 export const PAY_METHODS = ["cash", "card", "check", "other"];
+export const CARD_TYPES = ["Visa", "Mastercard", "Amex", "Discover", "Debit", "Other"];
+
+/* Suggested cash tenders at or above the amount due — the next whole dollar,
+   then the common bills, so the writer can one-tap what the customer handed
+   over. Deduped, ascending, capped. */
+export function cashTenders(amount) {
+  const due = Math.max(0, round2(amount));
+  if (!due) return [];
+  const set = new Set();
+  set.add(Math.ceil(due)); // next whole dollar
+  for (const step of [5, 10, 20]) set.add(Math.ceil(due / step) * step);
+  for (const bill of [20, 40, 60, 100]) if (bill >= due) set.add(bill);
+  return [...set].filter((v) => v >= due).sort((a, b) => a - b).slice(0, 5);
+}
+
+/* How a saved payment reads on the ticket and receipt — card brand + last 4,
+   cash change given, check number, etc. */
+export function paymentDesc(p) {
+  if (!p) return "";
+  const cap = (s) => String(s || "").replace(/^\w/, (c) => c.toUpperCase());
+  if (p.method === "card") return `${p.cardType || "Card"}${p.ref ? ` ·${p.ref}` : ""}`;
+  if (p.method === "cash") return `Cash${num(p.change) > 0.005 ? ` · ${fmtMoney(p.change)} change` : ""}`;
+  if (p.method === "check") return `Check${p.ref ? ` #${p.ref}` : ""}`;
+  return `${cap(p.method)}${p.ref ? ` ${p.ref}` : ""}`;
+}
 
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);

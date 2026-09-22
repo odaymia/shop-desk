@@ -241,3 +241,20 @@ test("imported history never counts as a balance due, but a real posted invoice 
   const paid = { status: "invoiced", lines, payments: [{ amount: 54.99 }] };
   assert.equal(owesBalance(paid, orderTotals(paid, { taxRate: 0 })), false);
 });
+
+import { cashTenders, paymentDesc } from "../src/lib/invoice.js";
+
+test("cashTenders suggests the next dollar and common bills at/above the amount", () => {
+  assert.deepEqual(cashTenders(27.05), [28, 30, 40, 60, 100]); // next $, next 10, next 20, then 40/60/100
+  assert.deepEqual(cashTenders(40), [40, 60, 100]); // exact multiples aren't duplicated
+  assert.deepEqual(cashTenders(0), []);
+});
+
+test("paymentDesc reads the card brand, cash change, or check number", () => {
+  assert.equal(paymentDesc({ method: "card", cardType: "Amex", ref: "1234" }), "Amex ·1234");
+  assert.equal(paymentDesc({ method: "card" }), "Card");
+  assert.equal(paymentDesc({ method: "cash", change: 2.95 }), "Cash · $2.95 change");
+  assert.equal(paymentDesc({ method: "cash", change: 0 }), "Cash");
+  assert.equal(paymentDesc({ method: "check", ref: "204" }), "Check #204");
+  assert.equal(paymentDesc({ method: "other", ref: "store credit" }), "Other store credit");
+});
