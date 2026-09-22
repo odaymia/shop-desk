@@ -19,10 +19,10 @@ test("platformFeeCfg falls back to the default, then to overrides", () => {
 });
 
 test("platformFee: percent + fixed, rounded to the cent", () => {
-  // default 0.5% of $100 = $0.50
-  assert.equal(platformFee(100, {}), 0.5);
-  // 0.5% of $253.40 = $1.267 -> $1.27
-  assert.equal(platformFee(253.4, {}), 1.27);
+  // default 0.3% of $100 = $0.30
+  assert.equal(platformFee(100, {}), 0.3);
+  // 0.3% of $253.40 = $0.7602 -> $0.76
+  assert.equal(platformFee(253.4, {}), 0.76);
   // percent + fixed
   assert.equal(platformFee(200, { payments: { platformFeePct: 0.6, platformFeeFixed: 0.1 } }), round(200 * 0.006 + 0.1));
 });

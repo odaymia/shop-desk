@@ -65,7 +65,7 @@ async function pay(body) {
    not something an individual shop can turn down. A deployment can override it
    with cfg.payments.{platformFeePct,platformFeeFixed}; the default lives here
    so the math is testable and there is always a sane value. */
-export const DEFAULT_PLATFORM_FEE = { pct: 0.5, fixed: 0 }; // 0.5% + $0.00
+export const DEFAULT_PLATFORM_FEE = { pct: 0.3, fixed: 0 }; // 0.3% + $0.00
 
 export function platformFeeCfg(cfg) {
   const p = (cfg && cfg.payments) || {};
