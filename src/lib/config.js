@@ -34,6 +34,7 @@ export const DEFAULT_CFG = {
   serviceMenu: DEFAULT_SERVICE_MENU, // the buttons on a ticket: oil change, then a button per canned job category
   checklist: DEFAULT_CHECKLIST, // the service checklist run on every oil change; edited in Settings
   checklistOnOil: true, // open the checklist as soon as an oil change goes on a ticket
+  cardPayments: false, // accept cards in-app via Stripe Connect (Settings → Payments); the shop connects its own account
   portalEnabled: false, // customer portal: publish customer records for sign-in at /portal/
   hours: "", // free text for the portal card: "Mon–Fri 8–6, Sat 8–2"
   nextOrderNumber: 1001, // first estimate/RO/invoice number; the live counter is in sd:counters

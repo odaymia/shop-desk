@@ -13,6 +13,9 @@ import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
 import { DEFAULT_SYMPTOMS, DEFAULT_SYMPTOMS_MAP } from "../lib/symptoms.js";
 import { FINDINGS_BY_CATEGORY } from "../lib/findings.js";
 import { sGetAll, sSet, cloud } from "../storage/index.js";
+import { connectStatus, connectLink, listReaders, registerReader, platformFeeCfg, cardPaymentStats } from "../lib/payments.js";
+import { fmtMoney } from "../lib/invoice.js";
+import { DEMO } from "../lib/demo.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -57,6 +60,7 @@ const SETTINGS_SECTIONS = [
   ["builder", "Symptom & fix lists"],
   ["oilchange", "Oil change"],
   ["commissions", "Commissions"],
+  ["payments", "Payments"],
   ["data", "Data & backup"],
 ];
 
@@ -694,6 +698,8 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </>
           )}
 
+          {show("payments") && <PaymentsPanel d={d} set={set} shop={shop} />}
+
           {section !== "data" && (
             <button className="btn primary lg" onClick={save} style={{ marginTop: 18 }}>
               Save settings
@@ -716,6 +722,170 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           )}
         </div>
       </div>
+    </>
+  );
+}
+
+/* Card processing on Stripe Connect. The shop connects its own account, pairs
+   a counter reader, and turns card payments on; charges then happen right on
+   the ticket (OrderEditor's CardCharge). The platform fee is Bolt Badger's and
+   isn't editable here. See src/lib/payments.js and the "pay" Edge Function. */
+function PaymentsPanel({ d, set, shop }) {
+  const linked = (() => {
+    try {
+      return DEMO || cloud.getState().linked;
+    } catch {
+      return DEMO;
+    }
+  })();
+  const [status, setStatus] = useState(null); // { chargesEnabled, ... } | { error }
+  const [readers, setReaders] = useState(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+
+  const refresh = async () => {
+    if (!linked) return;
+    try {
+      const s = await connectStatus();
+      setStatus(s);
+    } catch (e) {
+      setStatus({ error: e.message || "Could not reach Stripe." });
+    }
+    try {
+      const r = await listReaders();
+      setReaders(r.readers || []);
+    } catch {
+      setReaders([]);
+    }
+  };
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
+
+  const startOnboarding = async () => {
+    setBusy("connect");
+    setMsg("");
+    try {
+      const { url, simulated } = await connectLink(window.location.href);
+      if (simulated) {
+        setMsg("Simulated — add your Stripe keys to the pay function to go live.");
+        setBusy("");
+        await refresh();
+        return;
+      }
+      window.location.href = url; // Stripe-hosted onboarding, returns to the app
+    } catch (e) {
+      setMsg(e.message || "Could not start onboarding.");
+      setBusy("");
+    }
+  };
+
+  const pairReader = async () => {
+    if (!code.trim()) return setMsg("Enter the pairing code shown on the reader.");
+    setBusy("reader");
+    setMsg("");
+    try {
+      await registerReader(code.trim(), "Counter reader");
+      setCode("");
+      setMsg("Reader paired.");
+      await refresh();
+    } catch (e) {
+      setMsg(e.message || "Could not pair the reader.");
+    }
+    setBusy("");
+  };
+
+  const stats = cardPaymentStats(Object.values(shop.orders || {}));
+  const fee = platformFeeCfg(d);
+  const ready = status && status.chargesEnabled;
+
+  return (
+    <>
+      <h3 className="subhead">Card processing</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Take cards right on the ticket — on a counter reader or by texting the customer a secure pay link. Powered by
+        Stripe; money is deposited to your own bank, usually next business day.
+      </p>
+
+      {!linked ? (
+        <p className="legalNote">Sign in to your shop's cloud account (Data &amp; backup) to set up card processing.</p>
+      ) : (
+        <>
+          <div className="payStatusRow">
+            <span className={`payDot ${ready ? "ok" : "off"}`} />
+            <div>
+              <strong>
+                {status?.error
+                  ? "Couldn't reach Stripe"
+                  : ready
+                    ? `Connected${status.simulated ? " (simulated)" : ""}`
+                    : status
+                      ? "Not connected yet"
+                      : "Checking…"}
+              </strong>
+              <p className="muted" style={{ margin: "2px 0 0" }}>
+                {ready
+                  ? "Your shop can accept cards."
+                  : "Connect your shop's account to start accepting cards."}
+              </p>
+            </div>
+            <div className="grow" />
+            <button className="btn" disabled={busy === "connect"} onClick={startOnboarding}>
+              {ready ? "Manage / update" : busy === "connect" ? "Starting…" : "Connect Stripe"}
+            </button>
+          </div>
+
+          <label className="fld inline" style={{ marginTop: 14 }}>
+            <input type="checkbox" checked={!!d.cardPayments} onChange={(e) => set("cardPayments")(e.target.checked)} />
+            <span>Accept card payments in the app (show Charge on the payment screen)</span>
+          </label>
+
+          <h3 className="subhead" style={{ marginTop: 28 }}>Counter reader</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Pair a Stripe internet reader (WisePOS E or S700). On the reader, go to Settings → Generate pairing code, then
+            enter it here.
+          </p>
+          {readers && readers.length > 0 && (
+            <ul className="readerList">
+              {readers.map((r) => (
+                <li key={r.id}>
+                  <span className={`payDot ${r.status === "online" ? "ok" : "off"}`} />
+                  {r.label} <span className="muted">· {r.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="rowBtns" style={{ maxWidth: 420 }}>
+            <input className="search" style={{ flex: 1 }} value={code} onChange={(e) => setCode(e.target.value)} placeholder="Pairing code, e.g. quick-brown-fox" />
+            <button className="btn" disabled={busy === "reader"} onClick={pairReader}>
+              {busy === "reader" ? "Pairing…" : "Pair reader"}
+            </button>
+          </div>
+
+          <h3 className="subhead" style={{ marginTop: 28 }}>This shop's card totals</h3>
+          <div className="payStats">
+            <div>
+              <span>Card sales</span>
+              <b>{stats.count}</b>
+            </div>
+            <div>
+              <span>Processed</span>
+              <b>{fmtMoney(stats.gross)}</b>
+            </div>
+            <div>
+              <span>Processing fees</span>
+              <b>{fmtMoney(stats.fees)}</b>
+            </div>
+          </div>
+          <p className="legalNote">
+            Platform fee: {fee.pct}%{fee.fixed ? ` + ${fmtMoney(fee.fixed)}` : ""} per card sale, on top of Stripe's own
+            processing cost. Set for the product; full payout and payment detail live in your Stripe dashboard.
+          </p>
+          {msg && <p className="fldErr" style={{ marginTop: 6 }}>{msg}</p>}
+        </>
+      )}
     </>
   );
 }

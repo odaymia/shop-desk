@@ -128,6 +128,19 @@ create index if not exists sign_requests_shop on sign_requests (shop_id, created
 alter table sign_requests enable row level security;
 -- (intentionally no policies: only the Edge Function's service role touches this)
 
+-- Card payments (Stripe Connect): one row per shop mapping it to its connected
+-- (Express) account. Written only by the "pay" Edge Function's service role;
+-- the browser asks that function for status, it never reads this table. The
+-- account id (acct_...) isn't a secret, but there's no reason to expose it, so
+-- RLS is on with no policies.
+create table if not exists stripe_accounts (
+  shop_id uuid primary key references shops(id) on delete cascade,
+  account_id text not null,                 -- Stripe connected account, acct_...
+  created_at timestamptz not null default now()
+);
+alter table stripe_accounts enable row level security;
+-- (intentionally no policies: only the Edge Function's service role touches this)
+
 -- Punch photos and signatures live in Storage, under <shop_id>/...
 insert into storage.buckets (id, name, public)
   values ('media', 'media', false)

@@ -16,6 +16,8 @@ import { isFleet, fleetName, fleetDiscountLine } from "../lib/fleet.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
+import { platformFee, listReaders, chargeOnReader, chargeStatus, cancelReaderCharge, sendPayLink, cardPaymentRecord } from "../lib/payments.js";
+import { DEMO } from "../lib/demo.js";
 import {
   STATUS,
   PAY_METHODS,
@@ -1353,7 +1355,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           }}
         />
       )}
-      {pick === "pay" && <PaymentModal balance={t.balance} onClose={() => setPick(null)} onSave={addPayment} />}
+      {pick === "pay" && (
+        <PaymentModal
+          balance={t.balance}
+          order={o}
+          cfg={cfg}
+          customer={customer}
+          canCharge={!!cfg.cardPayments && (DEMO || cloud.getState().linked)}
+          onClose={() => setPick(null)}
+          onSave={addPayment}
+          flash={flash}
+        />
+      )}
       {pick === "confirmPost" && (
         <Modal title={`Post invoice #${o.number}?`} onClose={() => setPick(null)}>
           <p className="muted" style={{ lineHeight: 1.5 }}>
@@ -1532,13 +1545,14 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
 const PAY_ICONS = { cash: "💵", card: "💳", check: "🧾", account: "🏢", other: "•" };
 const PAY_LABELS = { account: "On account" };
 
-function PaymentModal({ balance, onClose, onSave }) {
+function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSave, flash }) {
   const due = balance > 0 ? round2(balance) : 0;
   const [method, setMethod] = useState("card");
   const [amount, setAmount] = useState(due ? due.toFixed(2) : "");
   const [ref, setRef] = useState("");
   const [cardType, setCardType] = useState("Visa");
   const [cash, setCash] = useState("");
+  const [manualCard, setManualCard] = useState(false); // record a card run elsewhere instead of charging here
   const [err, setErr] = useState("");
 
   const amt = toNum(amount);
@@ -1546,6 +1560,9 @@ function PaymentModal({ balance, onClose, onSave }) {
   const hasCash = String(cash).trim() !== "";
   const short = method === "cash" && hasCash && cashGiven < amt;
   const change = method === "cash" ? round2(Math.max(0, cashGiven - amt)) : 0;
+  // When card processing is on and we're online, charge the card right here
+  // instead of just recording it.
+  const chargeHere = method === "card" && canCharge && !manualCard;
 
   const save = () => {
     if (!amt) return setErr("Enter an amount. Use a negative number for a refund.");
@@ -1576,7 +1593,22 @@ function PaymentModal({ balance, onClose, onSave }) {
         <Num value={amount} onChange={setAmount} autoFocus={method !== "cash"} />
       </Field>
 
-      {method === "card" && (
+      {chargeHere && (
+        <CardCharge
+          order={order}
+          cfg={cfg}
+          customer={customer}
+          amount={amt}
+          onPaid={(rec) => onSave(rec)}
+          onLinkSent={() => {
+            flash("Pay link sent — the ticket updates when they pay");
+            onClose();
+          }}
+          onManual={() => setManualCard(true)}
+        />
+      )}
+
+      {method === "card" && !chargeHere && (
         <>
           <Field label="Card type">
             <div className="chipRow">
@@ -1633,13 +1665,162 @@ function PaymentModal({ balance, onClose, onSave }) {
         </Field>
       )}
 
-      {err && <p className="fldErr">{err}</p>}
-      <button className="btn primary lg full" onClick={save}>
-        Save payment
-      </button>
-      {method === "card" && <p className="legalNote">Card processing isn't wired in yet — run the card on your terminal and record it here.</p>}
-      {method === "account" && <p className="legalNote">Bills this amount to the fleet account — it shows on the account's report as owed until you collect it.</p>}
+      {!chargeHere && (
+        <>
+          {err && <p className="fldErr">{err}</p>}
+          <button className="btn primary lg full" onClick={save}>
+            Save payment
+          </button>
+          {method === "card" && canCharge && manualCard && (
+            <button type="button" className="btn ghost sm full" style={{ marginTop: 8 }} onClick={() => setManualCard(false)}>
+              ← Charge the card here instead
+            </button>
+          )}
+          {method === "card" && !canCharge && (
+            <p className="legalNote">
+              Turn on card processing in Settings → Payments to charge cards from here. For now, run the card on your terminal and record it.
+            </p>
+          )}
+          {method === "account" && <p className="legalNote">Bills this amount to the fleet account — it shows on the account's report as owed until you collect it.</p>}
+        </>
+      )}
     </Modal>
+  );
+}
+
+/* Charge the card without leaving the ticket: either tell a counter reader to
+   collect, or text the customer a pay link. All the Stripe work happens in the
+   "pay" Edge Function (see src/lib/payments.js); this is just the flow. */
+function CardCharge({ order, cfg, customer, amount, onPaid, onLinkSent, onManual }) {
+  const [busy, setBusy] = useState("");           // "reader" | "link" while working
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
+  const [readers, setReaders] = useState(null);   // null = not loaded yet
+  const [readerId, setReaderId] = useState("");
+  const [waiting, setWaiting] = useState(null);    // { piId, readerId } while the reader collects
+  const cancelled = useRef(false);
+  useEffect(() => () => { cancelled.current = true; }, []);
+
+  const fee = platformFee(amount, cfg);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const startReader = async () => {
+    if (!(amount > 0)) return setErr("Enter an amount first.");
+    setErr("");
+    setBusy("reader");
+    try {
+      let list = readers;
+      if (list === null) {
+        const r = await listReaders();
+        list = r.readers || [];
+        setReaders(list);
+        if (r.simulated) setNote("Simulated — connect Stripe in Settings → Payments to take real cards.");
+      }
+      if (!list.length) {
+        setErr("No reader paired yet. Add one in Settings → Payments.");
+        setBusy("");
+        return;
+      }
+      const rid = readerId || list[0].id;
+      setReaderId(rid);
+      const res = await chargeOnReader({ orderId: order.id, readerId: rid, amount, cfg });
+      setWaiting({ piId: res.paymentIntentId, readerId: rid });
+      // poll until the customer taps/dips and it settles
+      for (let i = 0; i < 40 && !cancelled.current; i++) {
+        await sleep(res.simulated ? 700 : 1600);
+        if (cancelled.current) return;
+        let st;
+        try {
+          st = await chargeStatus(res.paymentIntentId);
+        } catch {
+          continue;
+        }
+        if (st.status === "succeeded") {
+          onPaid(cardPaymentRecord({ amount, cardType: st.cardBrand, last4: st.last4, fee, paymentIntentId: res.paymentIntentId, simulated: st.simulated }));
+          return;
+        }
+        if (st.status === "canceled" || st.status === "requires_payment_method") {
+          setErr("The card wasn't completed. Try again or record it manually.");
+          setWaiting(null);
+          setBusy("");
+          return;
+        }
+      }
+      if (!cancelled.current) {
+        setErr("Timed out waiting for the reader.");
+        setWaiting(null);
+        setBusy("");
+      }
+    } catch (e) {
+      setErr(e.message || "Couldn't start the charge.");
+      setBusy("");
+      setWaiting(null);
+    }
+  };
+
+  const cancelReader = async () => {
+    if (waiting) {
+      try {
+        await cancelReaderCharge(waiting.piId, waiting.readerId);
+      } catch { /* reader may already be idle */ }
+    }
+    setWaiting(null);
+    setBusy("");
+  };
+
+  const sendLink = async () => {
+    if (!(amount > 0)) return setErr("Enter an amount first.");
+    setErr("");
+    setBusy("link");
+    try {
+      const res = await sendPayLink({ orderId: order.id, amount, phone: customer && customer.phone, cfg });
+      if (res.sent) {
+        onLinkSent();
+      } else {
+        setNote(`No cell number on file to text — copy this link to the customer: ${res.url}`);
+        setBusy("");
+      }
+    } catch (e) {
+      setErr(e.message || "Couldn't create the pay link.");
+      setBusy("");
+    }
+  };
+
+  if (waiting) {
+    return (
+      <div className="cardCharge">
+        <div className="chargeWait">
+          <span className="spin" aria-hidden="true" />
+          <div>
+            <strong>Waiting for the card…</strong>
+            <p className="muted" style={{ margin: "2px 0 0" }}>Have the customer tap, insert, or swipe on the reader.</p>
+          </div>
+        </div>
+        {note && <p className="legalNote">{note}</p>}
+        <button type="button" className="btn ghost full" onClick={cancelReader}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cardCharge">
+      <div className="chargeBtns">
+        <button type="button" className="btn primary lg" disabled={!!busy} onClick={startReader}>
+          💳 Charge on reader
+        </button>
+        <button type="button" className="btn lg" disabled={!!busy} onClick={sendLink}>
+          📲 {busy === "link" ? "Sending…" : "Text a pay link"}
+        </button>
+      </div>
+      {fee > 0 && amount > 0 && <p className="muted feeNote">Processing fee on {fmtMoney(amount)}: {fmtMoney(fee)}</p>}
+      {err && <p className="fldErr">{err}</p>}
+      {note && <p className="legalNote">{note}</p>}
+      <button type="button" className="btn ghost sm full" style={{ marginTop: 8 }} onClick={onManual} disabled={!!busy}>
+        Record a card run elsewhere instead
+      </button>
+    </div>
   );
 }
 
