@@ -3,6 +3,7 @@ import { Modal, Field, Text, Num, Money, toNum } from "./ui.jsx";
 import { activeList, searchText } from "./useShop.js";
 import { OIL_TYPE_OPTIONS } from "../lib/oilchange.js";
 import { itemCategory, packQuartsOf } from "../lib/inventoryReports.js";
+import { InventoryCount } from "./InventoryCount.jsx";
 
 const blank = () => ({
   number: "",
@@ -39,6 +40,7 @@ export function Inventory({ shop, cfg, flash }) {
   const [quick, setQuick] = useState(false);
   const [receive, setReceive] = useState(false);
   const [imp, setImp] = useState(false);
+  const [counting, setCounting] = useState(false);
   const vendors = activeList(shop.vendors).sort((a, b) => a.name.localeCompare(b.name));
 
   const stock = useMemo(
@@ -59,6 +61,8 @@ export function Inventory({ shop, cfg, flash }) {
   const value = rows.reduce((a, p) => a + toNum(p.onHand) * toNum(p.cost), 0);
   const low = activeList(shop.parts).filter((p) => !p.tire && toNum(p.onHand) <= toNum(p.reorderAt) && toNum(p.reorderAt) > 0).length;
 
+  if (counting) return <InventoryCount shop={shop} cfg={cfg} flash={flash} onClose={() => setCounting(false)} />;
+
   return (
     <>
       <header className="deskHead">
@@ -76,6 +80,9 @@ export function Inventory({ shop, cfg, flash }) {
         <span className="muted">
           Stock at cost: <Money v={value} />
         </span>
+        <button className="btn" onClick={() => setCounting(true)}>
+          Take inventory
+        </button>
         <button className="btn" onClick={() => setReceive(true)}>
           Receive order
         </button>

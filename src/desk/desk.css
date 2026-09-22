@@ -534,6 +534,31 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .payStats b { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
 @media (max-width:520px) { .chargeBtns, .payStats { grid-template-columns:1fr; } }
 
+/* physical inventory count */
+.resumeBar { display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid #93c5fd; background:#eff6ff; border-radius:10px; margin-bottom:16px; font-size:14px; }
+.countStart { border:1px solid var(--line); border-radius:12px; padding:18px; background:#fff; max-width:520px; }
+.countGrid td { padding:4px 12px; }
+tr.counted td { background:var(--tint, #f0fdf4); }
+.countInput { width:110px; text-align:right; font-variant-numeric:tabular-nums; font-size:16px; font-weight:600; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); }
+.countInput:focus { outline:2px solid var(--signal); outline-offset:1px; border-color:var(--signal); }
+kbd { font-family:ui-monospace, monospace; font-size:12px; background:var(--panel); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; }
+.vTotals { display:grid; grid-template-columns:repeat(5,1fr); gap:12px 18px; border:1px solid var(--line); border-radius:12px; padding:16px 18px; background:#fff; }
+.vTotals > div { display:flex; flex-direction:column; }
+.vTotals span { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
+.vTotals b { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+.vShort { color:#b91c1c; }
+.vOver { color:#166534; }
+@media (max-width:640px) { .vTotals { grid-template-columns:1fr 1fr; } }
+
+/* count / variance print sheets */
+.countByLine { margin:10px 0 14px; font-size:13px; color:#444; }
+table.countPrint { width:100%; border-collapse:collapse; font-size:13px; }
+table.countPrint th, table.countPrint td { border:1px solid #999; padding:6px 8px; text-align:left; }
+table.countPrint th.cnt, table.countPrint td.cnt { text-align:right; width:80px; font-variant-numeric:tabular-nums; }
+table.countPrint td.cnt:empty { height:26px; }
+table.countPrint td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
+
 @media (max-width:720px) {
   .concernBody { flex-direction:column; }
   .concernPreview { position:static; flex-basis:auto; width:100%; }
