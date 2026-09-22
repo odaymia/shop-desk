@@ -133,6 +133,24 @@ test("loyaltyRows: one per invoiced service in window, opt-in flags", () => {
   assert.equal(r.Location_ID, "BOLTBADGER0001");
 });
 
+test("loyaltyRows: skips no-contact, dedups VIN+date, trims cell/zip", () => {
+  const veh = { v: { vin: "1HGCM82633A004352" } };
+  const cust = {
+    c1: { first: "A", email: "a@x.com", phone: "1-619-555-0000", zip: "92021-1234", marketingOptIn: true },
+    c2: { first: "B" }, // no email, no phone
+  };
+  const ords = {
+    o1: { number: "1", status: "invoiced", customerId: "c1", vehicleId: "v", invoicedAt: now - day, lines: [] },
+    o2: { number: "2", status: "invoiced", customerId: "c1", vehicleId: "v", invoicedAt: now - day, lines: [] }, // same VIN + date -> deduped
+    o3: { number: "3", status: "invoiced", customerId: "c2", vehicleId: "v", invoicedAt: now - 2 * day, lines: [] }, // no contact -> skipped
+  };
+  const r = loyaltyRows(ords, cust, veh, CFG, { now });
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.skippedNoContact, 1);
+  assert.equal(r.rows[0].CellPhone, "6195550000"); // 10 digits, leading country code stripped
+  assert.equal(r.rows[0].ZipCode, "92021"); // 5-digit
+});
+
 test("loyaltyRows: 24-month archive window excludes older", () => {
   const old = { oX: { number: "1000", status: "invoiced", customerId: "c1", vehicleId: "v1", invoicedAt: now - 800 * day, lines: [{ kind: "labor", description: "Old" }] } };
   const { rows } = loyaltyRows(old, CUSTOMERS, VEHICLES, CFG, { now });

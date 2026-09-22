@@ -244,6 +244,8 @@ export function loyaltyRows(orders, customers, vehicles, cfg, { monthsBack = 24,
   const cutoff = Math.max(sinceTs, now - monthsBack * MONTH_MS);
   const rows = [];
   let skippedNoVin = 0;
+  let skippedNoContact = 0;
+  const seen = new Set(); // one line per VIN + operation date
   const list = Object.values(orders || {})
     .filter((o) => o && o.status === STATUS.invoiced && (o.invoicedAt || o.createdAt || 0) >= cutoff)
     .sort((a, b) => (a.invoicedAt || a.createdAt || 0) - (b.invoicedAt || b.createdAt || 0));
@@ -254,24 +256,36 @@ export function loyaltyRows(orders, customers, vehicles, cfg, { monthsBack = 24,
       continue;
     }
     const c = (customers || {})[o.customerId] || {};
+    const email = String(c.email || "").trim();
+    const cell = digits10(c.phone);
+    const cell10 = cell.length === 10 ? cell : ""; // spec: 10-digit numeric
+    if (!email && !cell10) {
+      skippedNoContact += 1; // no way to reach them — not a usable loyalty record
+      continue;
+    }
+    const vin = cleanVin(v.vin);
+    const date = mdy(o.invoicedAt || o.createdAt);
+    const key = `${vin}|${date}`;
+    if (seen.has(key)) continue; // one per line per operation date
+    seen.add(key);
     const optIn = c.marketingOptIn ? "Yes" : "No";
     rows.push({
-      Email: c.email || "",
-      Email_Opt_In: c.email ? optIn : "No",
-      VIN: cleanVin(v.vin),
+      Email: email,
+      Email_Opt_In: email ? optIn : "No",
+      VIN: vin,
       Operation_Type: "Service",
       Operation_Sale_Type: "",
-      Operation_Date: mdy(o.invoicedAt || o.createdAt),
-      CellPhone: digits10(c.phone),
-      CellPhone_Opt_In: c.phone ? optIn : "No",
+      Operation_Date: date,
+      CellPhone: cell10,
+      CellPhone_Opt_In: cell10 ? optIn : "No",
       First_Name: c.first || "",
       Last_Name: c.last || "",
-      ZipCode: c.zip || "",
+      ZipCode: String(c.zip || "").replace(/\D/g, "").slice(0, 5), // 5-digit
       Provider_ID: cf.providerId,
       Location_ID: cf.locationId,
     });
   }
-  return { rows, skippedNoVin };
+  return { rows, skippedNoVin, skippedNoContact };
 }
 
 export function loyaltyFileText(rows) {
