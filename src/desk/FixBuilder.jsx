@@ -33,7 +33,7 @@ export function FixBuilder({ cfg, concern, onSave, onClose }) {
     }
     return out;
   }, [cats]);
-  const findingGroups = useMemo(() => findingsForCategories(cats), [cats]);
+  const findingGroups = useMemo(() => findingsForCategories(cats, cfg), [cats, cfg]);
 
   /* selected findings in the taxonomy's order, plus any "other" text */
   const foundList = useMemo(() => {

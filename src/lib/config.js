@@ -43,6 +43,8 @@ export const DEFAULT_CFG = {
   oilSticker: true, // pop the reminder sticker to print when an oil-change ticket is posted
   requireRealName: true, // a customer's name must be actual letters, not placeholder symbols or numbers
   bays: [], // shop-floor work areas, e.g. [{ id, name: "Bay 1" }]; a ticket can be sent to a bay's display
+  symptomsByCat: {}, // per-category overrides of the concern builder's symptom lists, { "Brakes": ["...", ...] }
+  findingsByCat: {}, // per-category overrides of the fix builder's findings lists
   invoiceFooter:
     "Thank you for your business. Parts and labor are warranted for 12 months or 12,000 miles, whichever comes first. Returned parts are subject to a restocking fee.",
   authorizationText:

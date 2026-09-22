@@ -475,6 +475,13 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .symTabBody { min-height:180px; max-height:52vh; overflow:auto; }
 .symTabBody .symChips { gap:9px; }
 .symTabBody .symChip { font-size:15px; padding:10px 15px; }
+/* settings: symptom & fix list editor */
+.builderCols { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.builderCol .cardHead { margin-bottom:8px; }
+.builderCol h4 { margin:0; font-size:14px; }
+.builderRow { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+.builderRow input { flex:1; min-width:0; }
+@media (max-width:720px) { .builderCols { grid-template-columns:1fr; } }
 @media (max-width:720px) {
   .concernBody { flex-direction:column; }
   .concernPreview { position:static; flex-basis:auto; width:100%; }

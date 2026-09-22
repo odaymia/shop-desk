@@ -10,6 +10,8 @@ import { NAME_MODES } from "../lib/names.js";
 import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
 import { COMM_ROLES, commToForm, commFromForm } from "../lib/commission.js";
 import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
+import { DEFAULT_SYMPTOMS, DEFAULT_SYMPTOMS_MAP } from "../lib/symptoms.js";
+import { FINDINGS_BY_CATEGORY } from "../lib/findings.js";
 import { sGetAll, sSet, cloud } from "../storage/index.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
@@ -36,11 +38,23 @@ function readLogo(file) {
    account. */
 const portalUrl = () => new URL("portal/", window.location.href).toString();
 
+/* Trim a per-category override map, dropping empty items and any category
+   whose list is empty (so it falls back to the built-in list). */
+function normalizeByCat(map) {
+  const out = {};
+  for (const [cat, list] of Object.entries(map || {})) {
+    const items = (Array.isArray(list) ? list : []).map((s) => String(s || "").trim()).filter(Boolean);
+    if (items.length) out[cat] = items;
+  }
+  return out;
+}
+
 const SETTINGS_SECTIONS = [
   ["company", "Company info"],
   ["customers", "Customers"],
   ["pricing", "Pricing & parts"],
   ["menus", "Service menu"],
+  ["builder", "Symptom & fix lists"],
   ["oilchange", "Oil change"],
   ["commissions", "Commissions"],
   ["data", "Data & backup"],
@@ -63,6 +77,26 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
     });
   const setCk = (i, patch) => setD((x) => ({ ...x, checklist: (x.checklist || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const setPkg = (i, patch) => setD((x) => ({ ...x, oilPackages: (x.oilPackages || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
+  /* Editable symptom / findings lists per category (Settings → Symptom & fix
+     lists). The effective list is the shop's override or the built-in. */
+  const [builderCat, setBuilderCat] = useState(DEFAULT_SYMPTOMS[0][0]);
+  const builtinFor = (mapKey, cat) => (mapKey === "symptomsByCat" ? DEFAULT_SYMPTOMS_MAP[cat] : FINDINGS_BY_CATEGORY[cat]) || [];
+  const effList = (x, mapKey, cat) => {
+    const over = x[mapKey] && x[mapKey][cat];
+    return Array.isArray(over) ? over : builtinFor(mapKey, cat);
+  };
+  const listFor = (mapKey) => effList(d, mapKey, builderCat);
+  const setBuilderList = (mapKey, cat, fn) => setD((x) => ({ ...x, [mapKey]: { ...(x[mapKey] || {}), [cat]: fn(effList(x, mapKey, cat)) } }));
+  const editBuilderItem = (mapKey, cat, i, v) => setBuilderList(mapKey, cat, (l) => l.map((it, k) => (k === i ? v : it)));
+  const addBuilderItem = (mapKey, cat) => setBuilderList(mapKey, cat, (l) => [...l, ""]);
+  const removeBuilderItem = (mapKey, cat, i) => setBuilderList(mapKey, cat, (l) => l.filter((_, k) => k !== i));
+  const resetBuilderCat = (mapKey, cat) =>
+    setD((x) => {
+      const m = { ...(x[mapKey] || {}) };
+      delete m[cat];
+      return { ...x, [mapKey]: m };
+    });
+
   const split = (d.commission && d.commission.split) || { advisor: 40, top: 30, pit: 30 };
   const setSplit = (role, v) => setD((x) => ({ ...x, commission: { ...(x.commission || {}), split: { ...split, [role]: v } } }));
   const onOff = (k, onText, offText) => (
@@ -88,6 +122,8 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       bays: (d.bays || [])
         .filter((b) => String(b.name || "").trim())
         .map((b, i) => ({ id: b.id || "bay" + (i + 1), name: String(b.name).trim() })),
+      symptomsByCat: normalizeByCat(d.symptomsByCat),
+      findingsByCat: normalizeByCat(d.findingsByCat),
       nextOrderNumber: Math.max(1, Math.floor(toNum(d.nextOrderNumber)) || 1001),
       commission: { ...(d.commission || {}), split: { advisor: toNum(split.advisor), top: toNum(split.top), pit: toNum(split.pit) } },
       reminderMonths: Math.max(0, Math.floor(toNum(d.reminderMonths)) || 3),
@@ -301,6 +337,67 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </button>
           </div>
 
+          </>
+          )}
+          {show("builder") && (
+          <>
+          <h3 className="subhead">Symptom & fix builder lists</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Tailor the concern and fix builders. Pick a category, then add your own, reword, or remove any item — keep it in plain,
+            everyday language so it prints clearly. Reset a category to the built-in list anytime.
+          </p>
+          <Field label="Category">
+            <select value={builderCat} onChange={(e) => setBuilderCat(e.target.value)}>
+              {DEFAULT_SYMPTOMS.map(([cat]) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="builderCols">
+            <div className="builderCol">
+              <div className="cardHead">
+                <h4>Symptoms (what the customer notices)</h4>
+                <button className="btn tiny ghost" onClick={() => resetBuilderCat("symptomsByCat", builderCat)}>
+                  Reset
+                </button>
+              </div>
+              {listFor("symptomsByCat").map((it, i) => (
+                <div key={i} className="builderRow">
+                  <input value={it} onChange={(e) => editBuilderItem("symptomsByCat", builderCat, i, e.target.value)} placeholder="e.g. Brakes feel soft or mushy" />
+                  <button className="lineX" onClick={() => removeBuilderItem("symptomsByCat", builderCat, i)} aria-label="Remove">
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button className="btn tiny" onClick={() => addBuilderItem("symptomsByCat", builderCat)}>
+                + Symptom
+              </button>
+            </div>
+            <div className="builderCol">
+              <div className="cardHead">
+                <h4>Findings (what the tech finds)</h4>
+                <button className="btn tiny ghost" onClick={() => resetBuilderCat("findingsByCat", builderCat)}>
+                  Reset
+                </button>
+              </div>
+              {listFor("findingsByCat").map((it, i) => (
+                <div key={i} className="builderRow">
+                  <input value={it} onChange={(e) => editBuilderItem("findingsByCat", builderCat, i, e.target.value)} placeholder="e.g. front brake pads worn out" />
+                  <button className="lineX" onClick={() => removeBuilderItem("findingsByCat", builderCat, i)} aria-label="Remove">
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button className="btn tiny" onClick={() => addBuilderItem("findingsByCat", builderCat)}>
+                + Finding
+              </button>
+              <p className="legalNote" style={{ marginTop: 8 }}>
+                Findings read after the word "Found …" — write them lowercase-first, e.g. "front rotors scored or warped."
+              </p>
+            </div>
+          </div>
           </>
           )}
           {show("oilchange") && (

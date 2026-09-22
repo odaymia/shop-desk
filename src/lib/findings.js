@@ -125,11 +125,17 @@ export const FINDINGS_BY_CATEGORY = {
 };
 
 /* The findings to offer for a set of concern categories (deduped, in order).
-   With no categories, offer them all so the builder still works. */
-export function findingsForCategories(categories) {
-  const cats = (categories && categories.length ? categories : Object.keys(FINDINGS_BY_CATEGORY)).filter((c) => FINDINGS_BY_CATEGORY[c]);
+   With no categories, offer them all so the builder still works. A shop can
+   override any category's list in Settings (cfg.findingsByCat). */
+export function findingsForCategories(categories, cfg) {
+  const over = (cfg && cfg.findingsByCat) || {};
+  const all = Object.keys(FINDINGS_BY_CATEGORY);
+  const cats = (categories && categories.length ? categories : all).filter((c) => FINDINGS_BY_CATEGORY[c] || over[c]);
   const out = [];
-  for (const c of cats) out.push([c, FINDINGS_BY_CATEGORY[c]]);
+  for (const c of cats) {
+    const items = Array.isArray(over[c]) && over[c].length ? over[c].filter((s) => String(s || "").trim()) : FINDINGS_BY_CATEGORY[c] || [];
+    out.push([c, items]);
+  }
   return out;
 }
 

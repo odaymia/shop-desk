@@ -38,10 +38,15 @@ export const CATEGORY_META = {
 };
 export const categoryMeta = (name) => CATEGORY_META[name] || { icon: "•", short: name };
 
-/* The categorized list the picker shows — the shop's own symptoms merged in
-   under a "Shop" group. cfg.symptoms is a flat list of strings. */
+/* The built-in symptoms keyed by category, for the Settings editor and merges. */
+export const DEFAULT_SYMPTOMS_MAP = Object.fromEntries(DEFAULT_SYMPTOMS);
+
+/* The categorized list the picker shows. A shop can override any category's
+   list in Settings (cfg.symptomsByCat), and cfg.symptoms is an extra flat
+   "Shop" group kept for backward compatibility. */
 export function symptomGroups(cfg) {
-  const groups = DEFAULT_SYMPTOMS.map(([cat, items]) => [cat, items]);
+  const over = (cfg && cfg.symptomsByCat) || {};
+  const groups = DEFAULT_SYMPTOMS.map(([cat, items]) => [cat, Array.isArray(over[cat]) && over[cat].length ? over[cat].filter((s) => String(s || "").trim()) : items]);
   const own = Array.isArray(cfg && cfg.symptoms) ? cfg.symptoms.filter((s) => String(s || "").trim()) : [];
   if (own.length) groups.unshift(["Shop", own]);
   return groups;
