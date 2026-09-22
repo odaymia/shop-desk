@@ -40,8 +40,8 @@ test("parseConcern splits a saved concern into known symptoms and free text", ()
 test("parseConcern matches the shop's own custom symptoms, and round-trips with compose", () => {
   const cfg = { symptoms: ["Fleet inspection — monthly"] };
   assert.ok(allSymptomItems(cfg).includes("Fleet inspection — monthly"));
-  const built = composeConcern(["Fleet inspection — monthly", "Rough idle"], "Only when cold");
+  const built = composeConcern(["Fleet inspection — monthly", "Battery keeps dying"], "Only when cold");
   const { selected, extra } = parseConcern(built, cfg);
-  assert.deepEqual(selected, ["Fleet inspection — monthly", "Rough idle"]);
+  assert.deepEqual(selected, ["Fleet inspection — monthly", "Battery keeps dying"]);
   assert.equal(extra, "Only when cold");
 });

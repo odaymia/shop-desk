@@ -13,13 +13,13 @@ const cfg = {
 };
 
 test("concernCategories maps stated symptoms back to their areas", () => {
-  const cats = concernCategories("Grinding noise when braking\nA/C not cold", cfg);
+  const cats = concernCategories("Grinding when I brake\nA/C not cold", cfg);
   assert.ok(cats.includes("Noises"));
   assert.ok(cats.includes("A/C & heat"));
 });
 
 test("suggestedWork recommends a diagnosis first and the shop's matching repair menus", () => {
-  const w = suggestedWork("Brakes feel soft or spongy\nA/C not cold", cfg);
+  const w = suggestedWork("Brakes feel soft or mushy\nA/C not cold", cfg);
   // diagnose first (BAR-safe)
   assert.ok(w.diagnostics.some((d) => d.label === "Brake inspection"));
   assert.ok(w.diagnostics.some((d) => d.label === "A/C performance check"));
@@ -39,7 +39,7 @@ test("suggestedWork is empty when the concern has no recognized symptoms", () =>
 });
 
 test("suggestedWork de-dupes a diagnosis shared by two symptoms in the same area", () => {
-  const w = suggestedWork("Grinding noise when braking\nSquealing when braking", cfg);
+  const w = suggestedWork("Grinding when I brake\nSquealing when I brake", cfg);
   const noiseDiag = w.diagnostics.filter((d) => d.label === "Inspect and locate the noise");
   assert.equal(noiseDiag.length, 1);
 });

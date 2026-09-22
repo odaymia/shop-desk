@@ -7,18 +7,36 @@
    Pure data — no React, no storage. */
 
 export const DEFAULT_SYMPTOMS = [
-  ["Warning lights", ["Check engine light on", "Oil light on", "Battery/charging light on", "Brake warning light on", "ABS light on", "Airbag light on", "Temperature light on", "Tire pressure (TPMS) light on", "Traction/stability light on", "A warning light I don't recognize"]],
-  ["Noises", ["Grinding noise when braking", "Squealing when braking", "Clicking when turning", "Rattle over bumps", "Humming or roaring from the wheels", "Ticking or knocking from the engine", "Whining noise", "Squeal or chirp from the belt", "Clunk when shifting", "Noise only when cold"]],
-  ["Brakes", ["Brakes feel soft or spongy", "Brake pedal pulsates", "Car pulls to one side when braking", "Brakes grabbing or grinding", "Pedal goes to the floor", "Parking brake won't hold", "Brakes take too long to stop"]],
-  ["Engine / running", ["Engine won't start", "Hard to start", "Engine stalls", "Rough idle", "Loss of power", "Misfire or hesitation", "Poor fuel economy", "Runs rough when cold", "Backfires", "Smells like gas"]],
-  ["Transmission / shifting", ["Slipping when accelerating", "Hard or rough shifting", "Won't go into gear", "Delayed engagement", "Jerks or shudders", "Stuck in one gear", "Grinding when shifting (manual)"]],
-  ["Leaks / smells / smoke", ["Oil leak", "Coolant leak", "Transmission fluid leak", "Fluid spot under the car", "Burning smell", "Sweet smell (coolant)", "Smoke from the exhaust", "Smoke under the hood", "Overheating", "Low on oil"]],
-  ["A/C & heat", ["A/C not cold", "A/C blows warm sometimes", "Heater not warm", "Bad smell from the vents", "Weak air flow", "Defroster not working", "Fan only works on high"]],
-  ["Steering / ride / suspension", ["Shakes at highway speed", "Vibration in the steering wheel", "Pulls to one side", "Loose or wandering steering", "Hard to steer", "Rough ride", "Clunk over bumps", "Bounces after bumps", "Sits low on one corner"]],
-  ["Electrical / lights", ["Battery keeps dying", "Won't hold a charge", "Dead battery", "Lights flickering", "A light is out", "Power window stuck", "Door locks not working", "Radio or screen not working", "Horn not working", "Wipers not working"]],
-  ["Tires / wheels", ["Tire losing air", "Uneven tire wear", "Needs a rotation", "Flat tire", "Tire has a nail or screw", "Vibration that changes with speed", "Wants new tires"]],
-  ["Maintenance / requested", ["Here for an oil change", "Due for scheduled service", "Requests a multi-point inspection", "Pre-trip / road-trip check", "Brake inspection", "Check fluids and top off", "Battery test", "Wants an estimate for a specific repair", "Following up on a prior visit"]],
+  ["Warning lights", ["Check engine light on", "Oil light on", "Battery light on", "Brake light on", "ABS (brake) light on", "Airbag light on", "Temperature / hot light on", "Low tire pressure light on", "Traction or slip light on", "A light I don't recognize is on"]],
+  ["Noises", ["Grinding when I brake", "Squealing when I brake", "Clicking when I turn", "Rattling over bumps", "Humming or roaring while driving", "Ticking or knocking from the engine", "Whining sound", "Squeak or chirp under the hood", "Clunk when I take off or shift", "Noise only when it's cold"]],
+  ["Brakes", ["Brakes feel soft or mushy", "Brake pedal shakes or pulses", "Pulls to one side when I brake", "Brakes squeak or grind", "Pedal sinks toward the floor", "Parking brake won't hold", "Takes longer to stop than it should"]],
+  ["Engine / running", ["Won't start at all", "Takes a while to start", "Starts, then dies", "Shakes or rattles when stopped", "Feels weak or sluggish", "Stumbles or hesitates when I give it gas", "Using more gas than usual", "Runs rough until it warms up", "Backfires or pops", "Smells like gas"]],
+  ["Transmission / shifting", ["Revs up but doesn't speed up", "Shifts hard or rough", "Won't go into gear", "Slow to move when I press the gas", "Jerks or shudders", "Stuck in one gear", "Grinds when I shift (stick shift)"]],
+  ["Leaks / smells / smoke", ["Oil spot under the car", "Green or orange puddle (coolant)", "Red puddle (transmission)", "Something dripping under the car", "Burning smell", "Sweet syrup smell", "Smoke from the tailpipe", "Smoke under the hood", "Running hot / overheating", "Low on oil"]],
+  ["A/C & heat", ["A/C not cold", "A/C cold sometimes, warm other times", "Heat not warm", "Bad smell from the vents", "Weak air from the vents", "Defroster not working", "Fan only works on high"]],
+  ["Steering / ride / suspension", ["Shakes at highway speed", "Steering wheel shakes", "Pulls to one side while driving", "Steering feels loose", "Hard to steer", "Rough or bumpy ride", "Clunks over bumps", "Bounces a lot after bumps", "Sitting low on one corner"]],
+  ["Electrical / lights", ["Battery keeps dying", "Won't hold a charge", "Dead battery", "Lights flicker or dim", "A light bulb is out", "Power window stuck", "Door locks not working", "Radio or screen not working", "Horn not working", "Wipers not working"]],
+  ["Tires / wheels", ["Tire keeps going flat", "Tires wearing unevenly", "Needs a tire rotation", "Flat tire", "Nail or screw in a tire", "Shaking that gets worse with speed", "Wants new tires"]],
+  ["Maintenance / requested", ["Here for an oil change", "Due for regular service", "Wants a full inspection", "Road-trip / pre-trip check", "Check the brakes", "Check and top off fluids", "Test the battery", "Wants a price for a specific repair", "Following up on a past visit"]],
 ];
+
+/* Tab display for each category — a short label and an icon, so the concern
+   builder reads as friendly tabs. Keyed by the category names above. */
+export const CATEGORY_META = {
+  "Warning lights": { icon: "🔆", short: "Dash lights" },
+  Noises: { icon: "🔊", short: "Sounds" },
+  Brakes: { icon: "🛑", short: "Brakes" },
+  "Engine / running": { icon: "🔑", short: "Starting & running" },
+  "Transmission / shifting": { icon: "⚙️", short: "Shifting" },
+  "Leaks / smells / smoke": { icon: "💧", short: "Leaks & smells" },
+  "A/C & heat": { icon: "🌡️", short: "Heat & A/C" },
+  "Steering / ride / suspension": { icon: "🚗", short: "Steering & ride" },
+  "Electrical / lights": { icon: "💡", short: "Lights & power" },
+  "Tires / wheels": { icon: "🛞", short: "Tires" },
+  "Maintenance / requested": { icon: "🔧", short: "Service / other" },
+  Shop: { icon: "⭐", short: "Ours" },
+};
+export const categoryMeta = (name) => CATEGORY_META[name] || { icon: "•", short: name };
 
 /* The categorized list the picker shows — the shop's own symptoms merged in
    under a "Shop" group. cfg.symptoms is a flat list of strings. */

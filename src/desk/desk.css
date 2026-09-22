@@ -463,10 +463,23 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .concernPreview { flex:0 0 260px; position:sticky; top:0; background:var(--tint, #f3f4f6); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
 .concernList { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
 .concernList li { font-size:14px; line-height:1.35; padding:7px 10px; background:#fff; border:1px solid var(--line); border-radius:8px; }
+/* category tabs */
+.concernMain { flex:1 1 auto; min-width:0; }
+.symTabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.symTab { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:9px 14px; font-size:14px; color:var(--ink); cursor:pointer; line-height:1; }
+.symTab:hover { border-color:var(--signal); background:#fff; }
+.symTab.on { border-color:var(--brand, #7f1d1d); background:var(--brand, #7f1d1d); color:#fff; font-weight:600; }
+.symTabIcon { font-size:16px; }
+.symTabCount { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--brand, #7f1d1d); color:#fff; font-size:11px; font-weight:700; }
+.symTab.on .symTabCount { background:#fff; color:var(--brand, #7f1d1d); }
+.symTabBody { min-height:180px; max-height:52vh; overflow:auto; }
+.symTabBody .symChips { gap:9px; }
+.symTabBody .symChip { font-size:15px; padding:10px 15px; }
 @media (max-width:720px) {
   .concernBody { flex-direction:column; }
   .concernPreview { position:static; flex-basis:auto; width:100%; }
   .concernGroups { max-height:none; }
+  .symTabBody { max-height:none; }
 }
 
 /* revisions */
