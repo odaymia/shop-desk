@@ -80,6 +80,21 @@ test("serviceRows: invoiced + valid VIN only, one row per performed line", () =>
   assert.equal(part.LABOR_DESCRIPTION, "");
 });
 
+test("serviceRows recentRecords: newest whole tickets totaling at least N", () => {
+  const veh = { v: { vin: "1HGCM82633A004352", make: "Honda", model: "Accord", year: 2019 } };
+  const mk = (n, ts, nlines) => ({ number: String(n), status: "invoiced", vehicleId: "v", invoicedAt: ts, lines: Array.from({ length: nlines }, (_, i) => ({ kind: "part", description: "P" + i, qty: 1 })) });
+  const ords = { a: mk(1, 100, 2), b: mk(2, 200, 2), c: mk(3, 300, 2) }; // 3 tickets x 2 rows = 6
+  const r = serviceRows(ords, veh, {}, { recentRecords: 3 });
+  // newest tickets c(2)+b(2)=4 >= 3; a excluded. No RO split.
+  assert.equal(r.usedOrders, 2);
+  assert.equal(r.rows.length, 4);
+  // returned chronologically: b (200) before c (300)
+  assert.equal(r.rows[0].RO_INVOICE_NUMBER, "2");
+  assert.equal(r.rows[3].RO_INVOICE_NUMBER, "3");
+  // asking for more than exist just returns everything
+  assert.equal(serviceRows(ords, veh, {}, { recentRecords: 999 }).rows.length, 6);
+});
+
 test("serviceFileText: pipe-delimited, quoted, header first, CRLF", () => {
   const { rows } = serviceRows(ORDERS, VEHICLES, CFG);
   const text = serviceFileText(rows);

@@ -77,17 +77,51 @@ export const SERVICE_FIELDS = [
 // discounts, or notes) with an actual description.
 const performed = (l) => !!l && ["part", "labor", "sublet"].includes(l.kind) && !!String(l.description || "").trim();
 
+// One service-file row for a performed line on a ticket.
+function serviceRow(o, v, l, cf, open, close, miles) {
+  return {
+    VIN: cleanVin(v.vin),
+    RO_OPEN_DATE: open,
+    RO_CLOSE_DATE: close,
+    MILEAGE: miles,
+    ODOMETER_MEASURE: "MI",
+    RO_INVOICE_NUMBER: o.number || "",
+    SERVICE_DESCRIPTION: l.description,
+    LABOR_DESCRIPTION: l.kind === "labor" ? l.description : "",
+    PART_NAME_DESCRIPTION: l.kind === "part" ? l.description : "",
+    PART_QUANTITY: l.kind === "part" ? Number(l.qty) || "" : "",
+    MAKE: v.make || "",
+    MODEL: v.model || "",
+    MODEL_YEAR: v.year || "",
+    PLATE: v.plate || "",
+    PLATE_STATE: v.plateState || "",
+    MANAGEMENT_SYSTEM: cf.managementSystem,
+    LOCATION_ID: cf.locationId,
+    LOCATION_NAME: cf.locationName,
+    ADDRESS: cf.address,
+    CITY: cf.city,
+    STATE: cf.state,
+    POSTAL_CODE: cf.zip,
+    PHONE: phoneDash(cf.phone),
+    URL: cf.url,
+  };
+}
+
 /* Service rows from invoiced tickets. One row per performed line. Returns the
    rows plus counts so the UI can say how many were used and how many tickets
-   were skipped for a missing/invalid VIN. `sinceTs` limits to that day (PROD). */
-export function serviceRows(orders, vehicles, cfg, { sinceTs = 0 } = {}) {
+   were skipped for a missing/invalid VIN.
+
+   Options:
+   - sinceTs:       only tickets closed on/after this time (a day's PROD file).
+   - recentRecords: cap to roughly this many rows, taking the NEWEST whole
+                    tickets — a repair order is never split, so the result is at
+                    least this many rows (e.g. 250 → the latest tickets that
+                    total 250+ service lines). */
+export function serviceRows(orders, vehicles, cfg, { sinceTs = 0, recentRecords = 0 } = {}) {
   const cf = carfaxCfg(cfg);
-  const rows = [];
   let skippedNoVin = 0;
-  let usedOrders = 0;
-  const list = Object.values(orders || {})
-    .filter((o) => o && o.status === STATUS.invoiced && (o.invoicedAt || o.createdAt || 0) >= sinceTs)
-    .sort((a, b) => (a.invoicedAt || a.createdAt || 0) - (b.invoicedAt || b.createdAt || 0));
+  const groups = []; // { ts, rows }
+  const list = Object.values(orders || {}).filter((o) => o && o.status === STATUS.invoiced && (o.invoicedAt || o.createdAt || 0) >= sinceTs);
   for (const o of list) {
     const v = (vehicles || {})[o.vehicleId] || {};
     if (!validVin(v.vin)) {
@@ -96,40 +130,27 @@ export function serviceRows(orders, vehicles, cfg, { sinceTs = 0 } = {}) {
     }
     const lines = (o.lines || []).filter(performed);
     if (!lines.length) continue;
-    usedOrders += 1;
+    const ts = o.invoicedAt || o.createdAt || 0;
     const open = mdy(o.createdAt || o.invoicedAt);
     const close = mdy(o.invoicedAt || o.createdAt);
     const miles = Math.round(Number(o.mileageOut || o.mileageIn || 0)) || "";
-    for (const l of lines) {
-      rows.push({
-        VIN: cleanVin(v.vin),
-        RO_OPEN_DATE: open,
-        RO_CLOSE_DATE: close,
-        MILEAGE: miles,
-        ODOMETER_MEASURE: "MI",
-        RO_INVOICE_NUMBER: o.number || "",
-        SERVICE_DESCRIPTION: l.description,
-        LABOR_DESCRIPTION: l.kind === "labor" ? l.description : "",
-        PART_NAME_DESCRIPTION: l.kind === "part" ? l.description : "",
-        PART_QUANTITY: l.kind === "part" ? Number(l.qty) || "" : "",
-        MAKE: v.make || "",
-        MODEL: v.model || "",
-        MODEL_YEAR: v.year || "",
-        PLATE: v.plate || "",
-        PLATE_STATE: v.plateState || "",
-        MANAGEMENT_SYSTEM: cf.managementSystem,
-        LOCATION_ID: cf.locationId,
-        LOCATION_NAME: cf.locationName,
-        ADDRESS: cf.address,
-        CITY: cf.city,
-        STATE: cf.state,
-        POSTAL_CODE: cf.zip,
-        PHONE: phoneDash(cf.phone),
-        URL: cf.url,
-      });
-    }
+    groups.push({ ts, rows: lines.map((l) => serviceRow(o, v, l, cf, open, close, miles)) });
   }
-  return { rows, skippedNoVin, usedOrders };
+
+  let chosen = groups;
+  if (recentRecords > 0) {
+    // newest tickets first, accumulate whole tickets until we hit the target
+    const picked = [];
+    let count = 0;
+    for (const g of [...groups].sort((a, b) => b.ts - a.ts)) {
+      picked.push(g);
+      count += g.rows.length;
+      if (count >= recentRecords) break;
+    }
+    chosen = picked;
+  }
+  chosen = chosen.sort((a, b) => a.ts - b.ts); // report chronologically
+  return { rows: chosen.flatMap((g) => g.rows), skippedNoVin, usedOrders: chosen.length };
 }
 
 export function serviceFileText(rows) {

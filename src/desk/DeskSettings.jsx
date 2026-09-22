@@ -912,6 +912,7 @@ function downloadText(name, text, type) {
 
 function CarfaxExportPanel({ cfg, saveCfg, flash, shop }) {
   const [c, setC] = useState(() => ({ managementSystem: "Bolt Badger", locationId: "", providerId: "", locationName: cfg.shopName || "", address: "", city: "", state: "", zip: "", ...(cfg.carfax || {}) }));
+  const [recent, setRecent] = useState("250");
   const set = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
   const effCfg = { ...cfg, carfax: c };
 
@@ -920,6 +921,7 @@ function CarfaxExportPanel({ cfg, saveCfg, flash, shop }) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const svcToday = serviceRows(shop.orders, shop.vehicles, effCfg, { sinceTs: startOfToday.getTime() });
+  const svcRecent = serviceRows(shop.orders, shop.vehicles, effCfg, { recentRecords: Math.max(1, Number(recent) || 250) });
 
   const save = async () => {
     await saveCfg({ ...cfg, carfax: c });
@@ -999,10 +1001,15 @@ function CarfaxExportPanel({ cfg, saveCfg, flash, shop }) {
           <b className={svc.skippedNoVin ? "vShort" : ""}>{svc.skippedNoVin}</b>
         </div>
       </div>
-      <div className="rowBtns" style={{ marginTop: 12, flexWrap: "wrap" }}>
-        <button className="btn primary" onClick={() => exportService("HIST", svc)}>Export service file — full history (HIST)</button>
+      <div className="rowBtns" style={{ marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button className="btn primary" onClick={() => exportService("HIST", svcRecent)}>Export most recent</button>
+        <input className="search" style={{ width: 84 }} inputMode="numeric" value={recent} onChange={(e) => setRecent(e.target.value.replace(/[^0-9]/g, ""))} aria-label="Number of recent records" />
+        <span className="muted">records → {svcRecent.rows.length} rows, {svcRecent.usedOrders} tickets</span>
+      </div>
+      <div className="rowBtns" style={{ marginTop: 10, flexWrap: "wrap" }}>
+        <button className="btn" onClick={() => exportService("HIST", svc)}>Full history (HIST, {svc.rows.length})</button>
         <button className="btn" onClick={() => exportService("PROD", svcToday)}>Today only (PROD, {svcToday.rows.length})</button>
-        <button className="btn" onClick={exportLoyalty}>Export customer list (HIST, {loy.rows.length})</button>
+        <button className="btn" onClick={exportLoyalty}>Customer list (HIST, {loy.rows.length})</button>
       </div>
       <p className="legalNote">
         CARFAX needs at least 250 service records to start. Files are sent to CARFAX by FTP (service) / SFTP (loyalty) once
