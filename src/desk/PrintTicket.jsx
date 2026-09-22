@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel, owesBalance, paymentDesc } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
-import { fmtDate, fmtDateTime, fmtPhone } from "./ui.jsx";
+import { fmtDate, fmtDateTime, fmtTime, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
 import { staffLabel } from "../lib/names.js";
 import { checklistSummary, recommendedServices } from "../lib/checklist.js";
@@ -59,7 +59,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
                 {statusLabel(o.status)} #{o.number}
               </div>
               <div className="shMeta">
-                {fmtDate(o.invoicedAt || o.createdAt)}
+                {fmtDate(o.invoicedAt || o.createdAt)} · {fmtTime(o.invoicedAt || o.createdAt)}
                 {o.status === "void" ? " · VOID" : ""}
               </div>
             </div>

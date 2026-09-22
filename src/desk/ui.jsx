@@ -30,6 +30,7 @@ export function Money({ v, className }) {
 
 export const fmtDate = (ts) =>
   ts ? new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+export const fmtTime = (ts) => (ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "");
 export const fmtDateTime = (ts) =>
   ts
     ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
