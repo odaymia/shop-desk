@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Money, fmtDate, toNum, ConfirmModal } from "./ui.jsx";
 import { countCategories, countItems, countVariance, applyCounts } from "../lib/inventoryCount.js";
 import defaultLogo from "../assets/genie-logo.png";
@@ -31,6 +32,10 @@ const lsDel = (k) => {
     localStorage.removeItem(k);
   } catch { /* ignore */ }
 };
+
+/* Print sheets must be a direct child of .root for the print stylesheet to
+   reveal them (see the "@media print" rules), so portal them out of the desk. */
+const printPortal = (node) => createPortal(node, document.querySelector(".root") || document.body);
 
 export function InventoryCount({ shop, cfg, flash, onClose }) {
   const draft = useMemo(() => lsGet(DRAFT_KEY), []);
@@ -85,8 +90,11 @@ export function InventoryCount({ shop, cfg, flash, onClose }) {
   const catLabel = session ? (session.category === "all" ? "All items" : session.category) : "";
 
   // ---- print overlays ----
-  if (printing === "sheet") return <CountSheet cfg={cfg} category={catLabel} items={session.items} onClose={() => setPrinting(null)} />;
-  if (printing === "variance") return <VarianceSheet cfg={cfg} category={catLabel} variance={variance} onClose={() => setPrinting(null)} />;
+  // Mounted at the .root level: the print stylesheet only reveals a .printSheet
+  // that's a direct child of .root (it hides .root's other children), so a sheet
+  // nested inside the desk would print blank.
+  if (printing === "sheet") return printPortal(<CountSheet cfg={cfg} category={catLabel} items={session.items} onClose={() => setPrinting(null)} />);
+  if (printing === "variance") return printPortal(<VarianceSheet cfg={cfg} category={catLabel} variance={variance} onClose={() => setPrinting(null)} />);
 
   // ---- setup: pick a category ----
   if (phase === "setup") {
