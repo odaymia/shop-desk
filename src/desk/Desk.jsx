@@ -16,6 +16,7 @@ import { PrintTicket } from "./PrintTicket.jsx";
 import { StartTicket } from "./StartTicket.jsx";
 import { SignatureStation } from "./Signing.jsx";
 import { BayDisplay } from "./BayDisplay.jsx";
+import { Fleet } from "./Fleet.jsx";
 import { DEMO } from "../lib/demo.js";
 import defaultLogo from "../assets/genie-logo.png";
 
@@ -24,6 +25,7 @@ import defaultLogo from "../assets/genie-logo.png";
 const PAGES = [
   ["orders", "Tickets"],
   ["customers", "Customers"],
+  ["fleet", "Fleet"],
   ["inventory", "Inventory"],
   ["tires", "Tires"],
   ["jobs", "Canned jobs"],
@@ -179,6 +181,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "customers" && (
             <Customers shop={shop} cfg={cfg} nav={nav} flash={flash} customerId={customerId} onNew={newTicket} />
           )}
+          {page === "fleet" && <Fleet shop={shop} cfg={cfg} nav={nav} flash={flash} onNew={newTicket} />}
           {page === "inventory" && <Inventory shop={shop} cfg={cfg} flash={flash} />}
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
           {page === "jobs" && <Jobs shop={shop} cfg={cfg} flash={flash} />}

@@ -12,6 +12,7 @@ import { FixBuilder } from "./FixBuilder.jsx";
 import { addFinding } from "../lib/findings.js";
 import { suggestedWork } from "../lib/repairs.js";
 import { needsReauth, complianceWarnings } from "../lib/compliance.js";
+import { isFleet, fleetName, fleetDiscountLine } from "../lib/fleet.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
@@ -149,13 +150,25 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         const items = syncChecklist(next.checklist.items, next.lines, cfg.checklist, shop.parts);
         if (items !== next.checklist.items) next = { ...next, checklist: { ...next.checklist, items } };
       }
+      /* fleet accounts get an automatic per-category discount — keep that
+         discount line in step with the lines and the account's rates */
+      if (next.lines !== cur.lines || next.customerId !== cur.customerId) {
+        const fleetCust = shop.customers[next.customerId];
+        const existing = (next.lines || []).find((l) => l.fleetDiscount);
+        const want = fleetDiscountLine(next, fleetCust, shop.parts);
+        const changed = want ? !existing || existing.price !== want.price || existing.description !== want.description : !!existing;
+        if (changed) {
+          const base = (next.lines || []).filter((l) => !l.fleetDiscount);
+          next = { ...next, lines: want ? [...base, { id: "fleetdisc", kind: "discount", fleetDiscount: true, qty: 1, ...want }] : base };
+        }
+      }
       draftRef.current = next;
       dirty.current = true;
       setDraft(next);
       clearTimeout(timer.current);
       timer.current = setTimeout(flushNow, 600);
     },
-    [flushNow, cfg.checklist, shop.parts]
+    [flushNow, cfg.checklist, shop.parts, shop.customers]
   );
 
   /* A parts cart sent back by a catalog lands as its own record; when
@@ -658,6 +671,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               <button className="btn tiny" onClick={() => setPick("reauth")}>
                 Record approval
               </button>
+            </div>
+          )}
+          {isFleet(customer) && (
+            <div className="fleetBar" style={{ marginBottom: 14 }}>
+              <span>
+                🏢 Fleet account: <strong>{fleetName(customer)}</strong> — automatic discounts apply. Take payment with <strong>On account</strong> to bill it.
+              </span>
             </div>
           )}
 
@@ -1509,7 +1529,8 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
   );
 }
 
-const PAY_ICONS = { cash: "💵", card: "💳", check: "🧾", other: "•" };
+const PAY_ICONS = { cash: "💵", card: "💳", check: "🧾", account: "🏢", other: "•" };
+const PAY_LABELS = { account: "On account" };
 
 function PaymentModal({ balance, onClose, onSave }) {
   const due = balance > 0 ? round2(balance) : 0;
@@ -1545,7 +1566,7 @@ function PaymentModal({ balance, onClose, onSave }) {
           {PAY_METHODS.map((m) => (
             <button key={m} type="button" className={`payMethod ${method === m ? "on" : ""}`} onClick={() => setMethod(m)}>
               <span className="payIcon">{PAY_ICONS[m]}</span>
-              {m[0].toUpperCase() + m.slice(1)}
+              {PAY_LABELS[m] || m[0].toUpperCase() + m.slice(1)}
             </button>
           ))}
         </div>
@@ -1601,6 +1622,11 @@ function PaymentModal({ balance, onClose, onSave }) {
           <Text value={ref} onChange={setRef} inputMode="numeric" />
         </Field>
       )}
+      {method === "account" && (
+        <Field label="PO number (optional)">
+          <Text value={ref} onChange={setRef} placeholder="Purchase order / reference" />
+        </Field>
+      )}
       {method === "other" && (
         <Field label="Reference (optional)">
           <Text value={ref} onChange={setRef} />
@@ -1612,6 +1638,7 @@ function PaymentModal({ balance, onClose, onSave }) {
         Save payment
       </button>
       {method === "card" && <p className="legalNote">Card processing isn't wired in yet — run the card on your terminal and record it here.</p>}
+      {method === "account" && <p className="legalNote">Bills this amount to the fleet account — it shows on the account's report as owed until you collect it.</p>}
     </Modal>
   );
 }

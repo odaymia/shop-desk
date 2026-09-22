@@ -5,6 +5,7 @@ import { Money, fmtDate, fmtPhone } from "./ui.jsx";
 import { CustomerForm, VehicleForm } from "./forms.jsx";
 import { customerName, vehicleName, vehiclesOf, ordersOf, searchText } from "./useShop.js";
 import { orderTotals, orderTitle, statusLabel } from "../lib/invoice.js";
+import { isFleet, DEFAULT_FLEET } from "../lib/fleet.js";
 
 export function Customers({ shop, cfg, nav, flash, customerId, onNew }) {
   const [q, setQ] = useState("");
@@ -205,7 +206,21 @@ function CustomerDetail({ shop, cfg, nav, flash, customer: c, onNew }) {
         <h1>{customerName(c)}</h1>
         {c.active === false && <span className="st void">Inactive</span>}
         {c.taxExempt && <span className="st">Tax exempt</span>}
+        {isFleet(c) && <span className="st">Fleet account</span>}
         <div className="grow" />
+        {!isFleet(c) && (
+          <button
+            className="btn"
+            title="Turn this into a fleet account with automatic discounts and a house account"
+            onClick={async () => {
+              await shop.saveCustomer({ ...c, fleet: DEFAULT_FLEET });
+              flash("Made a fleet account — set discounts on the Fleet page");
+              nav.go("fleet");
+            }}
+          >
+            Make fleet account
+          </button>
+        )}
         <button className="btn" onClick={() => setEditing(true)}>
           Edit
         </button>

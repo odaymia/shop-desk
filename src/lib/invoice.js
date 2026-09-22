@@ -23,7 +23,7 @@ export const PART_CONDITIONS = [
   ["aftermarket-crash", "Non-OEM aftermarket crash part"],
 ];
 export const conditionLabel = (c) => (PART_CONDITIONS.find(([k]) => k === (c || "new")) || PART_CONDITIONS[0])[1];
-export const PAY_METHODS = ["cash", "card", "check", "other"];
+export const PAY_METHODS = ["cash", "card", "check", "account", "other"];
 export const CARD_TYPES = ["Visa", "Mastercard", "Amex", "Discover", "Debit", "Other"];
 
 /* Suggested cash tenders at or above the amount due — the next whole dollar,
@@ -47,6 +47,7 @@ export function paymentDesc(p) {
   if (p.method === "card") return `${p.cardType || "Card"}${p.ref ? ` ·${p.ref}` : ""}`;
   if (p.method === "cash") return `Cash${num(p.change) > 0.005 ? ` · ${fmtMoney(p.change)} change` : ""}`;
   if (p.method === "check") return `Check${p.ref ? ` #${p.ref}` : ""}`;
+  if (p.method === "account") return `On account${p.ref ? ` · ${p.ref}` : ""}`;
   return `${cap(p.method)}${p.ref ? ` ${p.ref}` : ""}`;
 }
 
