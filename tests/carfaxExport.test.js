@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   validVin,
   carfaxCfg,
+  carfaxServiceName,
   SERVICE_FIELDS,
   serviceRows,
   serviceFileText,
@@ -34,8 +35,10 @@ const ORDERS = {
     number: "2041", status: "invoiced", customerId: "c1", vehicleId: "v1",
     createdAt: Date.UTC(2026, 8, 18), invoicedAt: Date.UTC(2026, 8, 18), mileageOut: 79262.4,
     lines: [
-      { kind: "labor", description: "Oil change", qty: 1 },
-      { kind: "part", description: "Engine oil filter", qty: 1 },
+      { kind: "labor", description: "Full Service Oil Change", job: "Full Service Oil Change", oil: true, qty: 1 },
+      { kind: "part", description: "Motor oil (included)", job: "Full Service Oil Change", oil: true, qty: 5 },
+      { kind: "part", description: "Oil filter (included)", job: "Full Service Oil Change", qty: 1 },
+      { kind: "labor", description: "Tire rotation", job: "Tire Rotation", qty: 1 },
       { kind: "fee", description: "Shop supplies" }, // excluded
       { kind: "note", description: "Customer waited" }, // excluded
     ],
@@ -59,31 +62,42 @@ test("carfaxCfg defaults management system and falls back to shop info", () => {
   assert.equal(carfaxCfg({}).managementSystem, "BOLT BADGER");
 });
 
-test("serviceRows: invoiced + valid VIN only, one row per performed line", () => {
+test("serviceRows: one row per JOB done (not per part), invoiced + valid VIN only", () => {
   const { rows, skippedNoVin, usedOrders } = serviceRows(ORDERS, VEHICLES, CFG);
   assert.equal(usedOrders, 1); // only o1
   assert.equal(skippedNoVin, 1); // o2 bad VIN (o3 excluded before VIN check: not invoiced)
-  assert.equal(rows.length, 2); // labor + part (fee/note excluded)
-  const r = rows[0];
+  assert.equal(rows.length, 2); // oil-change job + tire-rotation job (parts folded in, not their own rows)
+  assert.deepEqual(rows.map((r) => r.SERVICE_DESCRIPTION).sort(), ["Engine Oil & Filter Change", "Tire Rotation"]);
+  const r = rows.find((x) => x.SERVICE_DESCRIPTION === "Engine Oil & Filter Change");
   assert.equal(r.VIN, "1HGCM82633A004352");
   assert.equal(r.RO_INVOICE_NUMBER, "2041");
   assert.equal(r.ODOMETER_MEASURE, "MI");
   assert.equal(r.MILEAGE, 79262); // rounded
-  assert.equal(r.SERVICE_DESCRIPTION, "Oil change");
-  assert.equal(r.LABOR_DESCRIPTION, "Oil change");
-  assert.equal(r.PART_NAME_DESCRIPTION, ""); // labor row has no part name
+  assert.equal(r.PART_NAME_DESCRIPTION, ""); // no parts written
+  assert.equal(r.PART_QUANTITY, "");
+  assert.equal(r.LABOR_DESCRIPTION, "");
   assert.equal(r.MANAGEMENT_SYSTEM, "BOLT BADGER");
   assert.equal(r.PHONE, "619-971-1418");
-  const part = rows[1];
-  assert.equal(part.PART_NAME_DESCRIPTION, "Engine oil filter");
-  assert.equal(part.PART_QUANTITY, 1);
-  assert.equal(part.LABOR_DESCRIPTION, "");
+});
+
+test("carfaxServiceName: clean, accurate job descriptions", () => {
+  assert.equal(carfaxServiceName("Full Service Oil Change", { oil: true }), "Engine Oil & Filter Change");
+  assert.equal(carfaxServiceName("Genie Synthetic Oil Change"), "Engine Oil & Filter Change");
+  assert.equal(carfaxServiceName("Transmission Flush Service"), "Transmission Flush");
+  assert.equal(carfaxServiceName("Transmission Drain & Refill"), "Transmission Drain & Refill");
+  assert.equal(carfaxServiceName("ATF Drain and Fill"), "Transmission Drain & Refill"); // drain matched before flush
+  assert.equal(carfaxServiceName("Coolant Flush Service"), "Coolant Flush");
+  assert.equal(carfaxServiceName("Front Brake Pads & Rotors"), "Front Brake Service");
+  assert.equal(carfaxServiceName("Engine Air Filter"), "Engine Air Filter Replacement");
+  assert.equal(carfaxServiceName("Cabin Air Filter"), "Cabin Air Filter Replacement");
+  assert.equal(carfaxServiceName("Tire Rotation"), "Tire Rotation");
+  assert.equal(carfaxServiceName("Headlight restoration (included)"), "Headlight Restoration"); // unknown kept, tidied
 });
 
 test("serviceRows recentRecords: newest whole tickets totaling at least N", () => {
   const veh = { v: { vin: "1HGCM82633A004352", make: "Honda", model: "Accord", year: 2019 } };
-  const mk = (n, ts, nlines) => ({ number: String(n), status: "invoiced", vehicleId: "v", invoicedAt: ts, lines: Array.from({ length: nlines }, (_, i) => ({ kind: "part", description: "P" + i, qty: 1 })) });
-  const ords = { a: mk(1, 100, 2), b: mk(2, 200, 2), c: mk(3, 300, 2) }; // 3 tickets x 2 rows = 6
+  const mk = (n, ts, nlines) => ({ number: String(n), status: "invoiced", vehicleId: "v", invoicedAt: ts, lines: Array.from({ length: nlines }, (_, i) => ({ kind: "labor", description: "Svc" + i, job: `${n}-${i}` })) });
+  const ords = { a: mk(1, 100, 2), b: mk(2, 200, 2), c: mk(3, 300, 2) }; // 3 tickets x 2 jobs = 6
   const r = serviceRows(ords, veh, {}, { recentRecords: 3 });
   // newest tickets c(2)+b(2)=4 >= 3; a excluded. No RO split.
   assert.equal(r.usedOrders, 2);

@@ -77,8 +77,51 @@ export const SERVICE_FIELDS = [
 // discounts, or notes) with an actual description.
 const performed = (l) => !!l && ["part", "labor", "sublet"].includes(l.kind) && !!String(l.description || "").trim();
 
-// One service-file row for a performed line on a ticket.
-function serviceRow(o, v, l, cf, open, close, miles) {
+/* Turn a job/service into a clean, accurate description for the Vehicle History
+   Report — the job that was done, not the parts. An oil-change package becomes
+   "Engine Oil & Filter Change"; a shop's own canned-job name is normalized to
+   the common CARFAX wording where it's recognizable, otherwise it's kept as
+   written (just tidied). `oil` short-circuits to an oil change when the group
+   carries the oil-change flag. */
+const titleClean = (s) =>
+  String(s || "")
+    .replace(/\((?:included|inc\.?)\)/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+
+export function carfaxServiceName(label, { oil = false } = {}) {
+  const t = String(label || "").toLowerCase();
+  if (oil || (/\boil\b/.test(t) && /(change|service|lof|lube)/.test(t))) return "Engine Oil & Filter Change";
+  if (/transmission|trans\b|\bcvt\b|\batf\b/.test(t) && /(drain|refill|drain\s*&?\s*fill)/.test(t)) return "Transmission Drain & Refill";
+  if (/transmission|trans\b|\bcvt\b|\batf\b/.test(t) && /(flush|exchange|service|fluid)/.test(t)) return "Transmission Flush";
+  if (/(coolant|antifreeze|radiator)/.test(t) && /(flush|exchange|service|fluid|drain)/.test(t)) return "Coolant Flush";
+  if (/differential|diff\b|gear\s*oil/.test(t)) return "Differential Service";
+  if (/transfer\s*case/.test(t)) return "Transfer Case Service";
+  if (/power\s*steering/.test(t)) return "Power Steering Fluid Service";
+  if (/brake/.test(t) && /fluid/.test(t)) return "Brake Fluid Service";
+  if (/brake/.test(t) && /front/.test(t)) return "Front Brake Service";
+  if (/brake/.test(t) && /rear/.test(t)) return "Rear Brake Service";
+  if (/brake/.test(t)) return "Brake Service";
+  if (/cabin/.test(t)) return "Cabin Air Filter Replacement";
+  if (/engine\s*air|air\s*filter|air\s*element/.test(t)) return "Engine Air Filter Replacement";
+  if (/tire/.test(t) && /rotat/.test(t)) return "Tire Rotation";
+  if (/align/.test(t)) return "Wheel Alignment";
+  if (/fuel/.test(t) && /filter/.test(t)) return "Fuel Filter Replacement";
+  if (/fuel/.test(t) && /(system|inject|clean|induction)/.test(t)) return "Fuel System Cleaning";
+  if (/timing\s*belt/.test(t)) return "Timing Belt Replacement";
+  if (/serpentine|drive\s*belt/.test(t)) return "Serpentine Belt Replacement";
+  if (/spark\s*plug/.test(t)) return "Spark Plug Replacement";
+  if (/battery/.test(t)) return "Battery Replacement";
+  if (/wiper/.test(t)) return "Wiper Blade Replacement";
+  if (/(a\/?c|air\s*condition)/.test(t) && /(recharge|refrig|service|evac)/.test(t)) return "A/C Service";
+  if (/coolant|antifreeze/.test(t)) return "Coolant Service";
+  if (/multi-?point|inspection|courtesy\s*check/.test(t)) return "Vehicle Inspection";
+  return titleClean(label);
+}
+
+// One service-file row: the job that was done, no parts (part columns stay null).
+function serviceRow(o, v, cf, open, close, miles, desc) {
   return {
     VIN: cleanVin(v.vin),
     RO_OPEN_DATE: open,
@@ -86,10 +129,10 @@ function serviceRow(o, v, l, cf, open, close, miles) {
     MILEAGE: miles,
     ODOMETER_MEASURE: "MI",
     RO_INVOICE_NUMBER: o.number || "",
-    SERVICE_DESCRIPTION: l.description,
-    LABOR_DESCRIPTION: l.kind === "labor" ? l.description : "",
-    PART_NAME_DESCRIPTION: l.kind === "part" ? l.description : "",
-    PART_QUANTITY: l.kind === "part" ? Number(l.qty) || "" : "",
+    SERVICE_DESCRIPTION: desc,
+    LABOR_DESCRIPTION: "",
+    PART_NAME_DESCRIPTION: "",
+    PART_QUANTITY: "",
     MAKE: v.make || "",
     MODEL: v.model || "",
     MODEL_YEAR: v.year || "",
@@ -107,16 +150,49 @@ function serviceRow(o, v, l, cf, open, close, miles) {
   };
 }
 
-/* Service rows from invoiced tickets. One row per performed line. Returns the
-   rows plus counts so the UI can say how many were used and how many tickets
-   were skipped for a missing/invalid VIN.
+// The performed lines of a ticket, one row per JOB done (not per part).
+function ticketRows(o, v, cf) {
+  const lines = (o.lines || []).filter(performed);
+  if (!lines.length) return [];
+  const open = mdy(o.createdAt || o.invoicedAt);
+  const close = mdy(o.invoicedAt || o.createdAt);
+  const miles = Math.round(Number(o.mileageOut || o.mileageIn || 0)) || "";
+  // group by job name; loose lines each stand alone
+  const groups = new Map();
+  for (const l of lines) {
+    const job = String(l.job || "").trim();
+    const key = job ? `job:${job}` : `line:${l.id || Math.random()}`;
+    if (!groups.has(key)) groups.set(key, { job, lines: [] });
+    groups.get(key).lines.push(l);
+  }
+  const rows = [];
+  for (const g of groups.values()) {
+    const hasLabor = g.lines.some((l) => l.kind === "labor" || l.kind === "sublet");
+    if (!g.job && !hasLabor) continue; // loose parts, no job — not a service, skip
+    const oil = g.lines.some((l) => l.oil);
+    const labor = g.lines.find((l) => l.kind === "labor" || l.kind === "sublet");
+    const label = g.job || (labor && labor.description) || g.lines[0].description;
+    const desc = carfaxServiceName(label, { oil });
+    if (desc) rows.push(serviceRow(o, v, cf, open, close, miles, desc));
+  }
+  // a ticket of only loose parts still deserves one line so the visit shows
+  if (!rows.length) {
+    const l0 = lines[0];
+    rows.push(serviceRow(o, v, cf, open, close, miles, carfaxServiceName(l0.description, { oil: l0.oil })));
+  }
+  return rows;
+}
+
+/* Service rows from invoiced tickets — ONE row per job/service performed (the
+   job that was done, no parts). Returns the rows plus counts so the UI can say
+   how many were used and how many tickets were skipped for a missing VIN.
 
    Options:
    - sinceTs:       only tickets closed on/after this time (a day's PROD file).
    - recentRecords: cap to roughly this many rows, taking the NEWEST whole
                     tickets — a repair order is never split, so the result is at
                     least this many rows (e.g. 250 → the latest tickets that
-                    total 250+ service lines). */
+                    total 250+ services). */
 export function serviceRows(orders, vehicles, cfg, { sinceTs = 0, recentRecords = 0 } = {}) {
   const cf = carfaxCfg(cfg);
   let skippedNoVin = 0;
@@ -128,13 +204,8 @@ export function serviceRows(orders, vehicles, cfg, { sinceTs = 0, recentRecords 
       skippedNoVin += 1;
       continue;
     }
-    const lines = (o.lines || []).filter(performed);
-    if (!lines.length) continue;
-    const ts = o.invoicedAt || o.createdAt || 0;
-    const open = mdy(o.createdAt || o.invoicedAt);
-    const close = mdy(o.invoicedAt || o.createdAt);
-    const miles = Math.round(Number(o.mileageOut || o.mileageIn || 0)) || "";
-    groups.push({ ts, rows: lines.map((l) => serviceRow(o, v, l, cf, open, close, miles)) });
+    const rows = ticketRows(o, v, cf);
+    if (rows.length) groups.push({ ts: o.invoicedAt || o.createdAt || 0, rows });
   }
 
   let chosen = groups;
