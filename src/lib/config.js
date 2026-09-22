@@ -10,6 +10,7 @@ export const DEFAULT_CFG = {
   shopEmail: "",
   shopWebsite: "",
   carfaxLocationId: "", // assigned by CARFAX when the shop joins the Service Network
+  carfax: { managementSystem: "Bolt Badger", locationId: "", providerId: "", locationName: "", address: "", city: "", state: "", zip: "" }, // CARFAX Car Care data feed (Settings → Data)
   catalogs: { oreilly: true, partstech: true, valvoline: true }, // which parts catalogs get a button on the ticket
   partsMarkupPct: 35, // sell price = catalog cost + this percent, unless list is higher
   partsPriceEnding99: false,

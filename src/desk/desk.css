@@ -534,6 +534,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .payStats b { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
 @media (max-width:520px) { .chargeBtns, .payStats { grid-template-columns:1fr; } }
 
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+@media (max-width:520px) { .grid2 { grid-template-columns:1fr; } }
+
 /* physical inventory count */
 .resumeBar { display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid #93c5fd; background:#eff6ff; border-radius:10px; margin-bottom:16px; font-size:14px; }
 .countStart { border:1px solid var(--line); border-radius:12px; padding:18px; background:#fff; max-width:520px; }

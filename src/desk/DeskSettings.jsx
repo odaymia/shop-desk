@@ -14,6 +14,7 @@ import { DEFAULT_SYMPTOMS, DEFAULT_SYMPTOMS_MAP } from "../lib/symptoms.js";
 import { FINDINGS_BY_CATEGORY } from "../lib/findings.js";
 import { sGetAll, sSet, cloud } from "../storage/index.js";
 import { connectStatus, connectLink, listReaders, registerReader, platformFeeCfg, cardPaymentStats } from "../lib/payments.js";
+import { serviceRows, serviceFileText, serviceFileName, loyaltyRows, loyaltyFileText, loyaltyFileName } from "../lib/carfaxExport.js";
 import { fmtMoney } from "../lib/invoice.js";
 import { DEMO } from "../lib/demo.js";
 
@@ -713,6 +714,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           </h3>
           <CloudSync />
           <BackupPanel flash={flash} cfg={cfg} saveCfg={saveCfg} />
+          <CarfaxExportPanel cfg={cfg} saveCfg={saveCfg} flash={flash} shop={shop} />
           <ImportPanel roster={roster} saveRoster={saveRoster} flash={flash} shop={shop} />
           <p className="legalNote">
             Posting an invoice freezes the tax rate and supplies rule on that ticket. Changing them here affects new
@@ -886,6 +888,126 @@ function PaymentsPanel({ d, set, shop }) {
           {msg && <p className="fldErr" style={{ marginTop: 6 }}>{msg}</p>}
         </>
       )}
+    </>
+  );
+}
+
+/* CARFAX Car Care data feed. Builds the two files CARFAX asks for from the
+   shop's real tickets: the pipe-delimited service file (Service Network / Vehicle
+   History Report) and the customer-list CSV (Shop Loyalty Program). Exported
+   here for the sample/onboarding step; a scheduled daily push comes later. */
+function downloadText(name, text, type) {
+  const blob = new Blob([text], { type: type || "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 0);
+}
+
+function CarfaxExportPanel({ cfg, saveCfg, flash, shop }) {
+  const [c, setC] = useState(() => ({ managementSystem: "Bolt Badger", locationId: "", providerId: "", locationName: cfg.shopName || "", address: "", city: "", state: "", zip: "", ...(cfg.carfax || {}) }));
+  const set = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
+  const effCfg = { ...cfg, carfax: c };
+
+  const svc = serviceRows(shop.orders, shop.vehicles, effCfg);
+  const loy = loyaltyRows(shop.orders, shop.customers, shop.vehicles, effCfg, { monthsBack: 24 });
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const svcToday = serviceRows(shop.orders, shop.vehicles, effCfg, { sinceTs: startOfToday.getTime() });
+
+  const save = async () => {
+    await saveCfg({ ...cfg, carfax: c });
+    flash("CARFAX settings saved");
+  };
+  const exportService = (status, res) => {
+    if (!res.rows.length) return flash("No matching records to export.", "out");
+    downloadText(serviceFileName(effCfg, status), serviceFileText(res.rows), "text/plain");
+    flash(`Exported ${res.rows.length} service rows`);
+  };
+  const exportLoyalty = () => {
+    if (!loy.rows.length) return flash("No matching records to export.", "out");
+    downloadText(loyaltyFileName(effCfg, "HIST"), loyaltyFileText(loy.rows), "text/csv");
+    flash(`Exported ${loy.rows.length} customer rows`);
+  };
+
+  return (
+    <>
+      <h3 className="subhead" style={{ marginTop: 36 }}>CARFAX Car Care</h3>
+      <p className="muted" style={{ marginTop: 0, maxWidth: 620 }}>
+        Build the two files CARFAX asks for from your tickets: the service file (goes on the Vehicle History Report) and the
+        customer list (Shop Loyalty Program). Only invoiced tickets with a valid 17-character VIN are included.
+      </p>
+      <div className="fld">
+        <span>Management system name (approved by CARFAX)</span>
+        <Text value={c.managementSystem} onChange={set("managementSystem")} />
+      </div>
+      <div className="grid2">
+        <div className="fld">
+          <span>Location ID (unique per shop)</span>
+          <Text value={c.locationId} onChange={set("locationId")} placeholder="e.g. BOLTBADGER6199711418" />
+        </div>
+        <div className="fld">
+          <span>Provider ID (from CARFAX)</span>
+          <Text value={c.providerId} onChange={set("providerId")} placeholder="assigned by CARFAX" />
+        </div>
+      </div>
+      <div className="fld">
+        <span>Location name</span>
+        <Text value={c.locationName} onChange={set("locationName")} placeholder={cfg.shopName} />
+      </div>
+      <div className="grid2">
+        <div className="fld">
+          <span>Street address</span>
+          <Text value={c.address} onChange={set("address")} />
+        </div>
+        <div className="fld">
+          <span>City</span>
+          <Text value={c.city} onChange={set("city")} />
+        </div>
+      </div>
+      <div className="grid2">
+        <div className="fld">
+          <span>State</span>
+          <Text value={c.state} onChange={set("state")} />
+        </div>
+        <div className="fld">
+          <span>ZIP</span>
+          <Text value={c.zip} onChange={set("zip")} inputMode="numeric" />
+        </div>
+      </div>
+      <div className="rowBtns" style={{ marginTop: 12 }}>
+        <button className="btn" onClick={save}>Save CARFAX settings</button>
+      </div>
+
+      <div className="payStats" style={{ marginTop: 16 }}>
+        <div>
+          <span>Service rows (all history)</span>
+          <b>{svc.rows.length}</b>
+        </div>
+        <div>
+          <span>From invoiced tickets</span>
+          <b>{svc.usedOrders}</b>
+        </div>
+        <div>
+          <span>Skipped — no valid VIN</span>
+          <b className={svc.skippedNoVin ? "vShort" : ""}>{svc.skippedNoVin}</b>
+        </div>
+      </div>
+      <div className="rowBtns" style={{ marginTop: 12, flexWrap: "wrap" }}>
+        <button className="btn primary" onClick={() => exportService("HIST", svc)}>Export service file — full history (HIST)</button>
+        <button className="btn" onClick={() => exportService("PROD", svcToday)}>Today only (PROD, {svcToday.rows.length})</button>
+        <button className="btn" onClick={exportLoyalty}>Export customer list (HIST, {loy.rows.length})</button>
+      </div>
+      <p className="legalNote">
+        CARFAX needs at least 250 service records to start. Files are sent to CARFAX by FTP (service) / SFTP (loyalty) once
+        they issue credentials. Per CARFAX, this data must not be fed into any AI features.
+      </p>
     </>
   );
 }
