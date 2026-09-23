@@ -573,6 +573,9 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .inspCardTitle { font-weight:600; font-size:15px; }
 .inspCardStats { display:flex; gap:12px; flex-wrap:wrap; font-size:13px; font-variant-numeric:tabular-nums; }
 .inspCardStats b { font-weight:700; }
+.inspCardBox { border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:#fff; }
+.inspCardBox .inspCardBtn { border:none; padding:0; }
+.inspCardBox .inspCardBtn:hover { border:none; }
 @media (max-width:600px) { .inspLabel { min-width:100%; } }
 
 /* physical inventory count */

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vehicle Inspection</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#13171e" />
+<style>
+  :root { color-scheme: light; --ink:#14181f; --muted:#5a6473; --line:#e3e7ed; --bg:#f4f6f9;
+    --good:#16a34a; --advise:#d97706; --fail:#dc2626; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px; line-height:1.5; }
+  .wrap { max-width:680px; margin:0 auto; padding:18px 16px 60px; }
+  .sheet { background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .head { padding:18px 20px; border-bottom:1px solid var(--line); }
+  .shop { font-size:20px; font-weight:700; }
+  .meta { color:var(--muted); font-size:13px; margin-top:2px; }
+  .ttl { font-weight:700; margin-top:10px; font-size:15px; }
+  .legend { display:flex; gap:14px; padding:12px 20px; border-bottom:1px solid var(--line); font-size:13px; flex-wrap:wrap; }
+  .legend b { font-weight:700; } .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+  .g { color:var(--good); } .a { color:var(--advise); } .f { color:var(--fail); }
+  .dot.g { background:var(--good); } .dot.a { background:var(--advise); } .dot.f { background:var(--fail); }
+  .cat { padding:6px 20px 4px; }
+  .cat h3 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:16px 0 6px; }
+  .item { padding:10px 0; border-bottom:1px solid var(--line); }
+  .item:last-child { border-bottom:none; }
+  .itemHead { display:flex; align-items:center; gap:10px; }
+  .badge { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .badge.good { background:rgba(22,163,74,.12); color:var(--good); }
+  .badge.advise { background:rgba(217,119,6,.14); color:var(--advise); }
+  .badge.fail { background:rgba(220,38,38,.12); color:var(--fail); }
+  .badge.na { background:#eef1f4; color:var(--muted); }
+  .ilabel { flex:1; font-weight:600; font-size:15px; }
+  .inote { color:var(--muted); font-size:14px; margin:6px 0 0; }
+  .photos { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .photos img { width:120px; height:120px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer; }
+  .recs { padding:16px 20px; border-top:1px solid var(--line); }
+  .recs h3 { margin:0 0 8px; font-size:15px; }
+  .rec { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:15px; }
+  .rec:last-of-type { border-bottom:none; }
+  .rec .amt { font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap; }
+  .rectot { display:flex; justify-content:space-between; padding:10px 0 0; font-weight:800; font-size:16px; }
+  .foot { padding:16px 20px; color:var(--muted); font-size:13px; text-align:center; }
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; padding:20px; z-index:20; }
+  .lightbox.on { display:flex; } .lightbox img { max-width:100%; max-height:100%; border-radius:10px; }
+  .center { text-align:center; padding:48px 20px; }
+  .center h1 { font-size:24px; margin:0 0 8px; } .center p { color:var(--muted); margin:0; }
+  .err { color:#b0341f; } .loading { text-align:center; padding:60px 20px; color:var(--muted); }
+</style>
+</head>
+<body>
+  <div class="wrap"><div id="app" class="loading">Loading…</div></div>
+  <div class="lightbox" id="lightbox"><img id="lightboxImg" alt="" /></div>
+  <script type="module" src="/src/inspect/main.js"></script>
+</body>
+</html>

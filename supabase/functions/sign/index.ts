@@ -113,20 +113,26 @@ Deno.serve(async (req) => {
     const shopId = member[0].shop_id as string;
 
     const orderId = String(body.orderId || "");
-    const slot = body.slot === "delivery" ? "delivery" : "authorization";
     const phone = digits(String(body.phone || ""));
     const payload = body.payload;
     if (!orderId || !payload) return json({ error: "Missing order" }, 400);
     if (phone.length < 10) return json({ error: "The customer needs a valid cell number on file." }, 400);
 
+    const p = payload as Record<string, unknown>;
+    // A texted inspection report is read-only (no signature). Everything else is
+    // a signing request. The link points at the matching public page.
+    const isInspection = p.kind === "inspection" || body.kind === "inspection";
+    const slot = isInspection ? "inspection" : body.slot === "delivery" ? "delivery" : "authorization";
+
     const t = token();
     await admin.from("sign_requests").insert({ token: t, shop_id: shopId, order_id: orderId, slot, payload });
     const base = (Deno.env.get("SIGN_BASE_URL") || "").replace(/\/$/, "");
-    const link = base ? `${base}/sign/?t=${t}` : `sign/?t=${t}`;
+    const page = isInspection ? "inspect" : "sign";
+    const link = base ? `${base}/${page}/?t=${t}` : `${page}/?t=${t}`;
 
-    const p = payload as Record<string, unknown>;
-    const kind = p.kind === "invoice" ? "invoice" : "estimate";
-    const msg = `${p.shopName || "Your shop"}: please review and sign your ${kind} #${p.number || ""}. ${link} Reply STOP to opt out.`;
+    const msg = isInspection
+      ? `${p.shopName || "Your shop"}: your vehicle inspection is ready to view. ${link} Reply STOP to opt out.`
+      : `${p.shopName || "Your shop"}: please review and sign your ${p.kind === "invoice" ? "invoice" : "estimate"} #${p.number || ""}. ${link} Reply STOP to opt out.`;
     const { sent, error } = await sendSms(phone, msg);
     return json({ token: t, link, sent, sendError: error || null });
   }

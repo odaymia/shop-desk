@@ -16,6 +16,7 @@ export default defineConfig({
         main: resolve(__dirname, "index.html"),
         portal: resolve(__dirname, "portal/index.html"),
         sign: resolve(__dirname, "sign/index.html"),
+        inspect: resolve(__dirname, "inspect/index.html"),
       },
     },
   },

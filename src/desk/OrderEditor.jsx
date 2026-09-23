@@ -48,6 +48,7 @@ import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { Inspection, InspectionCard } from "./Inspection.jsx";
+import { inspectionRecommendations } from "../lib/inspection.js";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
 import { composeConcern } from "../lib/symptoms.js";
@@ -299,6 +300,57 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     if (lines.length) addLines(lines);
     setPick(null);
     flash(`Added ${lines.length} recommended item${lines.length === 1 ? "" : "s"} to the estimate`);
+  };
+  /* Text the customer a link to the inspection report — the color-coded results,
+     notes, photos, and recommended work. Reuses the "sign" Edge Function. */
+  const textInspection = async () => {
+    const insp = o.inspection;
+    if (!insp) return;
+    if (!customer || !customer.phone) return flash("Add the customer's cell number first.", "out");
+    await flushNow();
+    flash("Preparing the inspection…");
+    const template = cfg.inspection || [];
+    const categories = [];
+    for (const cat of template) {
+      const items = [];
+      for (const def of cat.items || []) {
+        const it = (insp.items || {})[def.id];
+        if (!it || !it.status) continue; // only points that were checked
+        const photos = [];
+        for (const k of it.photos || []) {
+          try {
+            const d = await sGet(k);
+            if (d) photos.push(d);
+          } catch { /* missing media */ }
+        }
+        items.push({ label: def.label, status: it.status, note: it.note || "", photos });
+      }
+      if (items.length) categories.push({ name: cat.name, items });
+    }
+    const payload = {
+      kind: "inspection",
+      shopName: cfg.shopName,
+      shopPhone: cfg.shopPhone,
+      number: o.number,
+      vehicle: vehicleName(vehicle),
+      customer: customerName(customer),
+      at: insp.at || Date.now(),
+      categories,
+      recommendations: inspectionRecommendations(insp, template).map((r) => ({ label: r.label, price: r.price })),
+    };
+    try {
+      const res = await cloud.invoke("sign", { action: "create", orderId: o.id, kind: "inspection", phone: customer.phone, payload });
+      if (res && res.sent) flash("Inspection texted to the customer.");
+      else if (res && res.link) {
+        try {
+          await navigator.clipboard.writeText(res.link);
+        } catch { /* clipboard blocked */ }
+        flash("Texting isn't set up yet — link copied, paste it to the customer.", "out");
+      } else flash("Couldn't send.", "out");
+    } catch (e) {
+      console.error("text inspection failed", e);
+      flash("Couldn't send — the shop must be online and set up for texting.", "out");
+    }
   };
   const removeLine = (id) => update((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== id) }));
   /* remove every line that belongs to one job/package in a single click */
@@ -1140,7 +1192,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
 
           <ChecklistCard order={o} locked={locked} onOpen={() => setPick("checklist")} />
 
-          <InspectionCard order={o} onOpen={() => setPick("inspection")} />
+          <InspectionCard order={o} onOpen={() => setPick("inspection")} onSend={textInspection} />
 
           <div className="card">
             <div className="cardHead">

@@ -154,8 +154,8 @@ export function Inspection({ order, cfg, employees, flash, onClose, onSave, onAd
 }
 
 /* A compact read-out for the ticket, so the writer sees the inspection at a
-   glance and can reopen it. */
-export function InspectionCard({ order, onOpen }) {
+   glance, reopens it, or texts it to the customer. */
+export function InspectionCard({ order, onOpen, onSend }) {
   const insp = order.inspection;
   const s = inspectionSummary(insp || { items: {} });
   if (!insp) {
@@ -166,16 +166,22 @@ export function InspectionCard({ order, onOpen }) {
     );
   }
   return (
-    <button className="inspCardBtn" onClick={onOpen}>
-      <span className="inspCardTitle">Vehicle inspection</span>
-      <span className="inspCardStats">
-        <b className="vGood">{s.good} OK</b>
-        <b className="vAdvise">{s.advise} attention</b>
-        <b className="vFail">{s.fail} needs service</b>
-        {s.photos ? <b className="muted">{s.photos} 📷</b> : null}
-        {s.pending ? <b className="muted">{s.pending} left</b> : null}
-      </span>
-    </button>
+    <div className="inspCardBox">
+      <button className="inspCardBtn" onClick={onOpen}>
+        <span className="inspCardTitle">Vehicle inspection</span>
+        <span className="inspCardStats">
+          <b className="vGood">{s.good} OK</b>
+          <b className="vAdvise">{s.advise} attention</b>
+          <b className="vFail">{s.fail} needs service</b>
+          {s.photos ? <b className="muted">{s.photos} 📷</b> : null}
+          {s.pending ? <b className="muted">{s.pending} left</b> : null}
+        </span>
+      </button>
+      <div className="rowBtns" style={{ marginTop: 10 }}>
+        <button className="btn" onClick={onOpen}>Open / edit</button>
+        <button className="btn primary" onClick={onSend}>📲 Text report to customer</button>
+      </div>
+    </div>
   );
 }
 
