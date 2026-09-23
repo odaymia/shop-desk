@@ -1,12 +1,13 @@
 import { useMemo, useState, useEffect } from "react";
 import { Modal, fmtDate } from "./ui.jsx";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
-import { motorVehicle, motorMaintenance } from "../lib/motor.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { motorVehicle, motorMaintenance, motorFluids } from "../lib/motor.js";
 
 const STATUS = {
   due: { label: "Due now", cls: "due" },
   soon: { label: "Due soon", cls: "soon" },
+  inspect: { label: "Inspect", cls: "inspect" },
   done: { label: "Done", cls: "done" },
   unknown: { label: "No record", cls: "unknown" },
 };
@@ -37,10 +38,13 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         const v = await motorVehicle(vin);
         if (!live) return;
         if (!v.vehicle) return setMotorState("store");
-        const m = await motorMaintenance(v.vehicle.baseVehicleId);
+        const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId), motorFluids(v.vehicle.baseVehicleId)]);
         if (!live) return;
-        const mm = mergeMotorIntervals(baseIntervals, m.services, mode);
-        if (mm.matched > 0) {
+        // what the vehicle actually has (fluids + scheduled services) → hide the rest
+        const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
+        const applicable = filterApplicable(baseIntervals, motorNames);
+        const mm = mergeMotorIntervals(applicable, m.services, mode);
+        if (mm.matched > 0 || applicable.length !== baseIntervals.length) {
           setMerged(mm);
           setMotorState(v.sample || m.sample ? "motor-sample" : "motor");
         } else setMotorState("store");
@@ -95,6 +99,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
       <div className="svcTally">
         <b className="vFail">{counts.due} due</b>
         <b className="vAdvise">{counts.soon} soon</b>
+        {counts.inspect ? <b style={{ color: "#1657d6" }}>{counts.inspect} inspect</b> : null}
         <b className="vGood">{counts.done} up to date</b>
         {counts.due > 0 && (
           <button className="btn tiny primary" style={{ marginLeft: "auto" }} onClick={addAllDue}>
@@ -130,14 +135,20 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                     ) : null}
                   </td>
                   <td className="muted">
-                    {miles(r.miles)}
-                    {r.months ? ` / ${r.months} mo` : ""}
-                    {r.source === "MOTOR" && mode !== "both" ? <span className="sub" style={{ color: "#1657d6" }}>MOTOR</span> : null}
-                    {mode === "both" && r.motorMiles > 0 ? (
-                      <span className="sub">
-                        Store {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Mfr {miles(r.motorMiles)}</span>
-                      </span>
-                    ) : null}
+                    {r.basis === "inspect" ? (
+                      "On inspection"
+                    ) : (
+                      <>
+                        {miles(r.miles)}
+                        {r.months ? ` / ${r.months} mo` : ""}
+                        {r.source === "MOTOR" && mode !== "both" ? <span className="sub" style={{ color: "#1657d6" }}>MOTOR</span> : null}
+                        {mode === "both" && r.motorMiles > 0 ? (
+                          <span className="sub">
+                            Store {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Mfr {miles(r.motorMiles)}</span>
+                          </span>
+                        ) : null}
+                      </>
+                    )}
                   </td>
                   <td className="muted">{r.lastDone ? `${miles(r.lastDone.mileage)} · ${fmtDate(r.lastDone.at)}` : "—"}</td>
                   <td>

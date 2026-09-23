@@ -16,22 +16,36 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 /* id, name, interval (miles, months), `match` words to spot it in past tickets
    (same "a | b -c" grammar as the checklist), and a menu price for the upsell. */
 // `match` = words to spot the service in past tickets (checklist grammar).
-// `motorKeys` = words that appear in MOTOR's schedule names, so we can pull the
-// vehicle's real factory interval for this service when MOTOR is connected.
+// `motorKeys` = words in MOTOR's schedule names, to pull the real factory interval.
+// `basis` = "interval" (due by miles/months) or "inspect" (checked each visit,
+//   replaced when needed — air filters, wipers). `requiresFluid` = a fluid the
+//   vehicle must have, else the service is hidden (power steering on electric
+//   steering, differential on FWD) when MOTOR data says so.
 export const DEFAULT_SERVICE_INTERVALS = [
-  { id: "oil", name: "Engine oil & filter", miles: 5000, months: 6, match: "oil change | engine oil | oil & filter | oil and filter", motorKeys: ["engine oil"], price: 0 },
-  { id: "tireRotate", name: "Tire rotation", miles: 5000, months: 6, match: "tire rotation | rotate tires", motorKeys: ["tire rotation", "rotate tire"], price: 25 },
-  { id: "engineAir", name: "Engine air filter", miles: 30000, months: 36, match: "engine air filter | air filter -cabin", motorKeys: ["engine air filter", "air cleaner"], price: 45 },
-  { id: "cabinAir", name: "Cabin air filter", miles: 30000, months: 24, match: "cabin air filter | cabin filter", motorKeys: ["cabin air filter", "passenger compartment air filter"], price: 55 },
-  { id: "brakeFluid", name: "Brake fluid service", miles: 30000, months: 24, match: "brake fluid | brake flush", motorKeys: ["brake fluid"], price: 110 },
-  { id: "coolant", name: "Coolant flush", miles: 60000, months: 60, match: "coolant flush | coolant service | antifreeze | radiator flush", motorKeys: ["cooling system", "coolant", "engine coolant"], price: 130 },
-  { id: "trans", name: "Transmission fluid service", miles: 60000, months: 60, match: "transmission fluid | transmission flush | transmission service", motorKeys: ["transmission fluid", "transaxle fluid"], price: 180 },
-  { id: "diff", name: "Differential fluid service", miles: 45000, months: 48, match: "differential | diff fluid | gear oil", motorKeys: ["differential", "axle fluid"], price: 90 },
-  { id: "fuelFilter", name: "Fuel filter", miles: 30000, months: 36, match: "fuel filter", motorKeys: ["fuel filter"], price: 60 },
-  { id: "sparkPlugs", name: "Spark plugs", miles: 100000, months: 120, match: "spark plug", motorKeys: ["spark plug"], price: 220 },
-  { id: "serpentine", name: "Serpentine belt", miles: 90000, months: 96, match: "serpentine | drive belt", motorKeys: ["drive belt", "serpentine belt", "accessory drive belt"], price: 120 },
-  { id: "wipers", name: "Wiper blades", miles: 15000, months: 12, match: "wiper", motorKeys: ["wiper"], price: 25 },
+  { id: "oil", name: "Engine oil & filter", basis: "interval", miles: 5000, months: 6, match: "oil change | engine oil | oil & filter | oil and filter", motorKeys: ["engine oil"], price: 0 },
+  { id: "tireRotate", name: "Tire rotation", basis: "interval", miles: 5000, months: 6, match: "tire rotation | rotate tires", motorKeys: ["tire rotation", "rotate tire"], price: 25 },
+  { id: "engineAir", name: "Engine air filter", basis: "inspect", miles: 30000, months: 36, match: "engine air filter | air filter -cabin", motorKeys: ["engine air filter", "air cleaner"], price: 45 },
+  { id: "cabinAir", name: "Cabin air filter", basis: "inspect", miles: 30000, months: 24, match: "cabin air filter | cabin filter", motorKeys: ["cabin air filter", "passenger compartment air filter"], price: 55 },
+  { id: "brakeFluid", name: "Brake fluid service", basis: "interval", miles: 30000, months: 24, match: "brake fluid | brake flush", motorKeys: ["brake fluid"], price: 110 },
+  { id: "coolant", name: "Coolant flush", basis: "interval", miles: 60000, months: 60, match: "coolant flush | coolant service | antifreeze | radiator flush", motorKeys: ["cooling system", "coolant", "engine coolant"], price: 130 },
+  { id: "trans", name: "Transmission fluid service", basis: "interval", miles: 60000, months: 60, match: "transmission fluid | transmission flush | transmission service", motorKeys: ["transmission fluid", "transaxle fluid"], requiresFluid: "transmission", price: 180 },
+  { id: "diff", name: "Differential fluid service", basis: "interval", miles: 45000, months: 48, match: "differential | diff fluid | gear oil", motorKeys: ["differential", "axle fluid"], requiresFluid: "differential", price: 90 },
+  { id: "psFluid", name: "Power steering fluid service", basis: "interval", miles: 75000, months: 72, match: "power steering fluid | power steering flush", motorKeys: ["power steering"], requiresFluid: "power steering", price: 100 },
+  { id: "fuelFilter", name: "Fuel filter", basis: "inspect", miles: 30000, months: 36, match: "fuel filter", motorKeys: ["fuel filter"], requiresFluid: "fuel filter", price: 60 },
+  { id: "sparkPlugs", name: "Spark plugs", basis: "interval", miles: 100000, months: 120, match: "spark plug", motorKeys: ["spark plug"], price: 220 },
+  { id: "serpentine", name: "Serpentine belt", basis: "inspect", miles: 90000, months: 96, match: "serpentine | drive belt", motorKeys: ["drive belt", "serpentine belt", "accessory drive belt"], price: 120 },
+  { id: "wipers", name: "Wiper blades", basis: "inspect", miles: 15000, months: 12, match: "wiper", motorKeys: ["wiper"], price: 25 },
 ];
+
+/* Drop services for equipment the vehicle doesn't have. `motorNames` is the pool
+   of fluid + maintenance names MOTOR returned for this vehicle; a service whose
+   `requiresFluid` keyword isn't present is hidden. With no MOTOR data we can't
+   tell, so everything stays. Pure. */
+export function filterApplicable(intervals, motorNames) {
+  const hay = (motorNames || []).join(" | ").toLowerCase();
+  if (!hay.trim()) return intervals || [];
+  return (intervals || []).filter((svc) => !svc.requiresFluid || hay.includes(String(svc.requiresFluid).toLowerCase()));
+}
 
 /* Only the services the owner has turned on (Settings). */
 export const activeIntervals = (intervals) => (intervals || []).filter((s) => s && s.enabled !== false);
@@ -81,11 +95,13 @@ export function normalizeServiceIntervals(rows) {
     .map((r) => ({
       id: r.id || String(r.name).toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || `s${Math.random().toString(36).slice(2, 7)}`,
       name: String(r.name).trim(),
+      basis: r.basis === "inspect" ? "inspect" : "interval",
       miles: Math.max(0, Math.round(num(r.miles))),
       months: Math.max(0, Math.round(num(r.months))),
       price: Math.max(0, num(r.price)),
       match: String(r.match || r.name || "").trim(),
       motorKeys: Array.isArray(r.motorKeys) ? r.motorKeys : String(r.motorKeys || r.name || "").split("|").map((s) => s.trim()).filter(Boolean),
+      ...(r.requiresFluid ? { requiresFluid: String(r.requiresFluid).trim() } : {}),
       enabled: r.enabled !== false,
     }));
 }
@@ -123,6 +139,7 @@ export function lastDoneMap(orders, intervals, exceptId) {
    "soon" = within 80% of the interval; "done" = recently serviced; "unknown" =
    no history and not enough info. */
 export function serviceStatus(svc, last, currentMileage, now = Date.now()) {
+  if (svc.basis === "inspect") return "inspect"; // checked each visit, replaced if needed
   const miles = num(svc.miles);
   const months = num(svc.months);
   if (!last) {
@@ -141,18 +158,16 @@ export function serviceStatus(svc, last, currentMileage, now = Date.now()) {
    next-due mileage — ordered due first, then soon, then the rest. */
 export function serviceReview(intervals, orders, currentMileage, exceptId, now = Date.now()) {
   const last = lastDoneMap(orders, intervals, exceptId);
-  const order = { due: 0, soon: 1, unknown: 2, done: 3 };
+  const order = { due: 0, soon: 1, inspect: 2, unknown: 3, done: 4 };
   const rows = (intervals || []).map((svc) => {
     const l = last[svc.id] || null;
     const status = serviceStatus(svc, l, currentMileage, now);
     const nextDueMiles = l && l.mileage && svc.miles ? l.mileage + num(svc.miles) : svc.miles ? (Math.floor(num(currentMileage) / num(svc.miles)) + 1) * num(svc.miles) : 0;
     return {
-      id: svc.id,
-      name: svc.name,
+      ...svc, // carries basis, source, store/motor intervals, price, match…
       miles: num(svc.miles),
       months: num(svc.months),
       price: num(svc.price),
-      match: svc.match,
       lastDone: l,
       status,
       nextDueMiles,
@@ -163,7 +178,7 @@ export function serviceReview(intervals, orders, currentMileage, exceptId, now =
 }
 
 export function reviewCounts(rows) {
-  const c = { due: 0, soon: 0, done: 0, unknown: 0 };
+  const c = { due: 0, soon: 0, done: 0, unknown: 0, inspect: 0 };
   for (const r of rows || []) if (c[r.status] != null) c[r.status] += 1;
   return c;
 }

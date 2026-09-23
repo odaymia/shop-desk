@@ -727,12 +727,15 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
               </label>
 
               <h3 className="subhead" style={{ marginTop: 24 }}>Services &amp; store intervals</h3>
-              <p className="muted" style={{ marginTop: 0 }}>Uncheck to hide a service. Store intervals are used directly, or as the fallback when a vehicle isn't in MOTOR.</p>
+              <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>
+                Uncheck to hide a service. <strong>Basis "On inspection"</strong> (air filters, wipers) shows as "Inspect" — replace when needed, never flagged overdue by mileage. Services tied to a fluid the car doesn't have (power steering, differential) are hidden automatically when MOTOR is connected.
+              </p>
               <table className="svcCfg">
                 <thead>
                   <tr>
                     <th>Show</th>
                     <th>Service</th>
+                    <th>Basis</th>
                     <th className="r">Every miles</th>
                     <th className="r">Every months</th>
                     <th className="r">Menu price</th>
@@ -744,8 +747,14 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
                     <tr key={r.id || i}>
                       <td className="c"><input type="checkbox" checked={r.enabled !== false} onChange={(e) => setSvc(i, { enabled: e.target.checked })} /></td>
                       <td><input value={r.name || ""} onChange={(e) => setSvc(i, { name: e.target.value })} placeholder="Service name" /></td>
-                      <td><input className="r" inputMode="numeric" value={r.miles ?? ""} onChange={(e) => setSvc(i, { miles: e.target.value.replace(/[^0-9]/g, "") })} /></td>
-                      <td><input className="r" inputMode="numeric" value={r.months ?? ""} onChange={(e) => setSvc(i, { months: e.target.value.replace(/[^0-9]/g, "") })} /></td>
+                      <td>
+                        <select value={r.basis === "inspect" ? "inspect" : "interval"} onChange={(e) => setSvc(i, { basis: e.target.value })}>
+                          <option value="interval">By mileage</option>
+                          <option value="inspect">On inspection</option>
+                        </select>
+                      </td>
+                      <td><input className="r" inputMode="numeric" value={r.miles ?? ""} onChange={(e) => setSvc(i, { miles: e.target.value.replace(/[^0-9]/g, "") })} disabled={r.basis === "inspect"} /></td>
+                      <td><input className="r" inputMode="numeric" value={r.months ?? ""} onChange={(e) => setSvc(i, { months: e.target.value.replace(/[^0-9]/g, "") })} disabled={r.basis === "inspect"} /></td>
                       <td><input className="r" inputMode="decimal" value={r.price ?? ""} onChange={(e) => setSvc(i, { price: e.target.value.replace(/[^0-9.]/g, "") })} /></td>
                       <td className="c"><button className="lineX" onClick={() => removeSvc(i)} aria-label="Remove" title="Remove">✕</button></td>
                     </tr>

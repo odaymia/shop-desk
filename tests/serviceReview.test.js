@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SERVICE_INTERVALS, lastDoneMap, serviceStatus, serviceReview, reviewCounts, mergeMotorIntervals } from "../src/lib/serviceReview.js";
+import { DEFAULT_SERVICE_INTERVALS, lastDoneMap, serviceStatus, serviceReview, reviewCounts, mergeMotorIntervals, filterApplicable } from "../src/lib/serviceReview.js";
 
 const now = Date.UTC(2026, 8, 23);
 const day = 24 * 3600 * 1000;
@@ -94,6 +94,26 @@ test('mergeMotorIntervals mode "both" keeps store + motor numbers', () => {
   assert.equal(oil.storeMiles, 5000);
   assert.equal(oil.motorMiles, 7500);
   assert.equal(oil.miles, 7500); // effective = manufacturer
+});
+
+test('serviceStatus: "inspect" basis is always inspect, never overdue by miles', () => {
+  const air = { id: "engineAir", basis: "inspect", miles: 30000, months: 36 };
+  assert.equal(serviceStatus(air, null, 200000, now), "inspect");
+  assert.equal(serviceStatus(air, { at: now - 900 * day, mileage: 10000 }, 200000, now), "inspect");
+});
+
+test("filterApplicable hides equipment the vehicle lacks (per MOTOR names)", () => {
+  const ints = [
+    { id: "oil", name: "Oil" },
+    { id: "psFluid", name: "Power steering", requiresFluid: "power steering" },
+    { id: "diff", name: "Differential", requiresFluid: "differential" },
+  ];
+  // MOTOR shows engine oil + differential, but NO power steering (electric)
+  const motorNames = ["Engine Oil Fluid Type", "Differential Fluid Type"];
+  const kept = filterApplicable(ints, motorNames).map((s) => s.id);
+  assert.deepEqual(kept, ["oil", "diff"]); // psFluid hidden
+  // no MOTOR data -> keep everything (can't tell)
+  assert.equal(filterApplicable(ints, []).length, 3);
 });
 
 test("default interval table is well-formed", () => {

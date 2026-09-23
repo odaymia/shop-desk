@@ -563,6 +563,7 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .svcBadge.soon { background:rgba(217,119,6,.14); color:#d97706; }
 .svcBadge.done { background:rgba(22,163,74,.12); color:#16a34a; }
 .svcBadge.unknown { background:#eef1f4; color:var(--muted); }
+.svcBadge.inspect { background:rgba(22,87,214,.12); color:#1657d6; }
 .svcCfg { width:100%; border-collapse:collapse; }
 .svcCfg th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--line); }
 .svcCfg th.r, .svcCfg td.r { text-align:right; }
