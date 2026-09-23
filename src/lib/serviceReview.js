@@ -33,25 +33,61 @@ export const DEFAULT_SERVICE_INTERVALS = [
   { id: "wipers", name: "Wiper blades", miles: 15000, months: 12, match: "wiper", motorKeys: ["wiper"], price: 25 },
 ];
 
-/* Override the generic intervals with the vehicle's real MOTOR factory schedule.
-   For each service, find the MOTOR schedule entries whose name contains one of
-   its motorKeys, prefer a "Replace/Service" entry over an "Inspect" one, and
-   take that entry's mile/month interval. Services MOTOR doesn't cover keep the
-   generic interval. Pure. */
-export function mergeMotorIntervals(intervals, motorServices) {
+/* Only the services the owner has turned on (Settings). */
+export const activeIntervals = (intervals) => (intervals || []).filter((s) => s && s.enabled !== false);
+
+/* Combine the shop's own intervals with the vehicle's real MOTOR factory schedule.
+   `mode` is the owner's choice:
+     - "store": use the shop's intervals only (no MOTOR).
+     - "motor": use the manufacturer interval where MOTOR has it, else the shop's.
+     - "both": same effective interval as "motor", but keep both numbers so the
+       screen can show store vs manufacturer side by side.
+   Each row carries storeMiles/Months, motorMiles/Months, the effective
+   miles/months (used for due/done), and a source tag. Pure. */
+export function mergeMotorIntervals(intervals, motorServices, mode = "both") {
   const svcs = (motorServices || []).filter((m) => m && m.name && (num(m.miles) > 0 || num(m.months) > 0));
   const rank = (name) => (/replace|service|flush|exchange|change|drain/i.test(name) ? 2 : /inspect/i.test(name) ? 0 : 1);
   let matched = 0;
   const merged = (intervals || []).map((svc) => {
+    const storeMiles = num(svc.miles);
+    const storeMonths = num(svc.months);
     const keys = (svc.motorKeys || []).map((k) => k.toLowerCase());
-    const cands = svcs.filter((m) => keys.some((k) => m.name.toLowerCase().includes(k)));
-    if (!cands.length) return { ...svc, source: "generic" };
+    const cands = mode === "store" ? [] : svcs.filter((m) => keys.some((k) => m.name.toLowerCase().includes(k)));
     cands.sort((a, b) => rank(b.name) - rank(a.name) || num(a.miles) - num(b.miles));
-    const m = cands[0];
-    matched += 1;
-    return { ...svc, miles: num(m.miles) || num(svc.miles), months: num(m.months) || num(svc.months), motorName: m.name, source: "MOTOR" };
+    const m = cands[0] || null;
+    const motorMiles = m ? num(m.miles) : 0;
+    const motorMonths = m ? num(m.months) : 0;
+    const useMotor = mode !== "store" && m && (motorMiles > 0 || motorMonths > 0);
+    if (useMotor) matched += 1;
+    return {
+      ...svc,
+      storeMiles,
+      storeMonths,
+      motorMiles,
+      motorMonths,
+      motorName: m ? m.name : "",
+      miles: useMotor ? motorMiles || storeMiles : storeMiles,
+      months: useMotor ? motorMonths || storeMonths : storeMonths,
+      source: useMotor ? "MOTOR" : "store",
+    };
   });
-  return { intervals: merged, source: matched ? "MOTOR" : "generic", matched };
+  return { intervals: merged, source: matched && mode !== "store" ? "MOTOR" : "store", matched, mode };
+}
+
+/* Tidy an edited interval table for saving (Settings). */
+export function normalizeServiceIntervals(rows) {
+  return (rows || [])
+    .filter((r) => String(r.name || "").trim())
+    .map((r) => ({
+      id: r.id || String(r.name).toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || `s${Math.random().toString(36).slice(2, 7)}`,
+      name: String(r.name).trim(),
+      miles: Math.max(0, Math.round(num(r.miles))),
+      months: Math.max(0, Math.round(num(r.months))),
+      price: Math.max(0, num(r.price)),
+      match: String(r.match || r.name || "").trim(),
+      motorKeys: Array.isArray(r.motorKeys) ? r.motorKeys : String(r.motorKeys || r.name || "").split("|").map((s) => s.trim()).filter(Boolean),
+      enabled: r.enabled !== false,
+    }));
 }
 
 /* Every performed (part/labor/sublet) line description on an order, for matching. */

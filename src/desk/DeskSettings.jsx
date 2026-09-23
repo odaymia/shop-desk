@@ -10,6 +10,7 @@ import { NAME_MODES } from "../lib/names.js";
 import { DEFAULT_CHECKLIST, normalizeChecklist } from "../lib/checklist.js";
 import { COMM_ROLES, commToForm, commFromForm } from "../lib/commission.js";
 import { DEFAULT_SERVICE_MENU, normalizeMenu } from "../lib/services.js";
+import { DEFAULT_SERVICE_INTERVALS, normalizeServiceIntervals } from "../lib/serviceReview.js";
 import { DEFAULT_SYMPTOMS, DEFAULT_SYMPTOMS_MAP } from "../lib/symptoms.js";
 import { FINDINGS_BY_CATEGORY } from "../lib/findings.js";
 import { sGetAll, sSet, cloud } from "../storage/index.js";
@@ -61,6 +62,7 @@ const SETTINGS_SECTIONS = [
   ["builder", "Symptom & fix lists"],
   ["oilchange", "Oil change"],
   ["commissions", "Commissions"],
+  ["servicereview", "Service review"],
   ["payments", "Payments"],
   ["data", "Data & backup"],
 ];
@@ -82,6 +84,11 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
     });
   const setCk = (i, patch) => setD((x) => ({ ...x, checklist: (x.checklist || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const setPkg = (i, patch) => setD((x) => ({ ...x, oilPackages: (x.oilPackages || []).map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
+  /* Service review interval table */
+  const svcRows = () => (d.serviceIntervals && d.serviceIntervals.length ? d.serviceIntervals : DEFAULT_SERVICE_INTERVALS);
+  const setSvc = (i, patch) => setD((x) => ({ ...x, serviceIntervals: svcRows().map((r, k) => (k === i ? { ...r, ...patch } : r)) }));
+  const addSvc = () => setD((x) => ({ ...x, serviceIntervals: [...svcRows(), { id: "svc" + Date.now(), name: "", miles: 30000, months: 24, price: 0, match: "", motorKeys: [], enabled: true }] }));
+  const removeSvc = (i) => setD((x) => ({ ...x, serviceIntervals: svcRows().filter((_, k) => k !== i) }));
   /* Editable symptom / findings lists per category (Settings → Symptom & fix
      lists). The effective list is the shop's override or the built-in. */
   const [builderCat, setBuilderCat] = useState(DEFAULT_SYMPTOMS[0][0]);
@@ -124,6 +131,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
         .map((p) => ({ ...p, name: p.name.trim(), price: toNum(p.price), quarts: toNum(p.quarts) || 5, extraQuart: toNum(p.extraQuart), commission: commFromForm(p.commission) })),
       checklist: normalizeChecklist(d.checklist),
       serviceMenu: normalizeMenu(d.serviceMenu),
+      serviceIntervals: normalizeServiceIntervals(d.serviceIntervals && d.serviceIntervals.length ? d.serviceIntervals : DEFAULT_SERVICE_INTERVALS),
       bays: (d.bays || [])
         .filter((b) => String(b.name || "").trim())
         .map((b, i) => ({ id: b.id || "bay" + (i + 1), name: String(b.name).trim() })),
@@ -697,6 +705,55 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
 
           <CarfaxPanel cfg={cfg} shop={shop} d={d} set={set} flash={flash} />
           </>
+          )}
+
+          {show("servicereview") && (
+            <>
+              <h3 className="subhead">Service review</h3>
+              <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>
+                The "what's due" screen shown at an oil change. Choose where the intervals come from and which services appear.
+              </p>
+              <div className="fld">
+                <span>Interval source</span>
+                <select value={d.serviceIntervalSource || "both"} onChange={(e) => set("serviceIntervalSource")(e.target.value)}>
+                  <option value="store">Store recommended only</option>
+                  <option value="motor">Manufacturer (MOTOR) — factory schedule, falls back to store</option>
+                  <option value="both">Both — show store and manufacturer side by side</option>
+                </select>
+              </div>
+              <label className="fld inline" style={{ marginTop: 8 }}>
+                <input type="checkbox" checked={d.serviceReviewOnOil !== false} onChange={(e) => set("serviceReviewOnOil")(e.target.checked)} />
+                <span>Pop the service review automatically when an oil change is added</span>
+              </label>
+
+              <h3 className="subhead" style={{ marginTop: 24 }}>Services &amp; store intervals</h3>
+              <p className="muted" style={{ marginTop: 0 }}>Uncheck to hide a service. Store intervals are used directly, or as the fallback when a vehicle isn't in MOTOR.</p>
+              <table className="svcCfg">
+                <thead>
+                  <tr>
+                    <th>Show</th>
+                    <th>Service</th>
+                    <th className="r">Every miles</th>
+                    <th className="r">Every months</th>
+                    <th className="r">Menu price</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {svcRows().map((r, i) => (
+                    <tr key={r.id || i}>
+                      <td className="c"><input type="checkbox" checked={r.enabled !== false} onChange={(e) => setSvc(i, { enabled: e.target.checked })} /></td>
+                      <td><input value={r.name || ""} onChange={(e) => setSvc(i, { name: e.target.value })} placeholder="Service name" /></td>
+                      <td><input className="r" inputMode="numeric" value={r.miles ?? ""} onChange={(e) => setSvc(i, { miles: e.target.value.replace(/[^0-9]/g, "") })} /></td>
+                      <td><input className="r" inputMode="numeric" value={r.months ?? ""} onChange={(e) => setSvc(i, { months: e.target.value.replace(/[^0-9]/g, "") })} /></td>
+                      <td><input className="r" inputMode="decimal" value={r.price ?? ""} onChange={(e) => setSvc(i, { price: e.target.value.replace(/[^0-9.]/g, "") })} /></td>
+                      <td className="c"><button className="lineX" onClick={() => removeSvc(i)} aria-label="Remove" title="Remove">✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button className="btn tiny" style={{ marginTop: 10 }} onClick={addSvc}>+ Add service</button>
+            </>
           )}
 
           {show("payments") && <PaymentsPanel d={d} set={set} shop={shop} />}

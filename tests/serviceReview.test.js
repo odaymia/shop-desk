@@ -69,13 +69,31 @@ test("mergeMotorIntervals overrides intervals from the factory schedule, prefers
   const coolant = intervals.find((s) => s.id === "coolant");
   assert.equal(coolant.miles, 100000); // "Cooling System..." matched via motorKeys
   const trans = intervals.find((s) => s.id === "trans");
-  assert.equal(trans.source, "generic"); // MOTOR didn't cover it -> generic kept
+  assert.equal(trans.source, "store"); // MOTOR didn't cover it -> store kept
 });
 
-test("mergeMotorIntervals with no MOTOR data keeps generic", () => {
+test("mergeMotorIntervals with no MOTOR data keeps store", () => {
   const { source, intervals } = mergeMotorIntervals(DEFAULT_SERVICE_INTERVALS, []);
-  assert.equal(source, "generic");
-  assert.ok(intervals.every((s) => s.source === "generic"));
+  assert.equal(source, "store");
+  assert.ok(intervals.every((s) => s.source === "store"));
+});
+
+test('mergeMotorIntervals mode "store" ignores MOTOR entirely', () => {
+  const motor = [{ name: "Engine Oil & Filter Replace", miles: 7500, months: 12 }];
+  const { intervals, source } = mergeMotorIntervals(DEFAULT_SERVICE_INTERVALS, motor, "store");
+  assert.equal(source, "store");
+  const oil = intervals.find((s) => s.id === "oil");
+  assert.equal(oil.miles, 5000); // store value, MOTOR ignored
+  assert.equal(oil.source, "store");
+  assert.equal(oil.motorMiles, 0);
+});
+
+test('mergeMotorIntervals mode "both" keeps store + motor numbers', () => {
+  const motor = [{ name: "Engine Oil & Filter Replace", miles: 7500, months: 12 }];
+  const oil = mergeMotorIntervals(DEFAULT_SERVICE_INTERVALS, motor, "both").intervals.find((s) => s.id === "oil");
+  assert.equal(oil.storeMiles, 5000);
+  assert.equal(oil.motorMiles, 7500);
+  assert.equal(oil.miles, 7500); // effective = manufacturer
 });
 
 test("default interval table is well-formed", () => {

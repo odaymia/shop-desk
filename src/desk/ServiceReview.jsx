@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { Modal, fmtDate } from "./ui.jsx";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { motorVehicle, motorMaintenance } from "../lib/motor.js";
 
 const STATUS = {
@@ -18,32 +18,34 @@ const miles = (n) => (Number(n) || 0).toLocaleString() + " mi";
 export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const vehicle = shop.vehicles[order.vehicleId] || {};
   const vehOrders = useMemo(() => ordersOf(shop.orders, { vehicleId: order.vehicleId }), [shop.orders, order.vehicleId]);
-  const baseIntervals = cfg.serviceIntervals || DEFAULT_SERVICE_INTERVALS;
-  const [merged, setMerged] = useState(() => ({ intervals: baseIntervals, source: "generic" }));
-  const [motorState, setMotorState] = useState("loading"); // loading | motor | motor-sample | generic
+  const mode = cfg.serviceIntervalSource || "both"; // store | motor | both
+  const baseIntervals = activeIntervals(cfg.serviceIntervals || DEFAULT_SERVICE_INTERVALS);
+  const [merged, setMerged] = useState(() => ({ intervals: mergeMotorIntervals(baseIntervals, [], "store").intervals, source: "store" }));
+  const [motorState, setMotorState] = useState(mode === "store" ? "store" : "loading"); // loading | motor | motor-sample | store
 
-  // pull the vehicle's real factory schedule from MOTOR and override the generic intervals
+  // pull the vehicle's real factory schedule from MOTOR (unless the owner chose store-only)
   useEffect(() => {
+    if (mode === "store") return;
     let live = true;
     const vin = String(vehicle.vin || "").trim();
     if (vin.length !== 17) {
-      setMotorState("generic");
+      setMotorState("store");
       return;
     }
     (async () => {
       try {
         const v = await motorVehicle(vin);
         if (!live) return;
-        if (!v.vehicle) return setMotorState("generic");
+        if (!v.vehicle) return setMotorState("store");
         const m = await motorMaintenance(v.vehicle.baseVehicleId);
         if (!live) return;
-        const mm = mergeMotorIntervals(baseIntervals, m.services);
+        const mm = mergeMotorIntervals(baseIntervals, m.services, mode);
         if (mm.matched > 0) {
           setMerged(mm);
           setMotorState(v.sample || m.sample ? "motor-sample" : "motor");
-        } else setMotorState("generic");
+        } else setMotorState("store");
       } catch {
-        if (live) setMotorState("generic");
+        if (live) setMotorState("store");
       }
     })();
     return () => { live = false; };
@@ -78,10 +80,10 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
             {motorState === "loading"
               ? "Loading the factory schedule…"
               : motorState === "motor"
-                ? "✓ Factory schedule from MOTOR · checked against this car's history"
+                ? `✓ ${mode === "both" ? "Store + factory (MOTOR)" : "Factory schedule (MOTOR)"} · checked against this car's history`
                 : motorState === "motor-sample"
-                  ? "Factory schedule (MOTOR sample) · checked against this car's history"
-                  : "General intervals · checked against this car's history"}
+                  ? `${mode === "both" ? "Store + factory (MOTOR sample)" : "Factory schedule (MOTOR sample)"} · checked against this car's history`
+                  : "Store intervals · checked against this car's history"}
           </div>
         </div>
         <label className="fld" style={{ width: 150 }}>
@@ -130,7 +132,12 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                   <td className="muted">
                     {miles(r.miles)}
                     {r.months ? ` / ${r.months} mo` : ""}
-                    {r.source === "MOTOR" ? <span className="sub" style={{ color: "#1657d6" }}>MOTOR</span> : null}
+                    {r.source === "MOTOR" && mode !== "both" ? <span className="sub" style={{ color: "#1657d6" }}>MOTOR</span> : null}
+                    {mode === "both" && r.motorMiles > 0 ? (
+                      <span className="sub">
+                        Store {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Mfr {miles(r.motorMiles)}</span>
+                      </span>
+                    ) : null}
                   </td>
                   <td className="muted">{r.lastDone ? `${miles(r.lastDone.mileage)} · ${fmtDate(r.lastDone.at)}` : "—"}</td>
                   <td>
@@ -150,10 +157,14 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         </table>
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
-        {merged.source === "MOTOR"
-          ? 'Intervals marked "MOTOR" are this vehicle\'s factory schedule; the rest use your general intervals (Settings).'
-          : "Intervals are a general guide — edit them in Settings. Connect MOTOR to use each vehicle's factory schedule."}{" "}
-        "Done" is detected from this car's past tickets.
+        {mode === "store"
+          ? "Showing your store intervals (Settings → Service review)."
+          : merged.source === "MOTOR"
+            ? mode === "both"
+              ? "Showing your store intervals and this vehicle's MOTOR factory schedule side by side; due/done uses the factory number."
+              : 'Manufacturer (MOTOR) intervals where available; the rest use your store intervals (Settings → Service review).'
+            : "Store intervals (Settings → Service review) — connect MOTOR for each vehicle's factory schedule."}{" "}
+        "Done" is detected from this car's past tickets. Which services and source are set in Settings.
       </p>
     </Modal>
   );
