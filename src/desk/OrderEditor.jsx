@@ -50,6 +50,7 @@ import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { Inspection, InspectionCard } from "./Inspection.jsx";
 import { inspectionRecommendations } from "../lib/inspection.js";
 import { MotorLookup } from "./MotorLookup.jsx";
+import { ServiceReview } from "./ServiceReview.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
 import { composeConcern } from "../lib/symptoms.js";
@@ -89,6 +90,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const dirty = useRef(false);
   const timer = useRef(null);
   const stickerAfterChecklist = useRef(null); // sticker to print once a post-time checklist is closed
+  const checklistAfterReview = useRef(false); // open the checklist once the oil-change service review is closed
   const saveRef = useRef(shop.saveOrder);
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
@@ -904,6 +906,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 <button className="btn tiny" onClick={() => setPick("motor")} title="Look up MOTOR labor times for this vehicle and add them">
                   🔧 Labor guide
                 </button>
+                <button className="btn tiny" onClick={() => setPick("serviceReview")} title="What maintenance is due for this vehicle, and what's already been done">
+                  🗓 Service review
+                </button>
                 <button className="btn tiny" onClick={() => addLine("sublet")}>
                   + Sublet
                 </button>
@@ -1370,8 +1375,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           onClose={() => setPick(null)}
           onAdd={(lines, pkg) => {
             addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.topTechId || o.techId || null } : l)));
-            /* on a repair order, run the checklist right away; on an estimate it waits until the RO is approved */
-            setPick(o.status === STATUS.open && !o.checklist && cfg.checklistOnOil !== false ? "checklist" : null);
+            /* an oil change is the moment to review what else is due — pop the
+               service review, then fall through to the walk-around checklist */
+            checklistAfterReview.current = o.status === STATUS.open && !o.checklist && cfg.checklistOnOil !== false;
+            setPick(cfg.serviceReviewOnOil === false ? (checklistAfterReview.current ? "checklist" : null) : "serviceReview");
             flash(`${pkg.name} added`);
           }}
         />
@@ -1453,6 +1460,29 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               techId: o.topTechId || o.techId || null,
             });
             flash(`Added: ${op.name}`);
+          }}
+        />
+      )}
+      {pick === "serviceReview" && (
+        <ServiceReview
+          order={o}
+          cfg={cfg}
+          shop={shop}
+          onClose={() => {
+            const next = checklistAfterReview.current ? "checklist" : null;
+            checklistAfterReview.current = false;
+            setPick(next);
+          }}
+          onAdd={(r) => {
+            addLine("labor", {
+              description: r.name,
+              hours: 1,
+              rate: toNum(r.price),
+              unit: "service",
+              job: "Recommended service",
+              techId: o.topTechId || o.techId || null,
+            });
+            flash(`Added: ${r.name}`);
           }}
         />
       )}

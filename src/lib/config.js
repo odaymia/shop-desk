@@ -2,6 +2,7 @@ import { DEFAULT_OIL_PACKAGES } from "./oilchange.js";
 import { DEFAULT_CHECKLIST } from "./checklist.js";
 import { DEFAULT_SERVICE_MENU } from "./services.js";
 import { DEFAULT_INSPECTION } from "./inspection.js";
+import { DEFAULT_SERVICE_INTERVALS } from "./serviceReview.js";
 /* Shop settings and their defaults. Saved config is merged over these. */
 
 export const DEFAULT_CFG = {
@@ -37,6 +38,8 @@ export const DEFAULT_CFG = {
   checklist: DEFAULT_CHECKLIST, // the service checklist run on every oil change; edited in Settings
   checklistOnOil: true, // open the checklist as soon as an oil change goes on a ticket
   inspection: DEFAULT_INSPECTION, // the digital vehicle inspection (DVI) template; edited in Settings
+  serviceIntervals: DEFAULT_SERVICE_INTERVALS, // maintenance-interval table for the Service Review; edited in Settings
+  serviceReviewOnOil: true, // pop the Service Review ("what's due") when an oil change is added to a ticket
   cardPayments: false, // accept cards in-app via Stripe Connect (Settings → Payments); the shop connects its own account
   portalEnabled: false, // customer portal: publish customer records for sign-in at /portal/
   hours: "", // free text for the portal card: "Mon–Fri 8–6, Sat 8–2"
