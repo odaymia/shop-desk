@@ -98,7 +98,7 @@ export function MotorReference({ vehicle, onClose }) {
   };
 
   return (
-    <Modal title="MOTOR vehicle data" onClose={onClose} size="lg">
+    <Modal title="MOTOR vehicle data" onClose={onClose} size="huge">
       {sample && <p className="sampleNote">Sample data — connect MOTOR in the function's secrets to pull this vehicle's live data.</p>}
       {veh ? <p className="motorVeh">{[veh.year, veh.make, veh.model, veh.submodel].filter(Boolean).join(" ")} · {veh.engine}</p> : null}
 
@@ -133,7 +133,7 @@ export function MotorReference({ vehicle, onClose }) {
           ) : !items || items.length === 0 ? (
             <p className="muted" style={{ padding: 16 }}>Nothing here for this vehicle.</p>
           ) : (
-            <div className="tableCard scroll" style={{ maxHeight: 420 }}>
+            <div className="dataScroll">
               <table className="dk">
                 <tbody>
                   {items.map((it, i) => (

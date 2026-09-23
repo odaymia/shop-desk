@@ -70,7 +70,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const veh = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "This vehicle";
 
   return (
-    <Modal title="Service review" onClose={onClose} size="lg">
+    <Modal title="Service review" onClose={onClose} size="huge">
       <div className="svcHead">
         <div>
           <strong>{veh}</strong>
@@ -101,7 +101,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         )}
       </div>
 
-      <div className="tableCard scroll" style={{ maxHeight: 440 }}>
+      <div className="dataScroll">
         <table className="dk">
           <thead>
             <tr>

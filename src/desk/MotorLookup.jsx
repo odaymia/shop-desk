@@ -55,7 +55,7 @@ export function MotorLookup({ vehicle, cfg, onClose, onAddLabor }) {
   };
 
   return (
-    <Modal title="MOTOR labor guide" onClose={onClose} size="lg">
+    <Modal title="MOTOR labor guide" onClose={onClose} size="huge">
       {sample && <p className="sampleNote">Sample data — connect MOTOR in the function's secrets to pull live labor times.</p>}
       {veh ? (
         <p className="motorVeh">
@@ -84,7 +84,7 @@ export function MotorLookup({ vehicle, cfg, onClose, onAddLabor }) {
           ) : labor.length === 0 ? (
             <p className="muted" style={{ padding: 16 }}>No labor operations match. Try a different word.</p>
           ) : (
-            <div className="tableCard scroll" style={{ maxHeight: 420 }}>
+            <div className="dataScroll">
               <table className="dk">
                 <tbody>
                   {labor.map((op) => (

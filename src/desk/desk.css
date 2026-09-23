@@ -156,7 +156,13 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .pickList li.low .side strong { color:var(--warn); }
 .editCard.wide { max-width:720px; }
 .editCard.xwide { max-width:900px; }
+.editCard.huge { max-width:1060px; width:94vw; }
 .editCard { max-height:92vh; overflow:auto; }
+/* a vertical-scrolling data region inside a modal (the base .scroll is x-only) */
+.dataScroll { max-height:64vh; overflow:auto; border:1px solid var(--line); border-radius:12px; background:#fff; }
+.dataScroll table.dk th { position:sticky; top:0; z-index:1; }
+.dataScroll table.dk td { padding:11px 14px; }
+@media (max-width:760px) { .dataScroll { max-height:56vh; } }
 .fld input[type=checkbox] { min-height:0; width:20px; height:20px; }
 /* inputs inside cards and rows must shrink with their column */
 .desk .fld input:not([type=checkbox]), .desk .fld select, .desk .fld textarea { width:100%; min-width:0; }
