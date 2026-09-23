@@ -47,6 +47,7 @@ import { SpecForm } from "./SpecForm.jsx";
 import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist, syncChecklist } from "../lib/checklist.js";
+import { Inspection, InspectionCard } from "./Inspection.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
 import { composeConcern } from "../lib/symptoms.js";
@@ -285,6 +286,20 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const addLine = (kind, extra) => update((d) => ({ ...d, lines: [...d.lines, makeLine(kind, cfg, { id: uid(), ...extra })] }));
   const addLines = (lines) => update((d) => ({ ...d, lines: [...d.lines, ...lines] }));
   const setLine = (id, patch) => update((d) => ({ ...d, lines: d.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
+
+  /* ---------- vehicle inspection (DVI) ---------- */
+  const saveInspection = async (insp) => {
+    update((d) => ({ ...d, inspection: insp, history: [...(d.history || []), { at: Date.now(), what: "vehicle inspection saved" }] }));
+    await flushNow();
+  };
+  const addInspectionWork = (recs) => {
+    const lines = (recs || []).map((r) =>
+      makeLine("labor", cfg, { id: uid(), description: r.label, details: r.note || "", hours: 1, rate: toNum(r.price), unit: "service", job: "Recommended — inspection", techId: o.topTechId || o.techId || null }),
+    );
+    if (lines.length) addLines(lines);
+    setPick(null);
+    flash(`Added ${lines.length} recommended item${lines.length === 1 ? "" : "s"} to the estimate`);
+  };
   const removeLine = (id) => update((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== id) }));
   /* remove every line that belongs to one job/package in a single click */
   const removeJob = (jobName) => update((d) => ({ ...d, lines: d.lines.filter((l) => (l.job || "") !== jobName) }));
@@ -1125,6 +1140,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
 
           <ChecklistCard order={o} locked={locked} onOpen={() => setPick("checklist")} />
 
+          <InspectionCard order={o} onOpen={() => setPick("inspection")} />
+
           <div className="card">
             <div className="cardHead">
               <h3>History</h3>
@@ -1353,6 +1370,17 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             closeChecklist();
             flash("Checklist saved");
           }}
+        />
+      )}
+      {pick === "inspection" && (
+        <Inspection
+          order={o}
+          cfg={cfg}
+          employees={employees}
+          flash={flash}
+          onClose={() => setPick(null)}
+          onSave={saveInspection}
+          onAddToEstimate={addInspectionWork}
         />
       )}
       {pick === "pay" && (
