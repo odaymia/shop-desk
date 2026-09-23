@@ -537,6 +537,10 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
 @media (max-width:520px) { .grid2 { grid-template-columns:1fr; } }
 
+/* MOTOR labor guide */
+.sampleNote { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:8px 12px; font-size:13px; margin:0 0 12px; }
+.motorVeh { font-weight:600; margin:0 0 12px; }
+
 /* digital vehicle inspection (DVI) */
 .vGood { color:#16a34a; } .vAdvise { color:#d97706; } .vFail { color:#dc2626; }
 .inspScreen { position:fixed; inset:0; z-index:70; background:var(--asphalt, #f4f5f7); display:flex; flex-direction:column; }

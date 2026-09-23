@@ -49,6 +49,7 @@ import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
 import { priorChecklist, syncChecklist } from "../lib/checklist.js";
 import { Inspection, InspectionCard } from "./Inspection.jsx";
 import { inspectionRecommendations } from "../lib/inspection.js";
+import { MotorLookup } from "./MotorLookup.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
 import { composeConcern } from "../lib/symptoms.js";
@@ -900,6 +901,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 <button className="btn tiny" onClick={() => addLine("labor", { techId: o.topTechId || o.techId || null })}>
                   + Labor
                 </button>
+                <button className="btn tiny" onClick={() => setPick("motor")} title="Look up MOTOR labor times for this vehicle and add them">
+                  🔧 Labor guide
+                </button>
                 <button className="btn tiny" onClick={() => addLine("sublet")}>
                   + Sublet
                 </button>
@@ -1433,6 +1437,23 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           onClose={() => setPick(null)}
           onSave={saveInspection}
           onAddToEstimate={addInspectionWork}
+        />
+      )}
+      {pick === "motor" && (
+        <MotorLookup
+          vehicle={vehicle}
+          cfg={cfg}
+          onClose={() => setPick(null)}
+          onAddLabor={(op) => {
+            addLine("labor", {
+              description: op.name,
+              hours: op.hours || 1,
+              rate: toNum(cfg.laborRate),
+              unit: op.hours ? "hr" : "service",
+              techId: o.topTechId || o.techId || null,
+            });
+            flash(`Added: ${op.name}`);
+          }}
         />
       )}
       {pick === "pay" && (
