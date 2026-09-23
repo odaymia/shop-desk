@@ -20,17 +20,17 @@ export const RECOMMEND = "Recommend";
 export const DEFAULT_CHECKLIST = [
   { id: "oil", label: "Engine oil", kind: "choice", options: ["Replaced", "Level OK", "Added", "Checked OK", "At your request"], value: "Level OK", auto: "oil change | motor oil | engine oil" },
   { id: "oilFilter", label: "Oil filter", kind: "choice", options: ["Replaced", "Checked OK", "Recommend", "At your request"], value: "Checked OK", auto: "oil filter" },
-  { id: "rearDiff", label: "Rear diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "rear diff | rear differential", recommendPrice: 90, recommendLabel: "Rear differential fluid service" },
+  { id: "rearDiff", label: "Rear diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "rear diff | rear differential", requiresFluid: "differential", recommendPrice: 90, recommendLabel: "Rear differential fluid service" },
   { id: "trans", label: "Transmission fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "At your request", "Sealed", "Can't check"], value: "Level OK", auto: "transmission fluid | transmission flush | transmission service", recommendPrice: 180, recommendLabel: "Transmission fluid service" },
   { id: "wipers", label: "Wiper blades", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "wiper", recommendPrice: 25, recommendLabel: "Wiper blade replacement" },
   { id: "airFilter", label: "Air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request"], value: "Checked OK", auto: "air filter -cabin | engine filter", recommendPrice: 30, recommendLabel: "Engine air filter replacement" },
   { id: "cabinFilter", label: "Cabin air filter", kind: "choice", options: ["Checked OK", "Replaced", "Recommend", "At your request", "Can't check", "N/A"], value: "Checked OK", auto: "cabin filter | cabin air", recommendPrice: 40, recommendLabel: "Cabin air filter replacement" },
   { id: "brakeFluid", label: "Brake fluid", kind: "choice", options: ["Sensor OK", "Level OK", "Added", "Replaced", "Recommend", "At your request"], value: "Sensor OK", auto: "brake fluid | brake flush", recommendPrice: 110, recommendLabel: "Brake fluid flush" },
-  { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "Recommend", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush", recommendPrice: 100, recommendLabel: "Power steering fluid flush" },
+  { id: "psFluid", label: "Power steering fluid", kind: "choice", options: ["Full", "Added", "Replaced", "Recommend", "At your request", "N/A (electric)", "Can't check"], value: "Full", auto: "power steering fluid | power steering flush", requiresFluid: "power steering", recommendPrice: 100, recommendLabel: "Power steering fluid flush" },
   { id: "coolant", label: "Radiator fluid", kind: "choice", options: ["Level OK", "Added", "Replaced", "Recommend", "Can't check", "At your request"], value: "Level OK", auto: "coolant flush | radiator flush | coolant service | antifreeze", recommendPrice: 130, recommendLabel: "Coolant flush and fill" },
   { id: "washer", label: "Windshield wash fluid", kind: "choice", options: ["Added", "Full", "Can't check"], value: "Added", auto: "" },
   { id: "tirePsi", label: "Tire pressure", kind: "pressure", value: "F35 R35", auto: "", remember: true },
-  { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case", recommendPrice: 90, recommendLabel: "Front differential fluid service" },
+  { id: "frontDiff", label: "Front diff fluid", kind: "choice", options: ["At your request", "Level OK", "Added", "Replaced", "Recommend", "Can't check", "N/A"], value: "At your request", auto: "front diff | front differential | transfer case", requiresFluid: "differential", recommendPrice: 90, recommendLabel: "Front differential fluid service" },
   { id: "lfDepth", label: "Front driver side tire depth", kind: "depth", value: "", auto: "" },
   { id: "rfDepth", label: "Front passenger side tire depth", kind: "depth", value: "", auto: "" },
   { id: "lrDepth", label: "Rear driver side tire depth", kind: "depth", value: "", auto: "" },
@@ -126,6 +126,30 @@ export function optionsOf(item, cfgItems) {
 
 /* A fresh checklist for a ticket: defaults, ticket lines marking what
    was replaced, and the car's last values for remembered items. */
+/* The "N/A"-style option in a choice list, if any (e.g. "N/A", "N/A (electric)"). */
+export const naOptionOf = (options) => (options || []).find((o) => /n\/?a\b/i.test(o)) || "";
+
+/* Auto-mark items N/A when the vehicle isn't equipped for them. `motorNames` is
+   the pool of fluid + maintenance names MOTOR returned for the car; a checklist
+   item with a `requiresFluid` keyword that isn't present is set to its N/A
+   option (unless it was actually done on the ticket, or the tech already moved
+   it off its default). With no MOTOR data, nothing changes. Pure. */
+export function applyEquipment(items, cfgItems, motorNames) {
+  const hay = (motorNames || []).join(" | ").toLowerCase();
+  if (!hay.trim()) return items;
+  const cfgMap = {};
+  for (const c of cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST) cfgMap[c.id] = c;
+  return (items || []).map((it) => {
+    const c = cfgMap[it.id];
+    const req = c && c.requiresFluid;
+    if (!req || it.auto || hay.includes(String(req).toLowerCase())) return it;
+    const na = naOptionOf(c.options);
+    const stillDefault = it.value === (c.value || "");
+    if (!na || it.value === na || !stillDefault) return it;
+    return { ...it, value: na, naAuto: true };
+  });
+}
+
 export function startChecklist(cfgItems, lines, prior, parts) {
   const src = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
   return src

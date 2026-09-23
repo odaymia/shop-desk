@@ -1,16 +1,39 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal } from "./ui.jsx";
-import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parsePressure, formatPressure } from "../lib/checklist.js";
+import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parsePressure, formatPressure, applyEquipment } from "../lib/checklist.js";
+import { motorVehicle, motorFluids, motorMaintenance } from "../lib/motor.js";
 
 /* The service checklist, driven from the keyboard: Enter takes the
    answer and moves on, Space (or the arrows) picks a different one,
    1–9 jumps straight to a choice, Backspace goes back. Items whose
    part or service is on the ticket start at Replaced. Closing saves. */
-export function ChecklistModal({ cfg, order, prior, parts, onSave, onCancel }) {
+export function ChecklistModal({ cfg, order, vehicle, prior, parts, onSave, onCancel }) {
   const cfgItems = cfg.checklist && cfg.checklist.length ? cfg.checklist : undefined;
+  const fresh = !(order.checklist && order.checklist.items && order.checklist.items.length);
   const [items, setItems] = useState(() =>
-    order.checklist && order.checklist.items && order.checklist.items.length ? order.checklist.items.map((x) => ({ ...x })) : startChecklist(cfgItems, order.lines, prior, parts)
+    fresh ? startChecklist(cfgItems, order.lines, prior, parts) : order.checklist.items.map((x) => ({ ...x }))
   );
+
+  // On a fresh checklist, mark fluids the car doesn't have as N/A — but only from
+  // real MOTOR data, never the sample fallback.
+  useEffect(() => {
+    if (!fresh) return;
+    const vin = String((vehicle && vehicle.vin) || "").trim();
+    if (vin.length !== 17) return;
+    let live = true;
+    (async () => {
+      try {
+        const v = await motorVehicle(vin);
+        if (!live || !v.vehicle || v.sample) return;
+        const [f, m] = await Promise.all([motorFluids(v.vehicle.baseVehicleId), motorMaintenance(v.vehicle.baseVehicleId)]);
+        if (!live || f.sample || m.sample) return;
+        const names = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
+        setItems((cur) => applyEquipment(cur, cfgItems, names));
+      } catch { /* offline / not set up — leave the checklist as-is */ }
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [idx, setIdx] = useState(0);
   const inputRef = useRef(null);
   const rearRef = useRef(null);

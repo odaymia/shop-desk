@@ -40,9 +40,10 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         if (!v.vehicle) return setMotorState("store");
         const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId), motorFluids(v.vehicle.baseVehicleId)]);
         if (!live) return;
-        // what the vehicle actually has (fluids + scheduled services) → hide the rest
+        const isSample = v.sample || m.sample || f.sample;
+        // only hide services from REAL per-vehicle data — never from the sample fallback
         const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
-        const applicable = filterApplicable(baseIntervals, motorNames);
+        const applicable = isSample ? baseIntervals : filterApplicable(baseIntervals, motorNames);
         const mm = mergeMotorIntervals(applicable, m.services, mode);
         if (mm.matched > 0 || applicable.length !== baseIntervals.length) {
           setMerged(mm);

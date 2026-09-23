@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_CHECKLIST, startChecklist, replacedOnTicket, syncChecklist, recommendedServices, cycle, withDepthDefault, checklistSummary, optionsOf, normalizeChecklist, priorChecklist } from "../src/lib/checklist.js";
+import { DEFAULT_CHECKLIST, startChecklist, replacedOnTicket, syncChecklist, recommendedServices, cycle, withDepthDefault, checklistSummary, optionsOf, normalizeChecklist, priorChecklist, applyEquipment, naOptionOf } from "../src/lib/checklist.js";
 import { DEFAULT_OIL_PACKAGES, oilPackageLines } from "../src/lib/oilchange.js";
 
 const byId = (items, id) => items.find((x) => x.id === id);
@@ -195,4 +195,23 @@ test("settings rows normalize: comma options, blank labels dropped, text items l
   assert.equal(rows[0].label, "Belts");
   assert.equal(rows[1].auto, "");
   assert.deepEqual(rows[1].options, []);
+});
+
+test("applyEquipment marks fluids the car lacks as N/A (from MOTOR names)", () => {
+  const items = startChecklist(DEFAULT_CHECKLIST, [], null, {});
+  // MOTOR shows differential but NOT power steering (electric)
+  const motorNames = ["Engine Oil Fluid Type", "Differential Fluid Type"];
+  const out = applyEquipment(items, DEFAULT_CHECKLIST, motorNames);
+  const ps = out.find((x) => x.id === "psFluid");
+  const rd = out.find((x) => x.id === "rearDiff");
+  assert.equal(ps.value, "N/A (electric)"); // no power steering -> N/A
+  assert.equal(ps.naAuto, true);
+  assert.equal(rd.value, "At your request"); // differential present -> unchanged (default)
+  // no MOTOR data -> unchanged
+  assert.equal(applyEquipment(items, DEFAULT_CHECKLIST, []).find((x) => x.id === "psFluid").value, "Full");
+});
+
+test("naOptionOf finds the N/A choice", () => {
+  assert.equal(naOptionOf(["Full", "N/A (electric)", "Can't check"]), "N/A (electric)");
+  assert.equal(naOptionOf(["Level OK", "Replaced"]), "");
 });

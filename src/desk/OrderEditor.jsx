@@ -1424,6 +1424,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <ChecklistModal
           cfg={cfg}
           order={o}
+          vehicle={vehicle}
           parts={shop.parts}
           prior={priorChecklist(shop.orders, o.vehicleId, o.id)}
           onCancel={closeChecklist}
