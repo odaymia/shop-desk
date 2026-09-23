@@ -713,13 +713,20 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
               <p className="muted" style={{ marginTop: 0, maxWidth: 640 }}>
                 The "what's due" screen shown at an oil change. Choose where the intervals come from and which services appear.
               </p>
-              <div className="fld">
-                <span>Interval source</span>
-                <select value={d.serviceIntervalSource || "both"} onChange={(e) => set("serviceIntervalSource")(e.target.value)}>
-                  <option value="store">Store recommended only</option>
-                  <option value="motor">Manufacturer (MOTOR) — factory schedule, falls back to store</option>
-                  <option value="both">Both — show store and manufacturer side by side</option>
-                </select>
+              <div className="grid2">
+                <div className="fld">
+                  <span>Interval source</span>
+                  <select value={d.serviceIntervalSource || "both"} onChange={(e) => set("serviceIntervalSource")(e.target.value)}>
+                    <option value="store">Your recommendation only</option>
+                    <option value="motor">Manufacturer recommendation (falls back to yours)</option>
+                    <option value="both">Both — show yours and the manufacturer side by side</option>
+                  </select>
+                </div>
+                <div className="fld">
+                  <span>What to call your recommendations</span>
+                  <Text value={d.serviceStoreLabel ?? "Store"} onChange={set("serviceStoreLabel")} placeholder="Store" />
+                  <span className="muted" style={{ fontSize: 12 }}>e.g. "Store", "Valvoline", "{cfg.shopName || "Genie"}" — shows on the review next to your intervals.</span>
+                </div>
               </div>
               <label className="fld inline" style={{ marginTop: 8 }}>
                 <input type="checkbox" checked={d.serviceReviewOnOil !== false} onChange={(e) => set("serviceReviewOnOil")(e.target.checked)} />

@@ -41,6 +41,7 @@ export const DEFAULT_CFG = {
   serviceIntervals: DEFAULT_SERVICE_INTERVALS, // maintenance-interval table for the Service Review; edited in Settings
   serviceReviewOnOil: true, // pop the Service Review ("what's due") when an oil change is added to a ticket
   serviceIntervalSource: "both", // Service Review intervals: "store" | "motor" (manufacturer) | "both"
+  serviceStoreLabel: "Store", // what the shop calls its own recommendations on the Service Review (e.g. "Store", "Valvoline")
   cardPayments: false, // accept cards in-app via Stripe Connect (Settings → Payments); the shop connects its own account
   portalEnabled: false, // customer portal: publish customer records for sign-in at /portal/
   hours: "", // free text for the portal card: "Mon–Fri 8–6, Sat 8–2"

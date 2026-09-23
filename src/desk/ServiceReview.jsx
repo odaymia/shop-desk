@@ -20,6 +20,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const vehicle = shop.vehicles[order.vehicleId] || {};
   const vehOrders = useMemo(() => ordersOf(shop.orders, { vehicleId: order.vehicleId }), [shop.orders, order.vehicleId]);
   const mode = cfg.serviceIntervalSource || "both"; // store | motor | both
+  const storeLabel = String(cfg.serviceStoreLabel || "Store").trim() || "Store";
   const baseIntervals = activeIntervals(cfg.serviceIntervals || DEFAULT_SERVICE_INTERVALS);
   const [merged, setMerged] = useState(() => ({ intervals: mergeMotorIntervals(baseIntervals, [], "store").intervals, source: "store" }));
   const [motorState, setMotorState] = useState(mode === "store" ? "store" : "loading"); // loading | motor | motor-sample | store
@@ -83,12 +84,12 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
           <strong>{veh}</strong>
           <div className="muted" style={{ fontSize: 13 }}>
             {motorState === "loading"
-              ? "Loading the factory schedule…"
+              ? "Loading the manufacturer schedule…"
               : motorState === "motor"
-                ? `✓ ${mode === "both" ? "Store + factory (MOTOR)" : "Factory schedule (MOTOR)"} · checked against this car's history`
+                ? `✓ ${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations · checked against this car's history`
                 : motorState === "motor-sample"
-                  ? `${mode === "both" ? "Store + factory (MOTOR sample)" : "Factory schedule (MOTOR sample)"} · checked against this car's history`
-                  : "Store intervals · checked against this car's history"}
+                  ? `${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations (sample) · checked against this car's history`
+                  : `${storeLabel} recommendations · checked against this car's history`}
           </div>
         </div>
         <label className="fld" style={{ width: 150 }}>
@@ -142,10 +143,10 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                       <>
                         {miles(r.miles)}
                         {r.months ? ` / ${r.months} mo` : ""}
-                        {r.source === "MOTOR" && mode !== "both" ? <span className="sub" style={{ color: "#1657d6" }}>MOTOR</span> : null}
+                        {r.source === "MOTOR" && mode !== "both" ? <span className="sub" style={{ color: "#1657d6" }}>Manufacturer</span> : null}
                         {mode === "both" && r.motorMiles > 0 ? (
                           <span className="sub">
-                            Store {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Mfr {miles(r.motorMiles)}</span>
+                            {storeLabel} {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Manufacturer {miles(r.motorMiles)}</span>
                           </span>
                         ) : null}
                       </>
@@ -170,12 +171,12 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
         {mode === "store"
-          ? "Showing your store intervals (Settings → Service review)."
+          ? `Showing your ${storeLabel.toLowerCase()} recommendations (Settings → Service review).`
           : merged.source === "MOTOR"
             ? mode === "both"
-              ? "Showing your store intervals and this vehicle's MOTOR factory schedule side by side; due/done uses the factory number."
-              : 'Manufacturer (MOTOR) intervals where available; the rest use your store intervals (Settings → Service review).'
-            : "Store intervals (Settings → Service review) — connect MOTOR for each vehicle's factory schedule."}{" "}
+              ? `Showing your ${storeLabel.toLowerCase()} recommendations and this vehicle's manufacturer schedule side by side; due/done uses the manufacturer number.`
+              : "Manufacturer recommendations where available; the rest use your own (Settings → Service review)."
+            : `${storeLabel} recommendations (Settings → Service review) — connect MOTOR for each vehicle's manufacturer schedule.`}{" "}
         "Done" is detected from this car's past tickets. Which services and source are set in Settings.
       </p>
     </Modal>
