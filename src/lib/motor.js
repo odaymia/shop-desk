@@ -31,6 +31,18 @@ const SAMPLE_MAINTENANCE = [
   { name: "Automatic Transmission Fluid Replace", miles: 60000, months: 72 },
   { name: "Spark Plug Replace", miles: 100000, months: 120 },
 ];
+const SAMPLE_CONTENT = {
+  Fluids: ["Engine Oil", "Engine Coolant", "Brake Fluid", "Automatic Transmission Fluid", "Differential Fluid"],
+  Specifications: ["Engine Oil Capacity", "Cooling System Capacity", "Spark Plug Gap", "Lug Nut Torque", "Wheel Alignment — Toe"],
+  Parts: ["Oil Filter", "Engine Air Filter", "Cabin Air Filter", "Front Brake Pads", "Spark Plug"],
+  EstimatedWorkTimes: ["Brake Pads Replace — Front", "Alternator Replace", "Water Pump Replace"],
+  MaintenanceSchedules: ["Engine Oil & Filter Replace", "Tire Rotation", "Cabin Air Filter Replace"],
+  ServiceProcedures: ["ABS Control Module R&R", "Alternator R&R", "Water Pump R&R"],
+  TechnicalServiceBulletins: ["Aluminum Panel Corrosion", "Transmission Shudder — Reprogram", "Water Pump Weep Hole Seepage"],
+  DiagnosticTroubleCodes: ["P0300 — Random/Multiple Cylinder Misfire", "P0171 — System Too Lean (Bank 1)", "P0420 — Catalyst Efficiency Below Threshold"],
+  ComponentLocations: ["Body Wiring Harness", "PCM Location", "Fuse Box"],
+  WiringDiagrams: ["Charging System", "Starting System", "Power Distribution"],
+};
 
 async function call(body) {
   try {
@@ -42,6 +54,8 @@ async function call(body) {
     if (body.action === "fluids") return { fluids: SAMPLE_FLUIDS, sample: true };
     if (body.action === "parts") return { parts: [], sample: true };
     if (body.action === "maintenance") return { services: SAMPLE_MAINTENANCE, sample: true };
+    if (body.action === "content") return { items: (SAMPLE_CONTENT[body.type] || []).map((name) => ({ name, id: 0 })), sample: true };
+    if (body.action === "content-detail") return { detail: { Note: "Sample — connect MOTOR to see the full detail for this item." }, sample: true };
     return { sample: true };
   }
 }
@@ -63,3 +77,12 @@ export const motorParts = (baseVehicleId, q) => call({ action: "parts", baseVehi
 /* The vehicle's factory maintenance schedule. Returns
    { services: [{ name, miles, months }], sample } — the real OEM intervals. */
 export const motorMaintenance = (baseVehicleId) => call({ action: "maintenance", baseVehicleId });
+
+/* Browse any MOTOR content domain for a vehicle (Fluids, Specifications, Parts,
+   ServiceProcedures, TechnicalServiceBulletins, DiagnosticTroubleCodes,
+   ComponentLocations, WiringDiagrams, …). Returns { items: [{ name, id }], sample }. */
+export const motorContent = (baseVehicleId, type) => call({ action: "content", baseVehicleId, type });
+
+/* The detail for one content item. Returns { detail, sample } — the raw MOTOR
+   record (engine/submodel block stripped), rendered generically by the panel. */
+export const motorContentDetail = (baseVehicleId, type, id) => call({ action: "content-detail", baseVehicleId, type, id });

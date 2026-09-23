@@ -51,6 +51,7 @@ import { Inspection, InspectionCard } from "./Inspection.jsx";
 import { inspectionRecommendations } from "../lib/inspection.js";
 import { MotorLookup } from "./MotorLookup.jsx";
 import { ServiceReview } from "./ServiceReview.jsx";
+import { MotorReference } from "./MotorReference.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
 import { composeConcern } from "../lib/symptoms.js";
@@ -909,6 +910,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 <button className="btn tiny" onClick={() => setPick("serviceReview")} title="What maintenance is due for this vehicle, and what's already been done">
                   🗓 Service review
                 </button>
+                <button className="btn tiny" onClick={() => setPick("motorRef")} title="Browse MOTOR data for this vehicle — fluids, specs, parts, procedures, TSBs, wiring">
+                  📚 MOTOR data
+                </button>
                 <button className="btn tiny" onClick={() => addLine("sublet")}>
                   + Sublet
                 </button>
@@ -1463,6 +1467,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           }}
         />
       )}
+      {pick === "motorRef" && <MotorReference vehicle={vehicle} onClose={() => setPick(null)} />}
       {pick === "serviceReview" && (
         <ServiceReview
           order={o}

@@ -32,6 +32,12 @@ const BASE = (Deno.env.get("MOTOR_BASE_URL") || "https://api.motor.com").replace
 const LIVE = !!(PUB && PRIV);
 const enc = (s: string) => new TextEncoder().encode(s);
 
+// Content domains the reference panel can browse (allow-listed → safe path building).
+const CONTENT_TYPES = [
+  "Fluids", "Specifications", "Parts", "EstimatedWorkTimes", "MaintenanceSchedules",
+  "ServiceProcedures", "TechnicalServiceBulletins", "DiagnosticTroubleCodes", "ComponentLocations", "WiringDiagrams",
+];
+
 /* ---- MOTOR request signing ---- */
 async function motorGet(path: string): Promise<Record<string, unknown>> {
   const epoch = Math.floor(Date.now() / 1000);
@@ -149,6 +155,18 @@ const SAMPLE_FLUIDS = [
   { name: "Differential Fluid Type", position: "Front", detail: "" },
   { name: "Air Conditioning Refrigerant Oil Fluid Type", position: "N/A", detail: "" },
 ];
+const SAMPLE_CONTENT: Record<string, string[]> = {
+  Fluids: ["Engine Oil", "Engine Coolant", "Brake Fluid", "Automatic Transmission Fluid", "Differential Fluid"],
+  Specifications: ["Engine Oil Capacity", "Cooling System Capacity", "Spark Plug Gap", "Lug Nut Torque", "Wheel Alignment — Toe"],
+  Parts: ["Oil Filter", "Engine Air Filter", "Cabin Air Filter", "Front Brake Pads", "Spark Plug"],
+  EstimatedWorkTimes: ["Brake Pads Replace — Front", "Alternator Replace", "Water Pump Replace"],
+  MaintenanceSchedules: ["Engine Oil & Filter Replace", "Tire Rotation", "Cabin Air Filter Replace"],
+  ServiceProcedures: ["ABS Control Module R&R", "Alternator R&R", "Water Pump R&R"],
+  TechnicalServiceBulletins: ["Aluminum Panel Corrosion", "Transmission Shudder — Reprogram", "Water Pump Weep Hole Seepage"],
+  DiagnosticTroubleCodes: ["P0300 — Random/Multiple Cylinder Misfire", "P0171 — System Too Lean (Bank 1)", "P0420 — Catalyst Efficiency Below Threshold"],
+  ComponentLocations: ["Body Wiring Harness", "PCM Location", "Fuse Box"],
+  WiringDiagrams: ["Charging System", "Starting System", "Power Distribution"],
+};
 const SAMPLE_MAINTENANCE = [
   { name: "Engine Oil & Filter Replace", miles: 7500, months: 12 },
   { name: "Tire Rotation", miles: 7500, months: 12 },
@@ -193,6 +211,8 @@ Deno.serve(async (req) => {
       if (action === "fluids") return json({ fluids: SAMPLE_FLUIDS, sample: true });
       if (action === "parts") return json({ parts: [], sample: true });
       if (action === "maintenance") return json({ services: SAMPLE_MAINTENANCE, sample: true });
+      if (action === "content") return json({ items: (SAMPLE_CONTENT[String(body.type || "")] || []).map((name) => ({ name, id: 0 })), sample: true });
+      if (action === "content-detail") return json({ detail: { Note: "Sample — connect MOTOR to see the full detail for this item." }, sample: true });
       return json({ error: "Unknown action" }, 400);
     }
 
@@ -207,6 +227,31 @@ Deno.serve(async (req) => {
     if (action === "fluids") return json({ fluids: normFluids(await motorGet(`${V}/Content/Summaries/Of/Fluids`)) });
     if (action === "parts") return json({ parts: normParts(await motorGet(`${V}/Content/Summaries/Of/Parts`), q) });
     if (action === "maintenance") return json({ services: await motorMaintenance(V) });
+    if (action === "content") {
+      const type = String(body.type || "");
+      if (!CONTENT_TYPES.includes(type)) return json({ error: "Unknown content type" }, 400);
+      const d = await motorGet(`${V}/Content/Summaries/Of/${type}`);
+      const apps = ((d.Body as Record<string, unknown>)?.Applications as Record<string, unknown>[]) || [];
+      const seen = new Set<string>();
+      const items: Record<string, unknown>[] = [];
+      for (const a of apps) {
+        const name = String(a.DisplayName || "").trim();
+        const key = name || String(a.ApplicationID);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push({ name: name || "(untitled)", id: a.ApplicationID });
+      }
+      return json({ items });
+    }
+    if (action === "content-detail") {
+      const type = String(body.type || "");
+      const id = String(body.id || "");
+      if (!CONTENT_TYPES.includes(type) || !id) return json({ error: "Bad request" }, 400);
+      const d = await motorGet(`${V}/Content/Details/Of/${type}/${id}`);
+      const detail = (d.Body as Record<string, unknown>) || {};
+      delete detail.Attributes; // drop the bulky engine/submodel block; keep the content
+      return json({ detail });
+    }
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("motor", action, e);

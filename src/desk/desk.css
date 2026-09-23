@@ -537,9 +537,16 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
 @media (max-width:520px) { .grid2 { grid-template-columns:1fr; } }
 
-/* MOTOR labor guide */
+/* MOTOR labor guide + reference */
 .sampleNote { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:8px 12px; font-size:13px; margin:0 0 12px; }
 .motorVeh { font-weight:600; margin:0 0 12px; }
+.motorTabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.motorTab { border:1px solid var(--line); background:var(--panel); color:var(--muted); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; }
+.motorTab:hover { border-color:var(--signal); color:var(--ink); }
+.motorTab.on { background:var(--brand,#7f1d1d); border-color:var(--brand,#7f1d1d); color:#fff; font-weight:600; }
+.motorDetail { border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:#fff; }
+.motorDetailList { margin:0; padding-left:18px; font-size:14px; line-height:1.6; }
+.motorDetailList li { margin:2px 0; }
 
 /* service review */
 .svcHead { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:12px; flex-wrap:wrap; }
