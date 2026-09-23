@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Modal, fmtDate } from "./ui.jsx";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { motorVehicle, motorMaintenance } from "../lib/motor.js";
 
 const STATUS = {
   due: { label: "Due now", cls: "due" },
@@ -17,8 +18,39 @@ const miles = (n) => (Number(n) || 0).toLocaleString() + " mi";
 export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const vehicle = shop.vehicles[order.vehicleId] || {};
   const vehOrders = useMemo(() => ordersOf(shop.orders, { vehicleId: order.vehicleId }), [shop.orders, order.vehicleId]);
-  const intervals = cfg.serviceIntervals || DEFAULT_SERVICE_INTERVALS;
+  const baseIntervals = cfg.serviceIntervals || DEFAULT_SERVICE_INTERVALS;
+  const [merged, setMerged] = useState(() => ({ intervals: baseIntervals, source: "generic" }));
+  const [motorState, setMotorState] = useState("loading"); // loading | motor | motor-sample | generic
 
+  // pull the vehicle's real factory schedule from MOTOR and override the generic intervals
+  useEffect(() => {
+    let live = true;
+    const vin = String(vehicle.vin || "").trim();
+    if (vin.length !== 17) {
+      setMotorState("generic");
+      return;
+    }
+    (async () => {
+      try {
+        const v = await motorVehicle(vin);
+        if (!live) return;
+        if (!v.vehicle) return setMotorState("generic");
+        const m = await motorMaintenance(v.vehicle.baseVehicleId);
+        if (!live) return;
+        const mm = mergeMotorIntervals(baseIntervals, m.services);
+        if (mm.matched > 0) {
+          setMerged(mm);
+          setMotorState(v.sample || m.sample ? "motor-sample" : "motor");
+        } else setMotorState("generic");
+      } catch {
+        if (live) setMotorState("generic");
+      }
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const intervals = merged.intervals;
   const guessMileage = Number(order.mileageOut) || Number(order.mileageIn) || vehOrders.reduce((m, o) => Math.max(m, Number(o.mileageOut) || Number(o.mileageIn) || 0), 0) || Number(vehicle.mileage) || 0;
   const [mileage, setMileage] = useState(String(guessMileage || ""));
   const cur = Number(mileage) || 0;
@@ -42,7 +74,15 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
       <div className="svcHead">
         <div>
           <strong>{veh}</strong>
-          <div className="muted" style={{ fontSize: 13 }}>Based on this car's service history with you.</div>
+          <div className="muted" style={{ fontSize: 13 }}>
+            {motorState === "loading"
+              ? "Loading the factory schedule…"
+              : motorState === "motor"
+                ? "✓ Factory schedule from MOTOR · checked against this car's history"
+                : motorState === "motor-sample"
+                  ? "Factory schedule (MOTOR sample) · checked against this car's history"
+                  : "General intervals · checked against this car's history"}
+          </div>
         </div>
         <label className="fld" style={{ width: 150 }}>
           <span>Current mileage</span>
@@ -90,6 +130,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                   <td className="muted">
                     {miles(r.miles)}
                     {r.months ? ` / ${r.months} mo` : ""}
+                    {r.source === "MOTOR" ? <span className="sub" style={{ color: "#1657d6" }}>MOTOR</span> : null}
                   </td>
                   <td className="muted">{r.lastDone ? `${miles(r.lastDone.mileage)} · ${fmtDate(r.lastDone.at)}` : "—"}</td>
                   <td>
@@ -109,7 +150,9 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         </table>
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
-        Intervals are a general guide — edit them in Settings, and MOTOR's factory schedule can refine them per vehicle.
+        {merged.source === "MOTOR"
+          ? 'Intervals marked "MOTOR" are this vehicle\'s factory schedule; the rest use your general intervals (Settings).'
+          : "Intervals are a general guide — edit them in Settings. Connect MOTOR to use each vehicle's factory schedule."}{" "}
         "Done" is detected from this car's past tickets.
       </p>
     </Modal>

@@ -93,6 +93,37 @@ function normFluids(data: Record<string, unknown>) {
     detail: ((a.Links as Record<string, unknown>[]) || [])[0]?.Href || "",
   }));
 }
+// The vehicle's factory maintenance schedule: unique service names, each with
+// its real interval (smallest positive miles/months across its schedule items).
+async function motorMaintenance(V: string) {
+  const sum = await motorGet(`${V}/Content/Summaries/Of/MaintenanceSchedules`);
+  const apps = ((sum.Body as Record<string, unknown>)?.Applications as Record<string, unknown>[]) || [];
+  const seen = new Set<string>();
+  const uniq: Record<string, unknown>[] = [];
+  for (const a of apps) {
+    const n = String(a.DisplayName || "");
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    uniq.push(a);
+  }
+  const capped = uniq.slice(0, 60);
+  const details = await Promise.all(
+    capped.map((a) => motorGet(`${V}/Content/Details/Of/MaintenanceSchedules/${a.ApplicationID}`).catch(() => null)),
+  );
+  const services: Record<string, unknown>[] = [];
+  for (let i = 0; i < capped.length; i++) {
+    const d = details[i];
+    if (!d) continue;
+    const items = (((d.Body as Record<string, unknown>)?.MaintenanceSchedules as Record<string, unknown>[]) || []).flatMap(
+      (m) => (m.Items as Record<string, unknown>[]) || [],
+    );
+    const mi = items.map((it) => Number(it.IntervalMile) || 0).filter((x) => x > 0);
+    const mo = items.map((it) => Number(it.IntervalMonth) || 0).filter((x) => x > 0);
+    services.push({ name: capped[i].DisplayName, miles: mi.length ? Math.min(...mi) : 0, months: mo.length ? Math.min(...mo) : 0 });
+  }
+  return services;
+}
+
 function normParts(data: Record<string, unknown>, q: string) {
   const apps = ((data.Body as Record<string, unknown>)?.Applications as Record<string, unknown>[]) || [];
   const out = apps.map((a) => ({
@@ -117,6 +148,16 @@ const SAMPLE_FLUIDS = [
   { name: "Engine Oil Fluid Type", position: "N/A", detail: "" },
   { name: "Differential Fluid Type", position: "Front", detail: "" },
   { name: "Air Conditioning Refrigerant Oil Fluid Type", position: "N/A", detail: "" },
+];
+const SAMPLE_MAINTENANCE = [
+  { name: "Engine Oil & Filter Replace", miles: 7500, months: 12 },
+  { name: "Tire Rotation", miles: 7500, months: 12 },
+  { name: "Cabin Air Filter Replace", miles: 30000, months: 36 },
+  { name: "Engine Air Filter Replace", miles: 30000, months: 36 },
+  { name: "Cooling System Fluid Replace", miles: 100000, months: 120 },
+  { name: "Automatic Transmission Fluid Replace", miles: 60000, months: 72 },
+  { name: "Spark Plug Replace", miles: 100000, months: 120 },
+  { name: "Brake System Inspect", miles: 15000, months: 12 },
 ];
 
 async function shopOf(req: Request): Promise<boolean> {
@@ -151,6 +192,7 @@ Deno.serve(async (req) => {
       if (action === "labor") return json({ labor: SAMPLE_LABOR.filter((l) => !q || l.name.toLowerCase().includes(q.toLowerCase())), sample: true });
       if (action === "fluids") return json({ fluids: SAMPLE_FLUIDS, sample: true });
       if (action === "parts") return json({ parts: [], sample: true });
+      if (action === "maintenance") return json({ services: SAMPLE_MAINTENANCE, sample: true });
       return json({ error: "Unknown action" }, 400);
     }
 
@@ -164,6 +206,7 @@ Deno.serve(async (req) => {
     if (action === "labor") return json({ labor: normLabor(await motorGet(`${V}/Content/Summaries/Of/EstimatedWorkTimes`), q) });
     if (action === "fluids") return json({ fluids: normFluids(await motorGet(`${V}/Content/Summaries/Of/Fluids`)) });
     if (action === "parts") return json({ parts: normParts(await motorGet(`${V}/Content/Summaries/Of/Parts`), q) });
+    if (action === "maintenance") return json({ services: await motorMaintenance(V) });
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("motor", action, e);

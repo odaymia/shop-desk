@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SERVICE_INTERVALS, lastDoneMap, serviceStatus, serviceReview, reviewCounts } from "../src/lib/serviceReview.js";
+import { DEFAULT_SERVICE_INTERVALS, lastDoneMap, serviceStatus, serviceReview, reviewCounts, mergeMotorIntervals } from "../src/lib/serviceReview.js";
 
 const now = Date.UTC(2026, 8, 23);
 const day = 24 * 3600 * 1000;
@@ -49,6 +49,33 @@ test("serviceReview: rows ordered due-first, with next-due mileage", () => {
   assert.equal(oil.nextDueMiles, 60000); // 55000 + 5000
   const c = reviewCounts(rows);
   assert.equal(c.due, 3);
+});
+
+test("mergeMotorIntervals overrides intervals from the factory schedule, prefers Replace over Inspect", () => {
+  const motor = [
+    { name: "Engine Oil & Filter Replace", miles: 7500, months: 12 },
+    { name: "Cabin Air Filter Inspect", miles: 15000, months: 0 },
+    { name: "Cabin Air Filter Replace", miles: 30000, months: 36 }, // preferred over the Inspect
+    { name: "Cooling System Fluid Replace", miles: 100000, months: 120 },
+  ];
+  const { intervals, source, matched } = mergeMotorIntervals(DEFAULT_SERVICE_INTERVALS, motor);
+  assert.equal(source, "MOTOR");
+  assert.ok(matched >= 3);
+  const oil = intervals.find((s) => s.id === "oil");
+  assert.equal(oil.miles, 7500); // from MOTOR, not the 5000 generic
+  assert.equal(oil.source, "MOTOR");
+  const cabin = intervals.find((s) => s.id === "cabinAir");
+  assert.equal(cabin.miles, 30000); // the Replace entry, not the 15000 Inspect
+  const coolant = intervals.find((s) => s.id === "coolant");
+  assert.equal(coolant.miles, 100000); // "Cooling System..." matched via motorKeys
+  const trans = intervals.find((s) => s.id === "trans");
+  assert.equal(trans.source, "generic"); // MOTOR didn't cover it -> generic kept
+});
+
+test("mergeMotorIntervals with no MOTOR data keeps generic", () => {
+  const { source, intervals } = mergeMotorIntervals(DEFAULT_SERVICE_INTERVALS, []);
+  assert.equal(source, "generic");
+  assert.ok(intervals.every((s) => s.source === "generic"));
 });
 
 test("default interval table is well-formed", () => {

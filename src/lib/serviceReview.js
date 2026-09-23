@@ -15,20 +15,44 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 /* id, name, interval (miles, months), `match` words to spot it in past tickets
    (same "a | b -c" grammar as the checklist), and a menu price for the upsell. */
+// `match` = words to spot the service in past tickets (checklist grammar).
+// `motorKeys` = words that appear in MOTOR's schedule names, so we can pull the
+// vehicle's real factory interval for this service when MOTOR is connected.
 export const DEFAULT_SERVICE_INTERVALS = [
-  { id: "oil", name: "Engine oil & filter", miles: 5000, months: 6, match: "oil change | engine oil | oil & filter | oil and filter", price: 0 },
-  { id: "tireRotate", name: "Tire rotation", miles: 5000, months: 6, match: "tire rotation | rotate tires", price: 25 },
-  { id: "engineAir", name: "Engine air filter", miles: 30000, months: 36, match: "engine air filter | air filter -cabin", price: 45 },
-  { id: "cabinAir", name: "Cabin air filter", miles: 30000, months: 24, match: "cabin air filter | cabin filter", price: 55 },
-  { id: "brakeFluid", name: "Brake fluid service", miles: 30000, months: 24, match: "brake fluid | brake flush", price: 110 },
-  { id: "coolant", name: "Coolant flush", miles: 60000, months: 60, match: "coolant flush | coolant service | antifreeze | radiator flush", price: 130 },
-  { id: "trans", name: "Transmission fluid service", miles: 60000, months: 60, match: "transmission fluid | transmission flush | transmission service", price: 180 },
-  { id: "diff", name: "Differential fluid service", miles: 45000, months: 48, match: "differential | diff fluid | gear oil", price: 90 },
-  { id: "fuelFilter", name: "Fuel filter", miles: 30000, months: 36, match: "fuel filter", price: 60 },
-  { id: "sparkPlugs", name: "Spark plugs", miles: 100000, months: 120, match: "spark plug", price: 220 },
-  { id: "serpentine", name: "Serpentine belt", miles: 90000, months: 96, match: "serpentine | drive belt", price: 120 },
-  { id: "wipers", name: "Wiper blades", miles: 15000, months: 12, match: "wiper", price: 25 },
+  { id: "oil", name: "Engine oil & filter", miles: 5000, months: 6, match: "oil change | engine oil | oil & filter | oil and filter", motorKeys: ["engine oil"], price: 0 },
+  { id: "tireRotate", name: "Tire rotation", miles: 5000, months: 6, match: "tire rotation | rotate tires", motorKeys: ["tire rotation", "rotate tire"], price: 25 },
+  { id: "engineAir", name: "Engine air filter", miles: 30000, months: 36, match: "engine air filter | air filter -cabin", motorKeys: ["engine air filter", "air cleaner"], price: 45 },
+  { id: "cabinAir", name: "Cabin air filter", miles: 30000, months: 24, match: "cabin air filter | cabin filter", motorKeys: ["cabin air filter", "passenger compartment air filter"], price: 55 },
+  { id: "brakeFluid", name: "Brake fluid service", miles: 30000, months: 24, match: "brake fluid | brake flush", motorKeys: ["brake fluid"], price: 110 },
+  { id: "coolant", name: "Coolant flush", miles: 60000, months: 60, match: "coolant flush | coolant service | antifreeze | radiator flush", motorKeys: ["cooling system", "coolant", "engine coolant"], price: 130 },
+  { id: "trans", name: "Transmission fluid service", miles: 60000, months: 60, match: "transmission fluid | transmission flush | transmission service", motorKeys: ["transmission fluid", "transaxle fluid"], price: 180 },
+  { id: "diff", name: "Differential fluid service", miles: 45000, months: 48, match: "differential | diff fluid | gear oil", motorKeys: ["differential", "axle fluid"], price: 90 },
+  { id: "fuelFilter", name: "Fuel filter", miles: 30000, months: 36, match: "fuel filter", motorKeys: ["fuel filter"], price: 60 },
+  { id: "sparkPlugs", name: "Spark plugs", miles: 100000, months: 120, match: "spark plug", motorKeys: ["spark plug"], price: 220 },
+  { id: "serpentine", name: "Serpentine belt", miles: 90000, months: 96, match: "serpentine | drive belt", motorKeys: ["drive belt", "serpentine belt", "accessory drive belt"], price: 120 },
+  { id: "wipers", name: "Wiper blades", miles: 15000, months: 12, match: "wiper", motorKeys: ["wiper"], price: 25 },
 ];
+
+/* Override the generic intervals with the vehicle's real MOTOR factory schedule.
+   For each service, find the MOTOR schedule entries whose name contains one of
+   its motorKeys, prefer a "Replace/Service" entry over an "Inspect" one, and
+   take that entry's mile/month interval. Services MOTOR doesn't cover keep the
+   generic interval. Pure. */
+export function mergeMotorIntervals(intervals, motorServices) {
+  const svcs = (motorServices || []).filter((m) => m && m.name && (num(m.miles) > 0 || num(m.months) > 0));
+  const rank = (name) => (/replace|service|flush|exchange|change|drain/i.test(name) ? 2 : /inspect/i.test(name) ? 0 : 1);
+  let matched = 0;
+  const merged = (intervals || []).map((svc) => {
+    const keys = (svc.motorKeys || []).map((k) => k.toLowerCase());
+    const cands = svcs.filter((m) => keys.some((k) => m.name.toLowerCase().includes(k)));
+    if (!cands.length) return { ...svc, source: "generic" };
+    cands.sort((a, b) => rank(b.name) - rank(a.name) || num(a.miles) - num(b.miles));
+    const m = cands[0];
+    matched += 1;
+    return { ...svc, miles: num(m.miles) || num(svc.miles), months: num(m.months) || num(svc.months), motorName: m.name, source: "MOTOR" };
+  });
+  return { intervals: merged, source: matched ? "MOTOR" : "generic", matched };
+}
 
 /* Every performed (part/labor/sublet) line description on an order, for matching. */
 function orderLineText(o) {

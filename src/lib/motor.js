@@ -22,6 +22,15 @@ const SAMPLE_FLUIDS = [
   { name: "Air Conditioning Refrigerant Oil Fluid Type", position: "N/A", detail: "" },
 ];
 const SAMPLE_VEHICLE = { baseVehicleId: 26332, vehicleId: 76389, engineId: 7929, year: 2012, make: "Ford", model: "F-150", submodel: "FX4", engine: "3.5L V6 (T) Turbocharged GAS FI" };
+const SAMPLE_MAINTENANCE = [
+  { name: "Engine Oil & Filter Replace", miles: 7500, months: 12 },
+  { name: "Tire Rotation", miles: 7500, months: 12 },
+  { name: "Cabin Air Filter Replace", miles: 30000, months: 36 },
+  { name: "Engine Air Filter Replace", miles: 30000, months: 36 },
+  { name: "Cooling System Fluid Replace", miles: 100000, months: 120 },
+  { name: "Automatic Transmission Fluid Replace", miles: 60000, months: 72 },
+  { name: "Spark Plug Replace", miles: 100000, months: 120 },
+];
 
 async function call(body) {
   try {
@@ -32,6 +41,7 @@ async function call(body) {
     if (body.action === "labor") return { labor: SAMPLE_LABOR.filter((l) => !body.q || l.name.toLowerCase().includes(String(body.q).toLowerCase())), sample: true };
     if (body.action === "fluids") return { fluids: SAMPLE_FLUIDS, sample: true };
     if (body.action === "parts") return { parts: [], sample: true };
+    if (body.action === "maintenance") return { services: SAMPLE_MAINTENANCE, sample: true };
     return { sample: true };
   }
 }
@@ -49,3 +59,7 @@ export const motorFluids = (baseVehicleId) => call({ action: "fluids", baseVehic
 /* Parts (incl. filters, with full production data) for a vehicle, optionally
    filtered by a keyword. Returns { parts: [{ name, position, qualifiers }], sample }. */
 export const motorParts = (baseVehicleId, q) => call({ action: "parts", baseVehicleId, q });
+
+/* The vehicle's factory maintenance schedule. Returns
+   { services: [{ name, miles, months }], sample } — the real OEM intervals. */
+export const motorMaintenance = (baseVehicleId) => call({ action: "maintenance", baseVehicleId });
