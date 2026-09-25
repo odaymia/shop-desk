@@ -32,7 +32,7 @@ export const SERVICE_CONTENT = [
     key: "oil",
     match: /oil|lube/i,
     intervalId: "oil",
-    photo: { id: "1487754180451-c456f719a1fc", by: "Tim Mossholder" },
+    photo: { id: "1784619588643-d5a7bfda632b", by: "BHARAT VISHAWAKARMA" }, // no oil brand in frame: shops pour different brands
     headline: "Keep your engine clean, cool, and protected",
     intro:
       "Oil keeps hundreds of fast-moving metal parts from grinding against each other. Over time it breaks down and fills with dirt, and worn-out oil can't do its job. A fresh change with the right oil for your engine is the cheapest insurance you can buy for your car.",

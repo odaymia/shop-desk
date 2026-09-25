@@ -248,6 +248,18 @@ export function WebsiteSettings({ d, set, shop, flash }) {
           <span>{label}</span>
         </label>
       ))}
+      {w.booking && (d.serviceMenu || []).length > 0 && (
+        <Field label="First come, first served (no appointments) — these say &quot;just pull in&quot; instead of offering to book">
+          <div>
+            {(d.serviceMenu || []).map((m) => (
+              <label key={m.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 0" }}>
+                <input type="checkbox" checked={(w.walkIn || []).includes(m.id)} onChange={() => toggleIn("walkIn", m.id)} />
+                <span>{m.name}</span>
+              </label>
+            ))}
+          </div>
+        </Field>
+      )}
       {(d.oilPackages || []).length > 0 && (
         <Field label="Oil change packages on the site">
           <div>

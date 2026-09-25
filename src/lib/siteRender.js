@@ -135,6 +135,22 @@ function dealLine(d) {
   return d.services && d.services.length ? `On ${d.services.slice(0, 3).join(", ")}${d.services.length > 3 ? " and more" : ""}` : "On any service";
 }
 
+/* "Oil change" → "oil changes are": service names read as plurals in
+   "… are first come, first served" */
+function plural(n) {
+  const t = String(n).toLowerCase();
+  if (/s$/.test(t)) return t;
+  if (/(sh|ch|x)$/.test(t)) return t + "es";
+  if (/(change|filter|service|rotation|flush|job|blade|inspection)$/.test(t)) return t + "s";
+  return t;
+}
+function areFirstCome(names) {
+  const list = names.map(plural);
+  const joined = list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : list[0] || "service";
+  const many = list.length > 1 || /s$/.test(list[0] || "");
+  return `${joined.charAt(0).toUpperCase() + joined.slice(1)} ${many ? "are" : "is"} first come, first served`;
+}
+
 /* A special as a cut-out coupon */
 function dealCard(d, i) {
   return `<article class="deal" style="--d:${(i % 3) * 70}ms" data-ends="${esc(d.endsAt)}">
@@ -154,10 +170,13 @@ function dealCard(d, i) {
 function offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ }) {
   const off = o.off.toUpperCase();
   const headline = o.headline || `${off} ${dealLine(o)}`;
-  const lead = o.blurb || `Show this coupon at ${p.name}${fullAddress ? `, ${fullAddress}` : ""}. ${o.firstTimeOnly ? "For first-time customers." : "Walk in or book a time below."}`;
+  const want0 = new Set((o.services || []).map((n) => n.toLowerCase()));
+  const covered0 = (p.services || []).filter((s) => [...(s.jobs || []), ...(s.prices || []).map((x) => x.name), ...(s.oil ? (p.oilPackages || []).map((x) => x.name) : [])].some((n) => want0.has(String(n).toLowerCase())));
+  /* first come, first served: no form to fill in, just come by */
+  const walkIn = !p.booking || (covered0.length > 0 && covered0.every((s) => s.walkIn));
+  const lead = o.blurb || `Show this coupon at ${p.name}${fullAddress ? `, ${fullAddress}` : ""}. ${walkIn ? "No appointment needed. Just drive in." : o.firstTimeOnly ? "For first-time customers." : "Walk in or book a time below."}`;
   const fine = [o.firstTimeOnly ? "First visit only." : "", o.minSubtotal ? `On services of ${money(o.minSubtotal)} or more.` : "", o.endsAt ? `Expires ${o.endsAt}.` : "", "One coupon per visit. Can't be combined with other offers."].filter(Boolean).join(" ");
-  const want = new Set((o.services || []).map((n) => n.toLowerCase()));
-  const covered = (p.services || []).filter((s) => [...(s.jobs || []), ...(s.prices || []).map((x) => x.name), ...(s.oil ? (p.oilPackages || []).map((x) => x.name) : [])].some((n) => want.has(String(n).toLowerCase())));
+  const covered = covered0;
   return `<section class="offerPage" id="offer-${esc(o.slug)}" data-title="${esc(off)} · ${esc(p.name)}">
   <div class="hero ofHero">
     <div class="wrap">
@@ -167,9 +186,15 @@ function offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ
         <h1>${esc(headline)}</h1>
         <p class="lead">${esc(lead)}</p>
         <div class="ctas">
-          <a class="btn primary" href="#offer-${esc(o.slug)}" data-scroll="claim-${esc(o.slug)}">Claim this offer</a>
+          ${
+            walkIn
+              ? `${fullAddress ? `<a class="btn primary" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} Get directions</a>` : ""}
           ${p.phone ? `<a class="btn light" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
-          ${fullAddress ? `<a class="btn ghost" href="${dirUrl}" target="_blank" rel="noopener">Directions</a>` : ""}
+          <a class="btn ghost" href="#offer-${esc(o.slug)}" data-scroll="claim-${esc(o.slug)}">How it works</a>`
+              : `<a class="btn primary" href="#offer-${esc(o.slug)}" data-scroll="claim-${esc(o.slug)}">Claim this offer</a>
+          ${p.phone ? `<a class="btn light" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
+          ${fullAddress ? `<a class="btn ghost" href="${dirUrl}" target="_blank" rel="noopener">Directions</a>` : ""}`
+          }
         </div>
       </div>
       <div class="ofCoupon" data-ends="${esc(o.endsAt)}">
@@ -186,7 +211,26 @@ function offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ
   </div>
   ${highlightsHtml}
   <div class="wrap ofBody" id="claim-${esc(o.slug)}">
-    <div>
+${
+  walkIn
+    ? `    <div class="walkIn">
+      <span class="eyebrow">No appointment needed</span>
+      <h2>Just pull in.</h2>
+      <p class="sub">${esc(areFirstCome(covered.map((s) => s.name)))}. Bring this coupon any time we're open.</p>
+      <div class="wiNow"><span class="status" data-status><i></i><span>${esc(p.name)}</span></span></div>
+      <ol class="wiSteps">
+        <li>${icon("pin")}<div><b>Pull in</b><span>No appointment, no phone call. Come by any time during business hours.</span></div></li>
+        <li>${icon("phone")}<div><b>Show this coupon</b><span>${o.code ? `Show this screen or mention code <strong>${esc(o.code)}</strong> at the counter.` : "Show this screen at the counter."}</span></div></li>
+        <li>${icon("check")}<div><b>Back on the road</b><span>We take care of the rest while you wait.</span></div></li>
+      </ol>
+      <div class="ctas">
+        ${fullAddress ? `<a class="btn primary" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} Get directions</a>` : ""}
+        ${p.phone ? `<a class="btn outline" href="${tel}">${icon("phone", "ic sm")} Questions? ${esc(p.phone)}</a>` : ""}
+      </div>
+      <p class="wiTip">Tip: take a screenshot of the coupon so it's handy when you get here.</p>
+    </div>
+`
+    : `    <div>
       <span class="eyebrow">Claim it</span>
       <h2>Save your spot</h2>
       <p class="sub">Leave your name and number and we'll call or text to set a time. Walk-ins welcome too.</p>
@@ -202,6 +246,8 @@ function offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ
         <div class="full"><button class="btn primary" type="submit">Claim my ${esc(o.off)} ${icon("arrow", "ic sm")}</button></div>
       </form>
     </div>
+`
+}
     <div class="visitCard ofVisit">
       ${p.phone ? `<a class="row tel" href="${tel}">${esc(p.phone)}</a>` : ""}
       ${fullAddress ? `<a class="row" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} ${esc(fullAddress)}</a>` : ""}
@@ -222,7 +268,7 @@ function offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ
 /* One service's own page: photo header, why it matters, the signs a car
    needs it, what the shop does, and a side card with how often, prices,
    matching specials, and a way to book. */
-function servicePage(p, s, i, { tel, garage }) {
+function servicePage(p, s, i, { tel, garage, dirUrl }) {
   const content = pageContent(s.key, s.oil ? "oil change" : s.name);
   const photo = content.photo;
   /* a selling point about this very service (lifetime brake pads on the
@@ -247,7 +293,13 @@ function servicePage(p, s, i, { tel, garage }) {
       <h1>${esc(s.name)}</h1>
       <p class="lead">${esc(content.headline)}</p>
       <div class="ctas">
-        ${p.booking ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>` : ""}
+        ${
+          s.walkIn
+            ? `<a class="btn primary" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} Get directions</a><span class="chip wiChip">No appointment needed</span>`
+            : p.booking
+              ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>`
+              : ""
+        }
         ${p.phone ? `<a class="btn ghost" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
         ${s.from != null ? `<span class="chip" style="font-size:15px;padding:10px 16px">from ${esc(money(s.from))}</span>` : ""}
       </div>
@@ -276,7 +328,7 @@ function servicePage(p, s, i, { tel, garage }) {
         !content.preventive && content.symptoms.length
           ? `<h2>Signs your car needs it</h2>
       <ul class="signs">${content.symptoms.map((x) => `<li>${icon("warn")}${esc(x)}</li>`).join("")}</ul>
-      <p class="signsNote">Notice one of these? ${p.booking ? `<a href="#book" data-svc="${esc(s.name)}">Request a time</a> or call us` : "Call us"} and we'll take a look.</p>`
+      <p class="signsNote">Notice one of these? ${s.walkIn ? "Just pull in, no appointment needed," : p.booking ? `<a href="#book" data-svc="${esc(s.name)}">Request a time</a> or call us` : "Call us"} and we'll take a look.</p>`
           : ""
       }
       <h2>What we do</h2>
@@ -286,7 +338,13 @@ function servicePage(p, s, i, { tel, garage }) {
       ${s.howOften ? `<h4>${icon("clock", "ic sm")} How often</h4><p>${esc(s.howOften)}</p>` : ""}
       ${priceRows ? `<h4>${icon("tag", "ic sm")} Prices</h4><ul>${priceRows}</ul>` : ""}
       ${deals.length ? `<a class="spDeal" href="#service-${esc(pageId)}" data-scroll="coupons-${esc(pageId)}"><b>${deals.length === 1 ? esc(deals[0].off.toUpperCase()) : `${deals.length} coupons`}</b>${deals.length === 1 ? esc(dealLine(deals[0])) : `for ${esc(s.name.toLowerCase())}`} · see below ↓</a>` : ""}
-      ${p.booking ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>` : ""}
+      ${
+        s.walkIn
+          ? `<div class="wiSide"><b>No appointment needed</b><span>${esc(areFirstCome([s.name]))}. Just pull in any time we're open.</span><span class="status" data-status><i></i><span>${esc(p.name)}</span></span></div><a class="btn primary" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} Get directions</a>`
+          : p.booking
+            ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>`
+            : ""
+      }
       ${p.phone ? `<a class="btn outline" href="${tel}">${icon("phone", "ic sm")} Call ${esc(p.phone)}</a>` : ""}
       ${garage ? `<a class="btn outline" href="${esc(garage)}">My Garage</a>` : ""}
     </aside>
@@ -357,7 +415,7 @@ export function renderSite(p, opts = {}) {
       </a>`
     )
     .join("");
-  const servicePages = (p.services || []).map((s, i) => servicePage(p, s, i, { tel, garage: opts.portalUrl })).join("");
+  const servicePages = (p.services || []).map((s, i) => servicePage(p, s, i, { tel, garage: opts.portalUrl, dirUrl })).join("");
   const highlightsHtml = (p.highlights || []).length
     ? `<div class="strip"><ul>${p.highlights
         .map((h) => (typeof h === "string" ? { title: h, sub: "" } : h))
@@ -386,7 +444,8 @@ export function renderSite(p, opts = {}) {
     .join("");
 
   const faq = (p.faq || []).map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join("");
-  const svcOptions = (p.services || []).map((s) => `<option>${esc(s.name)}</option>`).join("");
+  const svcOptions = (p.services || []).filter((s) => !s.walkIn).map((s) => `<option>${esc(s.name)}</option>`).join("");
+  const walkInNames = (p.services || []).filter((s) => s.walkIn).map((s) => s.name);
 
   /* the page's data for the little script at the bottom */
   const pageData = {
@@ -395,6 +454,8 @@ export function renderSite(p, opts = {}) {
     days: DAY_NAMES,
     pkgs: (p.oilPackages || []).map((k) => [k.name, k.price, k.quarts, k.extraQuart, k.kind || ""]),
     cars: hasQuote ? p.vehicles : [],
+    oilWalkIn: (p.services || []).some((x) => x.oil && x.walkIn),
+    dir: fullAddress ? dirUrl : "",
     api: opts.api && opts.api.url && opts.api.key && opts.api.shopId ? opts.api : null,
     preview: !!opts.preview,
   };
@@ -504,6 +565,26 @@ body:has(.offerPage:target) main{display:none}
 form.ofForm{border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
 .ofVisit{margin:0;width:100%;border:1px solid var(--line)}
 .ofMap{width:100%;height:220px;border:0;border-radius:14px;margin-top:6px;background:#e9e7e1}
+
+/* first come, first served */
+.walkIn{background:#fff;border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:var(--shadow)}
+.wiNow{margin:0 0 18px}
+.wiNow .status,.wiSide .status{background:var(--dark);color:#fff;border-color:var(--dark)}
+.wiSteps{list-style:none;margin:0 0 24px;padding:0;display:grid;gap:12px;counter-reset:wi}
+.wiSteps li{counter-increment:wi;position:relative;display:flex;gap:16px;align-items:flex-start;background:var(--paper);border-radius:16px;padding:18px 18px 18px 20px}
+.wiSteps li>.ic{flex:none;width:46px;height:46px;padding:10px;border-radius:14px;background:var(--brand);color:#fff}
+.wiSteps li:after{content:counter(wi);position:absolute;right:18px;top:12px;font:800 40px/1 var(--display);color:color-mix(in srgb,var(--brand) 16%,transparent)}
+.wiSteps b{display:block;font:800 24px/1 var(--display);text-transform:uppercase;margin:4px 0 6px}
+.wiSteps span{color:var(--ink2)}
+.walkIn .ctas{display:flex;flex-wrap:wrap;gap:10px}
+.wiTip{margin:16px 0 0;font-size:14px;color:var(--ink2)}
+.chip.wiChip{background:var(--ok);font-size:15px;padding:10px 16px}
+.wiSide{display:grid;gap:8px;background:color-mix(in srgb,var(--ok) 10%,#fff);border:1.5px solid color-mix(in srgb,var(--ok) 40%,#fff);border-radius:14px;padding:14px 16px;margin-bottom:6px}
+.wiSide b{font:800 22px/1 var(--display);text-transform:uppercase;color:var(--ok)}
+.wiSide>span:not(.status){font-size:14px;color:var(--ink2)}
+.wiSide .status{justify-self:start;font-size:13px;padding:6px 12px}
+.wiBanner{display:flex;gap:12px;align-items:flex-start;background:color-mix(in srgb,var(--ok) 10%,#fff);border:1.5px solid color-mix(in srgb,var(--ok) 40%,#fff);border-radius:14px;padding:14px 16px;margin:-18px 0 26px;max-width:760px}
+.wiBanner .ic{color:var(--ok);margin-top:2px}
 
 /* selling points */
 .strip{position:relative;z-index:2;margin-top:-72px}
@@ -824,6 +905,7 @@ ${p.booking ? `<section id="book" class="alt"><div class="wrap">
   <span class="eyebrow">Appointments</span>
   <h2>Request a time</h2>
   <p class="sub">Tell us what you need. We'll call or text to confirm. Walk-ins are always welcome.</p>
+  ${walkInNames.length ? `<p class="wiBanner">${icon("clock", "ic sm")}<span><b>No appointment needed.</b> ${esc(areFirstCome(walkInNames))}. Just pull in any time we're open.</span></p>` : ""}
   <div class="bookGrid rv">
     <div class="bookSide">
       <h3>Rather talk to a person?</h3>
@@ -921,7 +1003,7 @@ if(qy&&C.length){
     var q=c[5],h='<p class="car">'+esc(c[0]+" "+c[1]+" "+c[2])+'</p><p class="spec">'+(c[3]?esc(c[3])+' · ':'')+'takes <b>'+q+' quarts</b>'+(c[4]?' of <b>'+esc(c[4])+'</b>':'')+'</p>';
     var ks=S.pkgs.map(function(k){return k[4]}),kind=c[6]||"",idx=ks.map(function(k,i){return i}).filter(function(i){return kind==="d"?ks[i]==="d":ks[i]===""||(kind==="e"&&ks[i]==="e")});if(!idx.length)idx=ks.map(function(k,i){return i});
     idx.map(function(i){return S.pkgs[i]}).forEach(function(k){var extra=Math.max(0,Math.round((Math.round(q*10)/10-k[2])*100)/100),p=Math.round((k[1]+extra*k[3])*100)/100;h+='<div class="opt"><span>'+esc(k[0])+(extra?'<br><small>includes '+extra+' extra qt</small>':'')+'</span><b>'+money(p)+'</b></div>'});
-    h+='<p class="spec" style="margin:14px 0 16px;font-size:13px">Price for the oil change service before tax. We confirm your oil at the counter.</p>'+(document.getElementById("bookForm")?'<a class="btn primary" href="#book" data-svc="Oil change">Request a time</a>':'');qr.innerHTML=h};
+    h+='<p class="spec" style="margin:14px 0 16px;font-size:13px">Price for the oil change service before tax. We confirm your oil at the counter.</p>'+(S.oilWalkIn?'<p class="spec" style="margin:0 0 12px"><b>No appointment needed.</b> Oil changes are first come, first served.</p>'+(S.dir?'<a class="btn primary" target="_blank" rel="noopener" href="'+esc(S.dir)+'">Get directions</a>':''):document.getElementById("bookForm")?'<a class="btn primary" href="#book" data-svc="Oil change">Request a time</a>':'');qr.innerHTML=h};
   qy.onchange=function(){fill(qm,qy.value?uniq(pick().map(function(c){return c[1]})).sort():[],"Make");fill(qd,[],"Model");fill(qe,[],"Engine");show(null)};
   qm.onchange=function(){fill(qd,qm.value?uniq(pick().map(function(c){return c[2]})).sort():[],"Model");fill(qe,[],"Engine");show(null)};
   qd.onchange=function(){var L=qd.value?pick():[];fill(qe,uniq(L.map(function(c){return c[3]||"Standard"})),"Engine");if(L.length===1){qe.value=L[0][3]||"Standard";show(L[0])}else show(null)};

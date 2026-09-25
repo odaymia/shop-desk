@@ -223,3 +223,28 @@ test("ad landing pages: any live coupon given a page, advertised or not, code al
   assert.ok(page.includes('name="offer" value="FB20"')); // requests come in tagged
   assert.ok(page.includes('href="#service-oil-change"')); // "Good on" links to the service page
 });
+
+test("first come, first served services: no booking, just pull in", () => {
+  const cps = { fb: { id: "fb", code: "FB20", name: "$20 OFF ANY OIL CHANGE", kind: "amount", value: 20, active: true, requireAny: ["Conventional Oil Change"] } };
+  const c = { ...cfg, website: { ...cfg.website, walkIn: ["oil"], offers: { fb: {} } } };
+  const p = sitePayload({ cfg: c, jobs: {}, parts: {}, coupons: cps, orders: {}, specs: {}, today: "2026-09-25" });
+  assert.deepEqual(p.services.map((s) => s.walkIn), [true, false]);
+  const html = renderSite(p, {});
+  const offer = html.slice(html.indexOf('id="offer-fb20"'));
+  assert.ok(offer.includes("Just pull in.") && !offer.includes("Save your spot") && !offer.includes('name="offer"'));
+  const oilPage = html.slice(html.indexOf('id="service-oil-change"'), html.indexOf('id="service-brakes"'));
+  assert.ok(oilPage.includes("No appointment needed") && !oilPage.includes("Book this service"));
+  const brakesPage = html.slice(html.indexOf('id="service-brakes"'), html.indexOf('id="offer-fb20"'));
+  assert.ok(brakesPage.includes("Book this service"));
+  const form = html.slice(html.indexOf('id="bookForm"'), html.indexOf("</form>", html.indexOf('id="bookForm"')));
+  assert.ok(!form.includes("<option>Oil change</option>") && form.includes("<option>Brakes</option>"));
+  /* booking off for the whole shop: every offer is walk-in */
+  const none = renderSite(sitePayload({ cfg: { ...c, website: { ...c.website, walkIn: [], booking: false } }, jobs: {}, parts: {}, coupons: cps, orders: {}, specs: {}, today: "2026-09-25" }), {});
+  assert.ok(none.slice(none.indexOf('id="offer-fb20"')).includes("Just pull in."));
+});
+
+test("walk-in wording reads naturally", () => {
+  const html = renderSite(sitePayload({ cfg: { ...cfg, website: { ...cfg.website, walkIn: ["oil", "brakes"] } }, jobs: {}, parts: {}, coupons: {}, orders: {}, specs: {}, today: "2026-09-25" }), {});
+  assert.ok(html.includes("Oil changes are first come, first served"));
+  assert.ok(html.includes("Oil changes and brakes are first come, first served"));
+});

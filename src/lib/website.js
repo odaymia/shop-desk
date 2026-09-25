@@ -32,6 +32,7 @@ export const DEFAULT_WEBSITE = {
   showStats: true, // "since 2016 · 45,000+ services" from the invoice history
   quoteTool: true, // the pick-your-car oil change quote, from the shop's own specs
   booking: true, // appointment request form
+  walkIn: [], // service-menu ids that are first come, first served (no appointments), e.g. ["oil"]
   hiddenPackages: [], // oil package ids left off the site (e.g. customer-supplied oil)
   couponIds: [], // coupons the owner chose to advertise; none by default
   couponCodes: true, // print the code on the advertised coupon
@@ -356,6 +357,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
           : intervals.find((r) => r && r.id === content.intervalId && r.enabled !== false)
       ),
       oil: !!m.oil,
+      walkIn: !w.booking || (w.walkIn || []).includes(m.id), // first come, first served: no booking for this one
     };
   });
 
@@ -446,6 +448,7 @@ export function normalizeWebsite(w, shopName) {
     hoursWeek: x.hoursWeek ? normalizeHoursWeek(x.hoursWeek) : null,
     couponIds: [...new Set(x.couponIds || [])],
     hiddenPackages: [...new Set(x.hiddenPackages || [])],
+    walkIn: [...new Set(x.walkIn || [])],
     offers: Object.fromEntries(Object.entries(x.offers || {}).map(([id, o]) => [id, { headline: str(o && o.headline), blurb: str(o && o.blurb) }])),
     faq: (x.faq || []).map((f) => ({ q: str(f && f.q), a: str(f && f.a) })).filter((f) => f.q && f.a),
     links: Object.fromEntries(Object.entries({ ...DEFAULT_WEBSITE.links, ...(x.links || {}) }).map(([k, v]) => [k, /^https?:\/\//i.test(str(v)) ? str(v) : str(v) ? "https://" + str(v) : ""])),
