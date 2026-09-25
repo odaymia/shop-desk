@@ -9,8 +9,8 @@
      api       { url, key, shopId } — where the booking form posts; null = preview
      portalUrl link to the customer portal; blank hides it
      preview   true in the Settings preview (form doesn't send) */
-import { hoursRows, DAY_NAMES } from "./website.js";
-import { SERVICE_CONTENT, serviceContent, photoUrl } from "./serviceContent.js";
+import { hoursRows, DAY_NAMES, slugify } from "./website.js";
+import { pageContent, photoUrl } from "./serviceContent.js";
 
 const esc = (s) =>
   String(s == null ? "" : s)
@@ -139,7 +139,7 @@ function dealLine(d) {
    needs it, what the shop does, and a side card with how often, prices,
    matching specials, and a way to book. */
 function servicePage(p, s, i, { tel, garage }) {
-  const content = SERVICE_CONTENT.find((c) => c.key === s.key) || serviceContent(s.oil ? "oil change" : s.name);
+  const content = pageContent(s.key, s.oil ? "oil change" : s.name);
   const photo = content.photo;
   /* a selling point about this very service (lifetime brake pads on the
      Brakes page) leads the page */
@@ -150,8 +150,8 @@ function servicePage(p, s, i, { tel, garage }) {
   const priceRows = s.oil
     ? (p.oilPackages || []).map((k) => `<li><span>${esc(tierName(k.name))}</span><b>${esc(money(k.price))}</b></li>`).join("")
     : (s.prices || []).map((x) => `<li><span>${esc(x.name)}</span><b>${esc(money(x.price))}</b></li>`).join("");
-  const others = (p.services || []).filter((o) => o !== s).map((o) => `<a href="#service-${esc(o.slug)}">${iconFor(o.oil ? "oil" : o.name)}${esc(o.name)}</a>`).join("");
-  return `<section class="svcPage" id="service-${esc(s.slug || i)}" data-title="${esc(s.name)} · ${esc(p.name)}">
+  const others = (p.services || []).filter((o) => o !== s).map((o) => `<a href="#service-${esc(o.slug || slugify(o.name))}">${iconFor(o.oil ? "oil" : o.name)}${esc(o.name)}</a>`).join("");
+  return `<section class="svcPage" id="service-${esc(s.slug || slugify(s.name) || i)}" data-title="${esc(s.name)} · ${esc(p.name)}">
   <div class="spHero" style="background-image:url('${esc(photoUrl(photo.id))}')">
     <div class="wrap">
       <a class="back" href="#services">${icon("back", "ic sm")} All services</a><br>
@@ -169,10 +169,23 @@ function servicePage(p, s, i, { tel, garage }) {
     <div>
       ${perk ? `<div class="perk">${icon("shield")}<div><b>${esc(perk.title)}</b><span>${esc(perk.sub)}</span></div></div>` : ""}
       <p class="spIntro">${esc(content.intro)}</p>
+      ${
+        content.does
+          ? `<h2>${esc(content.does.title)}</h2>
+      <div class="does">${content.does.items.map(([t, d], k) => `<div class="doesItem"><span class="doesN">${k + 1}</span><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join("")}</div>
+      <div class="wear">${icon("clock")}<div><b>Why it wears out</b><p>${esc(content.does.wear)}</p></div></div>`
+          : ""
+      }
+      ${
+        content.prevents
+          ? `<h2>What it prevents</h2>
+      <div class="prevents">${content.prevents.map(([t, d]) => `<div class="prevent">${icon("shield")}<div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join("")}</div>`
+          : ""
+      }
       <h2>Why it matters</h2>
       <div class="benefits">${content.benefits.map(([t, d]) => `<div class="benefit">${icon("check")}<b>${esc(t)}</b><span>${esc(d)}</span></div>`).join("")}</div>
       ${
-        content.symptoms.length
+        !content.preventive && content.symptoms.length
           ? `<h2>Signs your car needs it</h2>
       <ul class="signs">${content.symptoms.map((x) => `<li>${icon("warn")}${esc(x)}</li>`).join("")}</ul>
       <p class="signsNote">Notice one of these? ${p.booking ? `<a href="#book" data-svc="${esc(s.name)}">Request a time</a> or call us` : "Call us"} and we'll take a look.</p>`
@@ -238,7 +251,7 @@ export function renderSite(p, opts = {}) {
 
   const services = (p.services || [])
     .map(
-      (s, i) => `<a class="svc rv" style="--d:${(i % 4) * 60}ms" href="#service-${esc(s.slug || i)}">
+      (s, i) => `<a class="svc rv" style="--d:${(i % 4) * 60}ms" href="#service-${esc(s.slug || slugify(s.name) || i)}">
         <div class="svcTop"><span class="svcIc">${iconFor(s.oil ? "oil" : s.name)}</span>${s.from != null ? `<span class="chip">from ${esc(money(s.from))}</span>` : ""}</div>
         <h3>${esc(s.name)}</h3>
         ${s.blurb ? `<p>${esc(s.blurb)}</p>` : "<p></p>"}
@@ -423,6 +436,20 @@ body:has(.svcPage:target) main{display:none}
 .benefit .ic{width:34px;height:34px;padding:7px;border-radius:10px;background:var(--ok);color:#fff;stroke-width:2.6;margin-bottom:12px}
 .benefit b{display:block;font:700 22px/1.1 var(--display);text-transform:uppercase;margin-bottom:6px}
 .benefit span{color:var(--ink2);font-size:15px}
+.does{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.doesItem{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 20px 20px 70px;box-shadow:var(--shadow)}
+.doesN{position:absolute;left:18px;top:18px;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--brandSoft);color:var(--brand);font:800 20px/1 var(--display)}
+.doesItem b{display:block;font:700 21px/1.1 var(--display);text-transform:uppercase;margin-bottom:6px}
+.doesItem span:last-child{color:var(--ink2);font-size:15px}
+.wear{display:flex;gap:16px;align-items:flex-start;background:var(--dark);color:#fff;border-radius:16px;padding:22px 24px;margin:0 0 52px}
+.wear .ic{width:30px;height:30px;flex:none;color:color-mix(in srgb,var(--brand) 40%,#fff);margin-top:2px}
+.wear b{font:800 22px/1 var(--display);text-transform:uppercase}
+.wear p{margin:8px 0 0;color:rgba(255,255,255,.82)}
+.prevents{display:grid;gap:10px;margin-bottom:52px}
+.prevent{display:flex;gap:16px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:14px;padding:16px 18px}
+.prevent .ic{width:28px;height:28px;flex:none;color:var(--ok)}
+.prevent b{display:block;font:700 20px/1.1 var(--display);text-transform:uppercase;margin-bottom:4px}
+.prevent span{color:var(--ink2);font-size:15px}
 .signs{list-style:none;margin:0 0 16px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .signs li{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-left:4px solid #e0a100;border-radius:12px;padding:14px 16px;font-weight:600}
 .signs .ic{color:#c98a00;flex:none}
@@ -573,7 +600,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   .strip{margin-top:-36px}
   .spBody{grid-template-columns:1fr;padding-top:36px;gap:32px}
   .spSide{position:static}
-  .benefits,.signs{grid-template-columns:1fr}
+  .benefits,.signs,.does{grid-template-columns:1fr}
   .spHero{min-height:420px}
   .strip ul{padding:0 20px;gap:12px}
   .heroCard{transform:none}

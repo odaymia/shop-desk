@@ -175,3 +175,16 @@ test("service pages: one per menu button, linked from its card, how often from t
   assert.ok(html.includes("images.unsplash.com/photo-"));
   assert.equal(intervalText({ basis: "inspect", miles: 15000 }), "We check it at every visit and replace it when it's worn, usually around every 15,000 miles.");
 });
+
+test("fluid services explain the fluid and what the service prevents, not warning signs", () => {
+  const p = sitePayload({ cfg: { ...cfg, serviceMenu: [{ id: "t", name: "Transmission", category: "Transmission services" }, { id: "b", name: "Brakes", category: "Brakes" }] }, jobs: {}, parts: {}, coupons, orders: {}, specs: {}, today: "2026-09-25" });
+  const html = renderSite(p, {});
+  const trans = html.slice(html.indexOf('id="service-transmission"'), html.indexOf('id="service-brakes"'));
+  assert.ok(trans.includes("What transmission fluid does") && trans.includes("Why it wears out") && trans.includes("What it prevents"));
+  assert.ok(!trans.includes("Signs your car needs it"));
+  const brakes = html.slice(html.indexOf('id="service-brakes"'));
+  assert.ok(brakes.includes("Signs your car needs it") && !brakes.includes("What it prevents"));
+  /* a page published before slugs existed still gets a readable address */
+  const old = renderSite({ ...p, services: p.services.map(({ slug, ...s }) => s) }, {});
+  assert.ok(old.includes('id="service-transmission"'));
+});

@@ -236,3 +236,145 @@ export function serviceContent(name) {
 }
 
 export const photoUrl = (id, w = 1600) => `https://images.unsplash.com/photo-${id}?w=${w}&q=70&auto=format&fit=crop`;
+
+/* Fluid services are preventive: nothing may feel wrong yet. Their pages
+   explain what the fluid does and why it wears out, then list what the
+   service prevents, in place of warning signs. */
+const PREVENTIVE = {
+  oil: {
+    does: {
+      title: "What motor oil does",
+      items: [
+        ["Lubricates", "Puts a thin film between parts moving thousands of times a minute, so metal never grinds on metal."],
+        ["Cools", "Carries heat away from the pistons and bearings, the hottest parts of the engine."],
+        ["Cleans", "Detergents pick up soot and grit and hold them until the filter catches them."],
+        ["Seals and protects", "Helps the piston rings seal and coats parts against rust and acids."],
+      ],
+      wear: "Heat breaks oil down, its additives get used up, and it fills with soot, fuel, and moisture. It keeps looking like oil long after it has stopped protecting like oil, which is why it's changed by miles and months, not by how it looks.",
+    },
+    prevents: [
+      ["Sludge", "Old oil thickens into sludge that clogs the small passages oil has to reach."],
+      ["Early engine wear", "Worn oil lets cams, bearings, and timing chains wear out long before their time."],
+      ["Overheating", "Clean oil carries heat out. Sludgy oil traps it."],
+      ["Burning oil", "Deposits stick the piston rings, and the engine starts using oil."],
+      ["Engine failure", "Running on worn-out oil is the most common way engines are ruined."],
+    ],
+  },
+  trans: {
+    does: {
+      title: "What transmission fluid does",
+      items: [
+        ["Carries the power", "In an automatic, the fluid is what moves power through the torque converter, and its pressure clamps the clutches that change gears."],
+        ["Cools", "It carries heat out of the transmission to a cooler at the radiator. Heat is where most transmission failures start."],
+        ["Lubricates", "It coats every gear, bearing, and bushing so metal never touches metal."],
+        ["Cleans and conditions", "Detergents hold wear particles until the filter catches them, and conditioners keep the rubber seals soft so they don't leak."],
+      ],
+      wear: "Every shift makes heat, and heat breaks the fluid down. Its friction additives get used up, it fills with fine clutch material, and it slowly turns from bright red to brown. Worn fluid shifts harder, runs hotter, and wears parts faster, usually without any warning until something goes wrong.",
+    },
+    prevents: [
+      ["Slipping and harsh shifts", "Fresh fluid gives the clutches the right grip to engage smoothly."],
+      ["Overheating", "New fluid carries heat away. Worn fluid lets temperatures climb and cooks seals and clutches."],
+      ["Stuck valves", "Varnish and debris can stick the valves that control shifting, causing erratic shifts."],
+      ["Leaks", "Conditioners in new fluid keep seals soft and sealing."],
+      ["A transmission replacement", "Fixing or replacing a transmission can cost thousands. A fluid service costs a small fraction of that."],
+    ],
+  },
+  coolant: {
+    does: {
+      title: "What coolant does",
+      items: [
+        ["Carries heat away", "It flows through the engine, picks up heat, and sheds it at the radiator."],
+        ["Raises the boiling point", "Under pressure, coolant stays liquid far hotter than plain water would."],
+        ["Stops rust and corrosion", "Additives coat the metal inside the engine, radiator, and heater core."],
+        ["Protects the water pump", "It lubricates the pump's seal so it doesn't wear and leak."],
+      ],
+      wear: "The anti-rust additives get used up over time. Old coolant turns acidic and starts eating the radiator, heater core, and water pump from the inside, even when the level looks full.",
+    },
+    prevents: [
+      ["Overheating", "A cooling system that's clean and full keeps the engine at the right temperature."],
+      ["Head gasket damage", "Overheating can warp the engine and blow the head gasket, one of the most expensive repairs there is."],
+      ["Radiator and heater core leaks", "Fresh additives stop the corrosion that eats through them."],
+      ["Water pump failure", "A lubricated seal lasts; a dry, corroded one leaks."],
+      ["Clogs and scale", "Old coolant leaves deposits that block the radiator's small tubes."],
+    ],
+  },
+  brakeFluid: {
+    does: {
+      title: "What brake fluid does",
+      items: [
+        ["Carries your foot's force", "Fluid can't be squeezed, so the push on the pedal travels through the lines and clamps the brakes at every wheel."],
+        ["Handles the heat", "Brakes get very hot. Brake fluid has to stay liquid at those temperatures or the pedal goes soft."],
+        ["Protects the metal", "Corrosion inhibitors keep the calipers, lines, and valves from rusting inside."],
+        ["Keeps the ABS working", "Anti-lock brakes use tiny valves that need clean fluid to work."],
+      ],
+      wear: "Brake fluid absorbs water from the air, a little at a time, through hoses and seals. Even a small amount of water lowers its boiling point a lot and starts rusting brake parts from the inside. It happens whether you drive a lot or not, which is why it's changed by time.",
+    },
+    prevents: [
+      ["Soft pedal and brake fade", "Wet fluid can boil under hard braking, and the pedal sinks when you need it most."],
+      ["Rusted calipers and lines", "Moisture corrodes them from the inside."],
+      ["ABS failure", "Corrosion and debris can ruin the ABS unit, a very expensive part."],
+      ["Sticking brakes", "Corroded caliper pistons can stick, wearing pads unevenly and pulling the car."],
+    ],
+  },
+  steering: {
+    does: {
+      title: "What power steering fluid does",
+      items: [
+        ["Does the heavy lifting", "The pump pressurizes the fluid, and that pressure helps turn the wheels so you don't have to muscle it."],
+        ["Lubricates", "Keeps the pump and steering rack moving smoothly."],
+        ["Cools", "Carries heat away from the pump."],
+        ["Conditions the seals", "Keeps the many rubber seals in the system soft."],
+      ],
+      wear: "Heat and pump wear darken the fluid and fill it with tiny particles that act like sandpaper on the seals and the pump.",
+    },
+    prevents: [
+      ["Pump whine and failure", "Clean fluid keeps the pump quiet and healthy."],
+      ["Rack leaks", "A leaking steering rack is a big repair. Soft seals don't leak."],
+      ["Stiff steering", "Fresh fluid keeps the assist smooth, especially when it's cold."],
+      ["Hose and seal leaks", "Conditioned rubber lasts longer."],
+    ],
+  },
+  diff: {
+    does: {
+      title: "What differential fluid does",
+      items: [
+        ["Protects gears under huge pressure", "Gear oil is thick and packed with extreme-pressure additives for gears that press together with tons of force."],
+        ["Cools", "Carries heat away from the gears, especially when towing or hauling."],
+        ["Protects bearings", "Keeps the bearings that hold the gears smooth and quiet."],
+        ["Helps limited-slip units", "Some differentials need special friction additives to work correctly."],
+      ],
+      wear: "Heat breaks gear oil down, fine metal from the gears builds up, and moisture can get in through the vent. It's out of sight, so it's often never changed at all.",
+    },
+    prevents: [
+      ["Gear and bearing wear", "Worn oil leads to a hum or whine that only gets louder."],
+      ["Overheating when towing", "Heavy loads push gear oil to its limit."],
+      ["Seal leaks", "Fresh oil keeps seals in good shape."],
+      ["A gear rebuild", "Rebuilding a differential costs many times more than the oil."],
+    ],
+  },
+  fuel: {
+    does: {
+      title: "What a fuel system cleaning does",
+      items: [
+        ["Cleans the injectors", "Restores a fine, even spray of fuel so it burns completely."],
+        ["Cleans the intake", "Removes carbon from the throttle body and intake."],
+        ["Cleans the combustion chamber", "Breaks down carbon that builds up where fuel burns."],
+        ["Treats the fuel", "Leaves cleaner in the tank to keep working as you drive."],
+      ],
+      wear: "Every tank of gas leaves a little carbon behind. Short trips and stop-and-go driving build it up faster. It happens slowly, so most drivers don't notice the power and mileage they've lost.",
+    },
+    prevents: [
+      ["Hesitation and rough idle", "Clean injectors keep the engine smooth."],
+      ["Lost gas mileage", "Deposits waste fuel you pay for."],
+      ["Failed smog checks", "An engine that burns fuel completely runs cleaner."],
+      ["Hard starts", "Especially on cold mornings."],
+    ],
+  },
+};
+
+/* The page content for a service, with the preventive sections when it has them. */
+export function pageContent(key, name) {
+  const base = SERVICE_CONTENT.find((c) => c.key === key) || serviceContent(name);
+  const extra = PREVENTIVE[base.key];
+  return extra ? { ...base, ...extra, preventive: true } : base;
+}
