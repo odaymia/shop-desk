@@ -1002,7 +1002,7 @@ ${
   </div>
   <div class="legal">
     <span>© ${new Date().getFullYear()} ${esc(p.name)}${p.ardNumber ? ` · BAR ${esc(p.ardNumber)}` : ""}</span>
-    <span>Website by <a href="https://odaymia.github.io/shop-desk/" target="_blank" rel="noopener">Bolt Badger</a></span>
+    <span>${live ? `<a href="/policies/privacy-policy/">Privacy</a> · ` : ""}Website by <a href="https://odaymia.github.io/shop-desk/" target="_blank" rel="noopener">Bolt Badger</a></span>
   </div>
 </div></footer>
 
