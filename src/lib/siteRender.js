@@ -135,6 +135,19 @@ function dealLine(d) {
   return d.services && d.services.length ? `On ${d.services.slice(0, 3).join(", ")}${d.services.length > 3 ? " and more" : ""}` : "On any service";
 }
 
+/* A special as a cut-out coupon */
+function dealCard(d, i) {
+  return `<article class="deal" style="--d:${(i % 3) * 70}ms" data-ends="${esc(d.endsAt)}">
+        <span class="snip">${icon("scissors")}</span>
+        <div class="off">${esc(d.off.toUpperCase())}</div>
+        <h3>${esc(dealLine(d))}</h3>
+        <div class="dealFoot">
+          ${d.code ? `<span class="code">${esc(d.code)}</span>` : "<span></span>"}
+          <span class="fine">${[d.firstTimeOnly ? "First visit only." : "", d.endsAt ? `Ends ${esc(d.endsAt)}.` : "", "One per visit."].filter(Boolean).join(" ")}</span>
+        </div>
+      </article>`;
+}
+
 /* One service's own page: photo header, why it matters, the signs a car
    needs it, what the shop does, and a side card with how often, prices,
    matching specials, and a way to book. */
@@ -145,13 +158,17 @@ function servicePage(p, s, i, { tel, garage }) {
      Brakes page) leads the page */
   const perkRe = { brakes: /brake/i, oil: /\boil\b/i, tires: /tire/i }[content.key];
   const perk = perkRe && (p.highlights || []).find((h) => h && typeof h === "object" && h.sub && perkRe.test(h.title));
-  const names = new Set([...(s.prices || []).map((x) => x.name.toLowerCase()), ...(s.oil ? (p.oilPackages || []).map((x) => x.name.toLowerCase()) : [])]);
-  const deals = (p.deals || []).filter((d) => (d.services || []).some((n) => names.has(String(n).toLowerCase()))).slice(0, 2);
+  const pageId = s.slug || slugify(s.name) || String(i);
+  /* coupons for this service first, then the ones good on any service */
+  const names = new Set([...(s.jobs || []), ...(s.prices || []).map((x) => x.name), ...(s.oil ? (p.oilPackages || []).map((x) => x.name) : [])].map((n) => String(n).toLowerCase()));
+  const forThis = (p.deals || []).filter((d) => (d.services || []).some((n) => names.has(String(n).toLowerCase())));
+  const anyService = (p.deals || []).filter((d) => !(d.services || []).length);
+  const deals = [...forThis, ...anyService];
   const priceRows = s.oil
     ? (p.oilPackages || []).map((k) => `<li><span>${esc(tierName(k.name))}</span><b>${esc(money(k.price))}</b></li>`).join("")
     : (s.prices || []).map((x) => `<li><span>${esc(x.name)}</span><b>${esc(money(x.price))}</b></li>`).join("");
   const others = (p.services || []).filter((o) => o !== s).map((o) => `<a href="#service-${esc(o.slug || slugify(o.name))}">${iconFor(o.oil ? "oil" : o.name)}${esc(o.name)}</a>`).join("");
-  return `<section class="svcPage" id="service-${esc(s.slug || slugify(s.name) || i)}" data-title="${esc(s.name)} · ${esc(p.name)}">
+  return `<section class="svcPage" id="service-${esc(pageId)}" data-title="${esc(s.name)} · ${esc(p.name)}">
   <div class="spHero" style="background-image:url('${esc(photoUrl(photo.id))}')">
     <div class="wrap">
       <a class="back" href="#services">${icon("back", "ic sm")} All services</a><br>
@@ -197,12 +214,22 @@ function servicePage(p, s, i, { tel, garage }) {
     <aside class="spSide">
       ${s.howOften ? `<h4>${icon("clock", "ic sm")} How often</h4><p>${esc(s.howOften)}</p>` : ""}
       ${priceRows ? `<h4>${icon("tag", "ic sm")} Prices</h4><ul>${priceRows}</ul>` : ""}
-      ${deals.map((d) => `<div class="spDeal"><b>${esc(d.off.toUpperCase())}</b>${esc(dealLine(d))}${d.code ? ` · code <strong>${esc(d.code)}</strong>` : ""}</div>`).join("")}
+      ${deals.length ? `<a class="spDeal" href="#service-${esc(pageId)}" data-scroll="coupons-${esc(pageId)}"><b>${deals.length === 1 ? esc(deals[0].off.toUpperCase()) : `${deals.length} coupons`}</b>${deals.length === 1 ? esc(dealLine(deals[0])) : `for ${esc(s.name.toLowerCase())}`} · see below ↓</a>` : ""}
       ${p.booking ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>` : ""}
       ${p.phone ? `<a class="btn outline" href="${tel}">${icon("phone", "ic sm")} Call ${esc(p.phone)}</a>` : ""}
       ${garage ? `<a class="btn outline" href="${esc(garage)}">My Garage</a>` : ""}
     </aside>
   </div>
+  ${
+    deals.length
+      ? `<div class="wrap spCoupons" id="coupons-${esc(pageId)}">
+    <span class="eyebrow">Save</span>
+    <h2>Coupons for ${esc(s.name.toLowerCase())}</h2>
+    <p class="sub">Show this page or mention the code at the counter.</p>
+    <div class="deals">${deals.map((d, k) => dealCard(d, k)).join("")}</div>
+  </div>`
+      : ""
+  }
   <div class="wrap others">
     ${others ? `<h3>Other services</h3><div>${others}</div>` : ""}
     <p class="credit" style="margin-top:28px">Photo: ${esc(photo.by)} / <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></p>
@@ -275,19 +302,7 @@ export function renderSite(p, opts = {}) {
     .join("");
   const jobRows = (p.prices || []).map((j) => `<li><span>${iconFor(j.category || j.name)}<b>${esc(j.name)}</b></span><span class="num">${esc(money(j.price))}</span></li>`).join("");
 
-  const deals = (p.deals || [])
-    .map(
-      (d, i) => `<article class="deal rv" style="--d:${(i % 3) * 70}ms" data-ends="${esc(d.endsAt)}">
-        <span class="snip">${icon("scissors")}</span>
-        <div class="off">${esc(d.off.toUpperCase())}</div>
-        <h3>${esc(dealLine(d))}</h3>
-        <div class="dealFoot">
-          ${d.code ? `<span class="code">${esc(d.code)}</span>` : "<span></span>"}
-          <span class="fine">${[d.firstTimeOnly ? "First visit only." : "", d.endsAt ? `Ends ${esc(d.endsAt)}.` : "", "One per visit."].filter(Boolean).join(" ")}</span>
-        </div>
-      </article>`
-    )
-    .join("");
+  const deals = (p.deals || []).map((d, i) => dealCard(d, i)).join("");
 
   const hours = hoursRows(p.hoursWeek)
     .map((r) => `<tr><td>${esc(r.days)}</td><td class="num">${esc(r.text)}</td></tr>`)
@@ -464,6 +479,11 @@ body:has(.svcPage:target) main{display:none}
 .spSide ul{list-style:none;margin:0 0 20px;padding:0}
 .spSide li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:15px}
 .spSide li b{font:700 20px/1 var(--display);white-space:nowrap}
+.spCoupons{padding-top:8px;padding-bottom:24px}
+.spCoupons h2{font-size:clamp(30px,3.6vw,42px);text-transform:uppercase;margin:0 0 8px;line-height:1}
+.spCoupons .sub{margin-bottom:26px}
+a.spDeal{display:block;text-decoration:none;color:var(--ink)}
+a.spDeal:hover{border-style:solid}
 .spDeal{background:var(--brandSoft);border:1.5px dashed color-mix(in srgb,var(--brand) 50%,#fff);border-radius:12px;padding:12px 14px;margin:0 0 10px;font-size:14px}
 .spDeal b{color:var(--brand);font:800 22px/1 var(--display);display:block;margin-bottom:4px}
 .spSide .btn{width:100%;margin-top:8px}
@@ -474,7 +494,7 @@ body:has(.svcPage:target) main{display:none}
 .others a:hover{border-color:var(--brand);color:var(--brand)}
 .others a .ic{width:20px;height:20px;color:var(--brand)}
 .credit{font-size:12px;color:var(--ink2);margin:0}
-.credit a{color:var(--ink2)}
+.others .credit a{display:inline;background:none;border:0;padding:0;border-radius:0;font-weight:400;color:var(--ink2);text-decoration:underline}
 
 /* quote */
 .dark{background:var(--dark);color:#fff;position:relative;overflow:hidden}
@@ -806,6 +826,7 @@ if(qy&&C.length){
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-svc]");if(!a)return;var f=$("bookForm");if(!f)return;var sel=f.elements.service,v=a.getAttribute("data-svc");for(var i=0;i<sel.options.length;i++)if(sel.options[i].text===v)sel.value=v;
   var y=qy&&qy.value,m=qm&&qm.value,d=qd&&qd.value;if(y&&m&&d&&!f.elements.vehicle.value)f.elements.vehicle.value=y+" "+m+" "+d});
 var rv=document.querySelectorAll(".rv");if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});rv.forEach(function(el){io.observe(el)})}else rv.forEach(function(el){el.classList.add("in")});
+document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-scroll]");if(!a)return;var t=document.getElementById(a.getAttribute("data-scroll"));if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});
 var baseTitle=document.title;function route(){var h=location.hash,el=h&&h.indexOf("#service-")===0?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
 window.addEventListener("hashchange",route);route();
 var form=$("bookForm"),msg=$("formMsg");

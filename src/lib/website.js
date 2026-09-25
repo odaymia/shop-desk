@@ -337,6 +337,14 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
       blurb: serviceBlurb(m.oil ? "oil change" : m.category || m.name, w.serviceBlurbs),
       from: w.showPrices && list.length ? Math.min(...list.map((x) => x.price)) : null,
       prices: w.showPrices && !m.oil ? list : [], // oil packages have their own cards
+      /* every job and package this service covers, published or not, so a
+         coupon that names any of them shows on this service's page */
+      jobs: m.oil
+        ? (cfg.oilPackages || []).map((p) => str(p.name)).filter(Boolean)
+        : Object.values(jobs || {})
+            .filter((j) => j && j.active !== false && !j.deleted && norm(j.category) === norm(m.category))
+            .map((j) => str(j.name))
+            .filter(Boolean),
       /* oil follows the reminder sticker the customer sees on the windshield */
       howOften: intervalText(
         content.key === "oil" && Number(cfg.reminderMiles) > 0
@@ -350,7 +358,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
   const ids = new Set(w.couponIds || []);
   const deals = Object.values(coupons || {})
     .filter((c) => c && ids.has(c.id) && couponLive(c, today || ""))
-    .map((c) => ({ title: str(c.name) || couponText(c), off: couponText(c), code: w.couponCodes ? str(c.code) : "", endsAt: c.endsAt || "", firstTimeOnly: !!c.firstTimeOnly, services: (c.requireAny || []).slice(0, 8) }));
+    .map((c) => ({ title: str(c.name) || couponText(c), off: couponText(c), code: w.couponCodes ? str(c.code) : "", endsAt: c.endsAt || "", firstTimeOnly: !!c.firstTimeOnly, services: (c.requireAny || []).map(str).filter(Boolean) }));
 
   return {
     v: 1,

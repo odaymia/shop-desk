@@ -188,3 +188,21 @@ test("fluid services explain the fluid and what the service prevents, not warnin
   const old = renderSite({ ...p, services: p.services.map(({ slug, ...s }) => s) }, {});
   assert.ok(old.includes('id="service-transmission"'));
 });
+
+test("a service page lists the coupons for its jobs, published or not, then any-service ones", () => {
+  const jobs = {
+    j1: { id: "j1", name: "Transmission fluid exchange", category: "Transmission services", active: true }, // not ticked for the portal
+  };
+  const cps = {
+    fluid: { id: "fluid", code: "FLUID10", name: "$10 OFF ANY FLUID EXCHANGE SERVICE", kind: "amount", value: 10, active: true, requireAny: ["Transmission fluid exchange", "Brake fluid flush"] },
+    oil: { id: "oil", code: "OIL5", name: "$5 off oil", kind: "amount", value: 5, active: true, requireAny: ["Conventional Oil Change"] },
+    any: { id: "any", code: "ANY20", name: "$20 OFF ANY SERVICE", kind: "amount", value: 20, active: true },
+  };
+  const c = { ...cfg, serviceMenu: [{ id: "t", name: "Transmission", category: "Transmission services" }], website: { ...cfg.website, couponIds: ["fluid", "oil", "any"] } };
+  const html = renderSite(sitePayload({ cfg: c, jobs, parts: {}, coupons: cps, orders: {}, specs: {}, today: "2026-09-25" }), {});
+  const page = html.slice(html.indexOf('id="service-transmission"'));
+  const section = page.slice(page.indexOf('id="coupons-transmission"'), page.indexOf("Other services") > 0 ? page.indexOf("Other services") : undefined);
+  assert.ok(section.includes("FLUID10") && section.includes("ANY20"));
+  assert.ok(!section.includes("OIL5"));
+  assert.ok(section.indexOf("FLUID10") < section.indexOf("ANY20"));
+});
