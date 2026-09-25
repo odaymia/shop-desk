@@ -23,6 +23,8 @@ import { STATUS, canTransition, snapshotRules, stockMoves, round2 } from "../lib
 import { STARTER_JOBS } from "../lib/starterJobs.js";
 import { specKey } from "../lib/specs.js";
 import { portalPayload, shopPublicPayload } from "../lib/portal.js";
+import { sitePayload } from "../lib/website.js";
+import defaultLogo from "../assets/genie-logo.png";
 import { cloud, sGet, sGetAll, sSet } from "../storage/index.js";
 
 /* Front desk data: customers, vehicles, parts, vendors, canned jobs, and
@@ -224,12 +226,45 @@ export function useShop(cfg) {
   const saveVehiclesBulk = useCallback((list) => putMany("vehicles", vehicleKey, list), [putMany]);
   const saveOrdersBulk = useCallback((list) => putMany("orders", orderKey, list), [putMany]);
   const saveVendor = useCallback((v) => put("vendors", vendorKey, v), [put]);
+  /* the public website (Settings → Website): built from the same records,
+     republished quietly when something it shows changes */
+  const buildSite = useCallback(
+    (c = cfg) => {
+      const d = ref.current;
+      const logo = c.logo || new URL(defaultLogo, window.location.href).href;
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      return sitePayload({ cfg: { ...c, logo }, jobs: d.jobs, parts: d.parts, coupons: d.coupons, orders: d.orders, specs: d.specs, today });
+    },
+    [cfg]
+  );
+  const publishSite = useCallback(
+    async (c = cfg) => {
+      const w = c.website || {};
+      if (!w.slug) throw new Error("Pick a web address first.");
+      await cloud.publishSite(w.slug, !!w.enabled, buildSite(c));
+    },
+    [cfg, buildSite]
+  );
+  const refreshSite = useCallback(() => {
+    const w = cfg.website || {};
+    if (w.enabled && w.slug) publishSite().catch((e) => console.error("website publish failed", e));
+  }, [cfg, publishSite]);
+
   const saveJob = useCallback(async (j) => {
+    const prev = j.id && ref.current.jobs[j.id];
     const saved = await put("jobs", jobKey, j);
-    if (saved.portal || (j.id && ref.current.jobs[j.id] && ref.current.jobs[j.id].portal !== saved.portal)) publishShop();
+    if (saved.portal || (prev && prev.portal !== saved.portal)) {
+      publishShop();
+      setTimeout(refreshSite, 0);
+    }
     return saved;
-  }, [put, publishShop]);
-  const saveCoupon = useCallback((c) => put("coupons", couponKey, c), [put]);
+  }, [put, publishShop, refreshSite]);
+  const saveCoupon = useCallback(async (c) => {
+    const saved = await put("coupons", couponKey, c);
+    if (((cfg.website || {}).couponIds || []).includes(saved.id)) setTimeout(refreshSite, 0);
+    return saved;
+  }, [put, cfg, refreshSite]);
   const saveOrder = useCallback((o) => put("orders", orderKey, o), [put]);
   /* one spec per year/make/model/engine; the key is the id so a re-save replaces */
   const saveSpec = useCallback((sp) => put("specs", specStoreKey, { ...sp, id: specKey(sp).replace(/[^A-Za-z0-9|.-]/g, "_") }), [put]);
@@ -366,6 +401,8 @@ export function useShop(cfg) {
     setStatus,
     publishShop,
     publishAll,
+    buildSite,
+    publishSite,
   };
 }
 

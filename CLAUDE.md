@@ -29,6 +29,11 @@ src/desk/ChecklistModal.jsx  the keyboard-driven service checklist and its card 
 src/desk/desk.css          desk stylesheet, including print rules
 src/lib/invoice.js         ticket math: lines, tax, supplies, payments — no UI
 src/lib/checklist.js       service checklist: defaults, auto-Replaced from ticket lines, cycling — no UI
+src/lib/website.js         the shop's public website: content payload, hours, quote — no UI
+src/lib/siteRender.js      renders that payload to one self-contained HTML page (pure)
+src/site/main.js           /site/?s=<address>: fetches the published payload, writes the page
+src/desk/WebsiteSettings.jsx  Settings → Website: fields, live preview, appointment requests
+supabase/website.sql       shop_site (public read when published) + site_requests
 src/lib/vin.js             VIN decode via NHTSA vPIC
 src/lib/config.js          DEFAULT_CFG
 src/lib/keys.js            storage key layout
@@ -96,6 +101,24 @@ paid, blue for estimates, red for problems. Built for a monitor and mouse,
 so denser than the kiosk, but still readable from arm's length. Tabular
 numerals for anything numeric. Plain language: "ticket," "lunch," not
 "repair order line item," "meal period."
+
+## Shop website
+
+Every shop gets a public site at `site/?s=<web address>`, turned on under
+Settings → Website and republished on every settings save. It is built
+from the desk's own records (`sitePayload` in `src/lib/website.js`), so
+prices and hours never drift from the counter. Rules:
+
+- Only public information goes in the payload: no customers, costs,
+  labor rate, API keys. Coupons appear only when ticked on the Website
+  page — manager codes like FREE stay private by default.
+- The oil change quote must match what a ticket charges
+  (`packagePrice` ↔ `oilPackageLines`: extra oil by the tenth of a quart).
+- The page is one self-contained HTML document (`renderSite`) so it can be
+  downloaded and hosted on the shop's own domain, and so Google reads the
+  content. Its small inline script repeats `openStatus`, `packagePrice`
+  and `packagesFor`; change them together.
+- Everything the shop types is escaped; links must be http(s).
 
 ## Known gaps
 

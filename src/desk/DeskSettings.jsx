@@ -18,6 +18,8 @@ import { connectStatus, connectLink, listReaders, registerReader, platformFeeCfg
 import { serviceRows, serviceFileText, serviceFileName, loyaltyRows, loyaltyFileText, loyaltyFileName } from "../lib/carfaxExport.js";
 import { fmtMoney } from "../lib/invoice.js";
 import { DEMO } from "../lib/demo.js";
+import { WebsiteSettings } from "./WebsiteSettings.jsx";
+import { normalizeWebsite } from "../lib/website.js";
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -57,6 +59,7 @@ function normalizeByCat(map) {
 const SETTINGS_SECTIONS = [
   ["company", "Company info"],
   ["customers", "Customers"],
+  ["website", "Website"],
   ["pricing", "Pricing & parts"],
   ["menus", "Service menu"],
   ["builder", "Symptom & fix lists"],
@@ -118,7 +121,7 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
     </select>
   );
   const save = async () => {
-    await saveCfg({
+    const next = {
       ...d,
       laborRate: toNum(d.laborRate),
       taxRate: toNum(d.taxRate),
@@ -141,7 +144,19 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
       commission: { ...(d.commission || {}), split: { advisor: toNum(split.advisor), top: toNum(split.top), pit: toNum(split.pit) } },
       reminderMonths: Math.max(0, Math.floor(toNum(d.reminderMonths)) || 3),
       reminderMiles: Math.max(0, Math.floor(toNum(d.reminderMiles)) || 3000),
-    });
+      website: normalizeWebsite(d.website, d.shopName),
+    };
+    await saveCfg(next);
+    /* a live website follows the settings; switching it off unpublishes it */
+    const was = (cfg.website || {}).enabled;
+    if (shop && next.website.slug && (next.website.enabled || was)) {
+      try {
+        await shop.publishSite(next);
+        return flash(next.website.enabled ? "Settings saved · website published" : "Settings saved · website taken down");
+      } catch (e) {
+        return flash(`Settings saved, but the website didn't publish: ${e.message}`, "out");
+      }
+    }
     flash("Settings saved");
   };
   return (
@@ -773,6 +788,8 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           )}
 
           {show("payments") && <PaymentsPanel d={d} set={set} shop={shop} />}
+
+          {show("website") && <WebsiteSettings d={d} set={set} shop={shop} flash={flash} />}
 
           {section !== "data" && (
             <button className="btn primary lg" onClick={save} style={{ marginTop: 18 }}>

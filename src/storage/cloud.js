@@ -193,6 +193,7 @@ async function push(item) {
   } else if (item.kind === "shopPublic") {
     const { error } = await supabase.from("shop_public").upsert({ shop_id, data: item.data });
     if (error) throw error;
+
   } else if (item.kind === "media") {
     const bucket = supabase.storage.from("media");
     const path = mediaPath(shop_id, item.key);
@@ -499,6 +500,47 @@ async function publishShop(data) {
   if (!state.linked) return;
   return enqueue({ kind: "shopPublic", data });
 }
+/* The shop's public website (supabase/website.sql). Sent straight away,
+   not queued, so the Publish button can say whether it worked (a taken web
+   address, or the website tables not set up yet). */
+async function publishSite(slug, published, data) {
+  if (!state.linked) throw new Error("Sign this computer in to your shop (Settings → Data) to publish.");
+  const { error } = await supabase.from("shop_site").upsert({ shop_id: state.shopId, slug, published, data });
+  if (error) {
+    if (/duplicate|unique/i.test(error.message)) throw new Error(`The web address "${slug}" is taken. Pick another.`);
+    if (/relation .* does not exist|schema cache/i.test(error.message)) throw new Error("The website tables aren't set up yet. Run supabase/website.sql in Supabase once.");
+    throw error;
+  }
+}
+/* What the booking form needs to post a request to this shop. */
+function siteApi() {
+  return state.linked && SUPABASE_URL && SUPABASE_ANON_KEY ? { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, shopId: state.shopId } : null;
+}
+/* Is a web address free? The owner's own row counts as free. */
+async function siteSlugTaken(slug) {
+  if (!state.linked) return false;
+  const { data, error } = await supabase.from("shop_site").select("shop_id").eq("slug", slug).maybeSingle();
+  if (error) throw error;
+  return !!data && data.shop_id !== state.shopId;
+}
+/* Appointment requests sent from the website. Read live; handled by staff. */
+async function listSiteRequests() {
+  if (!state.linked) return [];
+  const { data, error } = await supabase
+    .from("site_requests")
+    .select("id, name, phone, email, vehicle, service, preferred_day, note, created_at")
+    .eq("shop_id", state.shopId)
+    .is("handled_at", null)
+    .order("created_at");
+  if (error) throw error;
+  return data || [];
+}
+async function handleSiteRequest(id) {
+  if (!state.linked) return;
+  const { error } = await supabase.from("site_requests").update({ handled_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
+
 /* Customer requests from the portal. Read live; handled by staff. */
 async function listPortalRequests() {
   if (!state.linked) return [];
@@ -557,6 +599,11 @@ export const cloud = {
   publishShop,
   listPortalRequests,
   handlePortalRequest,
+  publishSite,
+  siteApi,
+  siteSlugTaken,
+  listSiteRequests,
+  handleSiteRequest,
   /* Call a Supabase Edge Function as the signed-in shop user. Used for
      distributor lookups (tire search/order) that must run server-side so
      the wholesale credentials never reach the browser. */
