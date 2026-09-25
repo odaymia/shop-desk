@@ -206,3 +206,20 @@ test("a service page lists the coupons for its jobs, published or not, then any-
   assert.ok(!section.includes("OIL5"));
   assert.ok(section.indexOf("FLUID10") < section.indexOf("ANY20"));
 });
+
+test("ad landing pages: any live coupon given a page, advertised or not, code always shown", () => {
+  const cps = {
+    fb: { id: "fb", code: "FB20", name: "$20 OFF ANY OIL CHANGE", kind: "amount", value: 20, active: true, endsAt: "2026-10-31", requireAny: ["Conventional Oil Change"] },
+    gone: { id: "gone", code: "OLD5", name: "$5 off", kind: "amount", value: 5, active: true, endsAt: "2026-01-01" },
+  };
+  const c = { ...cfg, website: { ...cfg.website, couponIds: [], couponCodes: false, offers: { fb: { headline: "New here? $20 off your first oil change", blurb: "" }, gone: {} } } };
+  const p = sitePayload({ cfg: c, jobs: {}, parts: {}, coupons: cps, orders: {}, specs: {}, today: "2026-09-25" });
+  assert.deepEqual(p.deals, []); // not one of the advertised specials
+  assert.deepEqual(p.offers.map((o) => [o.slug, o.code]), [["fb20", "FB20"]]); // expired one dropped
+  const html = renderSite(p, {});
+  const page = html.slice(html.indexOf('id="offer-fb20"'));
+  assert.ok(page.includes("New here? $20 off your first oil change"));
+  assert.ok(page.includes(">FB20<")); // the code shows even with codes off on the main site
+  assert.ok(page.includes('name="offer" value="FB20"')); // requests come in tagged
+  assert.ok(page.includes('href="#service-oil-change"')); // "Good on" links to the service page
+});

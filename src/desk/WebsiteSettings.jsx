@@ -3,6 +3,9 @@ import { Field, Text, fmtDate } from "./ui.jsx";
 import { cloud } from "../storage/index.js";
 import { DEFAULT_WEBSITE, FALLBACK_HIGHLIGHTS, DEFAULT_FAQ, DAY_NAMES, parseHoursText, normalizeHoursWeek, hoursText, slugify, couponText } from "../lib/website.js";
 import { renderSite } from "../lib/siteRender.js";
+import { offerSlug } from "../lib/website.js";
+import { QR } from "./QR.jsx";
+import qrcode from "qrcode-generator";
 
 /* Settings → Website. The shop's public site is built from what's already
    in the desk (name, phone, address, service menu, oil packages, published
@@ -13,6 +16,9 @@ import { renderSite } from "../lib/siteRender.js";
 
 const siteUrl = (slug) => new URL(`site/?s=${encodeURIComponent(slug)}`, window.location.href).toString();
 const portalUrl = () => new URL("portal/", window.location.href).toString();
+/* A coupon's ad landing page: the ?offer= form survives ad platforms that
+   strip or mangle #fragments */
+const offerUrl = (slug, c) => `${siteUrl(slug)}&offer=${encodeURIComponent(offerSlug(c))}`;
 
 /* Shrink a shop photo to something that fits in the settings record. */
 function readPhoto(file) {
@@ -33,9 +39,9 @@ function readPhoto(file) {
   });
 }
 
-function download(name, text) {
+function download(name, text, type = "text/html") {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "text/html" }));
+  a.href = URL.createObjectURL(new Blob([text], { type }));
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -279,6 +285,89 @@ export function WebsiteSettings({ d, set, shop, flash }) {
         <input type="checkbox" checked={!!w.couponCodes} onChange={(e) => setW({ couponCodes: e.target.checked })} />
         <span>Print the coupon code on the site</span>
       </label>
+
+      <h3 className="subhead" style={{ marginTop: 28 }}>
+        Ad landing pages
+      </h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Give a coupon its own page to send people to from an ad, a flyer, or a text blast: the coupon front and center,
+        why to choose you, and a short form to claim it. Requests come in tagged with the code, so you can tell which ad
+        worked. A coupon doesn't have to be one of the specials above to get a page. Save settings to publish.
+      </p>
+      <div style={{ maxHeight: 240, overflow: "auto", border: "1px solid var(--line)", borderRadius: 8, padding: "4px 10px" }}>
+        {coupons.length === 0 && <p className="legalNote">No coupons yet. Make one under Coupons, then give it a page here.</p>}
+        {coupons.map((c) => (
+          <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "6px 0" }}>
+            <input
+              type="checkbox"
+              checked={!!(w.offers || {})[c.id]}
+              onChange={(e) => {
+                const next = { ...(w.offers || {}) };
+                if (e.target.checked) next[c.id] = { headline: "", blurb: "" };
+                else delete next[c.id];
+                setW({ offers: next });
+              }}
+            />
+            <span>
+              <b>{c.code}</b> — {c.name || couponText(c)}
+              {c.endsAt ? ` (ends ${c.endsAt})` : ""}
+            </span>
+          </label>
+        ))}
+      </div>
+      {coupons
+        .filter((c) => (w.offers || {})[c.id])
+        .map((c) => {
+          const o = w.offers[c.id];
+          const url = offerUrl(slug, c);
+          const setO = (patch) => setW({ offers: { ...w.offers, [c.id]: { ...o, ...patch } } });
+          return (
+            <div key={c.id} className="card" style={{ padding: 14, marginTop: 12, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <QR value={url} size={132} />
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <b>
+                  {c.code} — {c.name || couponText(c)}
+                </b>
+                <div style={{ fontSize: 13, wordBreak: "break-all", margin: "4px 0 8px", color: "var(--muted)" }}>{url}</div>
+                <div className="rowBtns" style={{ marginBottom: 8 }}>
+                  <button
+                    className="btn tiny"
+                    onClick={() =>
+                      navigator.clipboard.writeText(url).then(
+                        () => flash("Link copied"),
+                        () => flash("Couldn't copy. Select the link and copy it.", "out")
+                      )
+                    }
+                  >
+                    Copy link
+                  </button>
+                  <a className="btn tiny" href={url} target="_blank" rel="noreferrer">
+                    Open ↗
+                  </a>
+                  <button
+                    className="btn tiny"
+                    title="A sharp QR code for flyers, receipts, and signs — it scales to any size"
+                    onClick={() => {
+                      const qr = qrcode(0, "M");
+                      qr.addData(url);
+                      qr.make();
+                      download(`${offerSlug(c)}-qr.svg`, qr.createSvgTag({ scalable: true, margin: 2 }), "image/svg+xml");
+                    }}
+                  >
+                    Download QR
+                  </button>
+                </div>
+                <Field label="Headline (blank uses the coupon: $20 OFF ANY OIL CHANGE)">
+                  <Text value={o.headline} onChange={(v) => setO({ headline: v })} placeholder="New here? Your first oil change is $20 off" />
+                </Field>
+                <Field label="Line under it (blank says where to bring it)">
+                  <Text value={o.blurb} onChange={(v) => setO({ blurb: v })} placeholder="Show this coupon at the counter. No appointment needed." />
+                </Field>
+                {!c.endsAt && <p className="legalNote" style={{ margin: "4px 0 0" }}>Tip: give the coupon an end date under Coupons. The page shows a countdown, and it comes down by itself when it ends.</p>}
+              </div>
+            </div>
+          );
+        })}
 
       <h3 className="subhead" style={{ marginTop: 28 }}>
         Questions and answers

@@ -35,6 +35,7 @@ export const DEFAULT_WEBSITE = {
   hiddenPackages: [], // oil package ids left off the site (e.g. customer-supplied oil)
   couponIds: [], // coupons the owner chose to advertise; none by default
   couponCodes: true, // print the code on the advertised coupon
+  offers: {}, // { couponId: { headline, blurb } } — coupons with their own ad landing page (#offer-<code>)
   serviceBlurbs: {}, // { "Brakes": "custom text" } overrides
   faq: [], // [{ q, a }]; blank uses defaults
   links: { google: "", yelp: "", facebook: "", instagram: "" },
@@ -300,6 +301,9 @@ export function couponText(c) {
   return c.kind === "percent" ? `${v}% off` : `$${v % 1 ? v.toFixed(2) : v} off`;
 }
 
+/* A coupon's landing page address: #offer-fb20 */
+export const offerSlug = (c) => slugify(c.code) || slugify(c.name) || String(c.id || "offer");
+
 /* ---------- the payload ---------- */
 
 /* Everything the public page shows. `today` is "YYYY-MM-DD" so expired
@@ -360,6 +364,24 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     .filter((c) => c && ids.has(c.id) && couponLive(c, today || ""))
     .map((c) => ({ title: str(c.name) || couponText(c), off: couponText(c), code: w.couponCodes ? str(c.code) : "", endsAt: c.endsAt || "", firstTimeOnly: !!c.firstTimeOnly, services: (c.requireAny || []).map(str).filter(Boolean) }));
 
+  /* ad landing pages: any live coupon the owner gave a page, advertised on
+     the main site or not; the code always shows, since that's the point */
+  const offers = Object.entries(w.offers || {})
+    .map(([id, o]) => [coupons && coupons[id], o || {}])
+    .filter(([c]) => c && couponLive(c, today || ""))
+    .map(([c, o]) => ({
+      slug: offerSlug(c),
+      title: str(c.name) || couponText(c),
+      off: couponText(c),
+      code: str(c.code),
+      endsAt: c.endsAt || "",
+      firstTimeOnly: !!c.firstTimeOnly,
+      minSubtotal: Number(c.minSubtotal) || 0,
+      services: (c.requireAny || []).map(str).filter(Boolean),
+      headline: str(o.headline),
+      blurb: str(o.blurb),
+    }));
+
   return {
     v: 1,
     name: str(cfg.shopName),
@@ -382,6 +404,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     oilPackages: w.showPrices ? pkgs.map((p) => ({ name: str(p.name), price: round2(p.price), quarts: Number(p.quarts) || 5, extraQuart: round2(p.extraQuart || 0), details: str(p.details), kind: packageKind(p) })) : [],
     prices: priced.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
     deals,
+    offers,
     stats: w.showStats ? sinceBefore(siteStats(orders), today) : null,
     vehicles: w.quoteTool && w.showPrices && pkgs.length ? quoteVehicles(specs) : [],
     booking: !!w.booking,
@@ -423,6 +446,7 @@ export function normalizeWebsite(w, shopName) {
     hoursWeek: x.hoursWeek ? normalizeHoursWeek(x.hoursWeek) : null,
     couponIds: [...new Set(x.couponIds || [])],
     hiddenPackages: [...new Set(x.hiddenPackages || [])],
+    offers: Object.fromEntries(Object.entries(x.offers || {}).map(([id, o]) => [id, { headline: str(o && o.headline), blurb: str(o && o.blurb) }])),
     faq: (x.faq || []).map((f) => ({ q: str(f && f.q), a: str(f && f.a) })).filter((f) => f.q && f.a),
     links: Object.fromEntries(Object.entries({ ...DEFAULT_WEBSITE.links, ...(x.links || {}) }).map(([k, v]) => [k, /^https?:\/\//i.test(str(v)) ? str(v) : str(v) ? "https://" + str(v) : ""])),
   };

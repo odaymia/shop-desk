@@ -124,6 +124,9 @@ prices and hours never drift from the counter. Rules:
   in `src/lib/serviceContent.js`; "how often" comes from the shop's Service
   Review intervals (oil: the reminder-sticker miles/months). Photos are
   Unsplash-licensed, hot-linked, and credited on the page.
+- Any coupon can get an ad landing page (`website.offers`, `#offer-<code>` or
+  `?offer=<code>`), advertised on the main site or not. Its claim form
+  tags the request note with the code so the shop can see which ad worked.
 
 ## Known gaps
 

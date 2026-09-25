@@ -148,6 +148,77 @@ function dealCard(d, i) {
       </article>`;
 }
 
+/* An ad landing page for one coupon: the offer up top, why drivers choose
+   the shop, a short form to claim it (the request carries the code), and
+   how to find the shop. Reached by #offer-<code> or ?offer=<code>. */
+function offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ }) {
+  const off = o.off.toUpperCase();
+  const headline = o.headline || `${off} ${dealLine(o)}`;
+  const lead = o.blurb || `Show this coupon at ${p.name}${fullAddress ? `, ${fullAddress}` : ""}. ${o.firstTimeOnly ? "For first-time customers." : "Walk in or book a time below."}`;
+  const fine = [o.firstTimeOnly ? "First visit only." : "", o.minSubtotal ? `On services of ${money(o.minSubtotal)} or more.` : "", o.endsAt ? `Expires ${o.endsAt}.` : "", "One coupon per visit. Can't be combined with other offers."].filter(Boolean).join(" ");
+  const want = new Set((o.services || []).map((n) => n.toLowerCase()));
+  const covered = (p.services || []).filter((s) => [...(s.jobs || []), ...(s.prices || []).map((x) => x.name), ...(s.oil ? (p.oilPackages || []).map((x) => x.name) : [])].some((n) => want.has(String(n).toLowerCase())));
+  return `<section class="offerPage" id="offer-${esc(o.slug)}" data-title="${esc(off)} · ${esc(p.name)}">
+  <div class="hero ofHero">
+    <div class="wrap">
+      <div>
+        <span class="status" data-status><i></i><span>${esc(p.name)}</span></span>
+        <span class="eyebrow ofEyebrow">${o.firstTimeOnly ? "New customer offer" : "Limited-time offer"}</span>
+        <h1>${esc(headline)}</h1>
+        <p class="lead">${esc(lead)}</p>
+        <div class="ctas">
+          <a class="btn primary" href="#offer-${esc(o.slug)}" data-scroll="claim-${esc(o.slug)}">Claim this offer</a>
+          ${p.phone ? `<a class="btn light" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
+          ${fullAddress ? `<a class="btn ghost" href="${dirUrl}" target="_blank" rel="noopener">Directions</a>` : ""}
+        </div>
+      </div>
+      <div class="ofCoupon" data-ends="${esc(o.endsAt)}">
+        <span class="snip">${icon("scissors")}</span>
+        <p class="ofShop">${esc(p.name)}</p>
+        <div class="ofOff">${esc(off)}</div>
+        <p class="ofLine">${esc(dealLine(o))}</p>
+        ${o.code ? `<div class="ofCode"><span>Code</span><b>${esc(o.code)}</b></div>` : ""}
+        ${o.endsAt ? `<p class="ofEnds" data-countdown="${esc(o.endsAt)}">Ends ${esc(o.endsAt)}</p>` : ""}
+        <p class="ofShow">${icon("phone", "ic sm")} Show this screen at the counter</p>
+        <p class="fine">${esc(fine)}</p>
+      </div>
+    </div>
+  </div>
+  ${highlightsHtml}
+  <div class="wrap ofBody" id="claim-${esc(o.slug)}">
+    <div>
+      <span class="eyebrow">Claim it</span>
+      <h2>Save your spot</h2>
+      <p class="sub">Leave your name and number and we'll call or text to set a time. Walk-ins welcome too.</p>
+      <form class="book ofForm" novalidate>
+        <label>Your name<input name="name" autocomplete="name" required maxlength="80"></label>
+        <label>Phone<input name="phone" type="tel" autocomplete="tel" maxlength="20"></label>
+        <label>Vehicle<input name="vehicle" placeholder="2018 Honda Civic" maxlength="80"></label>
+        <label>Preferred day<input name="day" type="date"></label>
+        <input type="hidden" name="service" value="${esc(dealLine(o).slice(0, 80))}">
+        <input type="hidden" name="offer" value="${esc(o.code || o.title)}">
+        <label class="hp" aria-hidden="true">Leave blank<input name="website" tabindex="-1" autocomplete="off"></label>
+        <p class="formMsg" role="status"></p>
+        <div class="full"><button class="btn primary" type="submit">Claim my ${esc(o.off)} ${icon("arrow", "ic sm")}</button></div>
+      </form>
+    </div>
+    <div class="visitCard ofVisit">
+      ${p.phone ? `<a class="row tel" href="${tel}">${esc(p.phone)}</a>` : ""}
+      ${fullAddress ? `<a class="row" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} ${esc(fullAddress)}</a>` : ""}
+      <div class="row">${icon("clock", "ic sm")} Hours</div>
+      <table class="hoursT">${hours}</table>
+      ${fullAddress ? `<iframe class="ofMap" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${mapQ}&output=embed"></iframe>` : ""}
+    </div>
+  </div>
+  ${
+    covered.length
+      ? `<div class="wrap others"><h3>Good on</h3><div>${covered.map((s) => `<a href="#service-${esc(s.slug || slugify(s.name))}">${iconFor(s.oil ? "oil" : s.name)}${esc(s.name)}</a>`).join("")}</div></div>`
+      : ""
+  }
+  <div class="wrap" style="padding-bottom:64px"><a class="btn outline" href="#top">See everything we do ${icon("arrow", "ic sm")}</a></div>
+</section>`;
+}
+
 /* One service's own page: photo header, why it matters, the signs a car
    needs it, what the shop does, and a side card with how often, prices,
    matching specials, and a way to book. */
@@ -287,6 +358,12 @@ export function renderSite(p, opts = {}) {
     )
     .join("");
   const servicePages = (p.services || []).map((s, i) => servicePage(p, s, i, { tel, garage: opts.portalUrl })).join("");
+  const highlightsHtml = (p.highlights || []).length
+    ? `<div class="strip"><ul>${p.highlights
+        .map((h) => (typeof h === "string" ? { title: h, sub: "" } : h))
+        .map((h) => `<li><span class="hlIc">${icon(iconForHighlight(h.title + " " + h.sub))}</span><div><b>${esc(h.title)}</b>${h.sub ? `<span>${esc(h.sub)}</span>` : ""}</div></li>`)
+        .join("")}</ul></div>`
+    : "";
 
   const tiers = (p.oilPackages || [])
     .map(
@@ -402,6 +479,31 @@ header nav a:hover{color:#fff;background:rgba(255,255,255,.07)}
 .stats div{background:var(--paper);border-radius:14px;padding:14px 6px 12px}
 .stats b{display:block;font:800 32px/1 var(--display);color:var(--brand);font-variant-numeric:tabular-nums}
 .stats span{display:block;margin-top:6px;font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em}
+
+/* ad landing pages (#offer-…) */
+section.offerPage{display:none;padding:0}
+section.offerPage:target{display:block}
+body:has(.offerPage:target) main{display:none}
+.ofHero .wrap{grid-template-columns:1.1fr .9fr}
+.ofEyebrow{display:flex;margin-top:22px;color:color-mix(in srgb,var(--brand) 40%,#fff)}
+.ofHero h1{margin-top:6px}
+.ofCoupon{position:relative;background:#fff;color:var(--ink);border:3px dashed var(--brand);border-radius:24px;padding:34px 30px 26px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.45);transform:rotate(-1.5deg)}
+.ofCoupon .snip{top:-16px;left:30px;background:#fff;border-radius:6px}
+.ofShop{margin:0 0 6px;font:700 15px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+.ofOff{font:800 clamp(64px,8vw,104px)/.9 var(--display);color:var(--brand);letter-spacing:-.01em}
+.ofLine{font:700 22px/1.15 var(--display);text-transform:uppercase;margin:10px 0 18px}
+.ofCode{display:inline-flex;align-items:center;gap:12px;background:var(--dark);color:#fff;border-radius:12px;padding:10px 18px;margin-bottom:14px}
+.ofCode span{font-size:12px;text-transform:uppercase;letter-spacing:.12em;opacity:.7}
+.ofCode b{font:700 26px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em}
+.ofEnds{margin:0 0 10px;font-weight:800;color:#b42318}
+.ofShow{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 12px;font-weight:600;color:var(--ink2)}
+.ofCoupon .fine{display:block;border-top:1px dashed var(--line);padding-top:12px;margin:0}
+.ofBody{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:start;padding-top:88px;padding-bottom:40px}
+.ofBody h2{font-size:clamp(34px,4.4vw,52px);text-transform:uppercase;margin:0 0 10px;line-height:1}
+.ofBody .sub{color:var(--ink2);font-size:17px;margin:0 0 22px}
+form.ofForm{border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+.ofVisit{margin:0;width:100%;border:1px solid var(--line)}
+.ofMap{width:100%;height:220px;border:0;border-radius:14px;margin-top:6px;background:#e9e7e1}
 
 /* selling points */
 .strip{position:relative;z-index:2;margin-top:-72px}
@@ -619,6 +721,9 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   .hero .wrap{padding:56px 20px 64px;gap:36px}
   .strip{margin-top:-36px}
   .spBody{grid-template-columns:1fr;padding-top:36px;gap:32px}
+  .ofHero .wrap,.ofBody{grid-template-columns:1fr}
+  .ofCoupon{transform:none}
+  .ofBody{padding-top:56px}
   .spSide{position:static}
   .benefits,.signs,.does{grid-template-columns:1fr}
   .spHero{min-height:420px}
@@ -653,7 +758,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   ${hero ? `<div class="bg" style="background-image:url('${esc(hero)}')"></div>` : ""}
   <div class="wrap">
     <div>
-      <span class="status" id="status"><i></i><span>${esc(p.name)}</span></span>
+      <span class="status" id="status" data-status><i></i><span>${esc(p.name)}</span></span>
       <h1>${esc(tagline)}</h1>
       ${fullAddress ? `<p class="lead">${icon("pin", "ic sm")} ${esc(fullAddress)}</p>` : ""}
       <div class="ctas">
@@ -666,10 +771,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   </div>
 </div>
 
-${(p.highlights || []).length ? `<div class="strip"><ul>${p.highlights
-  .map((h) => (typeof h === "string" ? { title: h, sub: "" } : h))
-  .map((h, i) => `<li class="rv" style="--d:${i * 80}ms"><span class="hlIc">${icon(iconForHighlight(h.title + " " + h.sub))}</span><div><b>${esc(h.title)}</b>${h.sub ? `<span>${esc(h.sub)}</span>` : ""}</div></li>`)
-  .join("")}</ul></div>` : ""}
+${highlightsHtml}
 
 <section id="services"><div class="wrap">
   <span class="eyebrow">Services</span>
@@ -755,7 +857,7 @@ ${p.booking ? `<section id="book" class="alt"><div class="wrap">
       ${fullAddress ? `<a class="row" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} ${esc(fullAddress)}</a>` : ""}
       ${p.email ? `<a class="row" href="mailto:${esc(p.email)}">${icon("mail", "ic sm")} ${esc(p.email)}</a>` : ""}
       <div class="row">${icon("clock", "ic sm")} Hours</div>
-      <table id="hours">${hours}</table>
+      <table id="hours" class="hoursT">${hours}</table>
       ${fullAddress ? `<a class="btn primary sm" href="${dirUrl}" target="_blank" rel="noopener">Get directions</a>` : ""}
       ${links.length ? `<div class="social">${links.map(([k, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(linkLabel[k] || k)}</a>`).join("")}</div>` : ""}
     </div>
@@ -766,6 +868,7 @@ ${opts.portalUrl ? `<div class="portal"><div class="wrap"><p><b>Already a custom
 </main>
 
 ${servicePages}
+${(p.offers || []).map((o) => offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ })).join("")}
 
 <footer><div class="wrap">
   <div class="cols">
@@ -800,10 +903,11 @@ function mins(t){var a=t.split(":");return a[0]*60+ +a[1]}
 function nowAt(){try{var f=new Intl.DateTimeFormat("en-US",{timeZone:S.tz,weekday:"short",hour:"numeric",minute:"numeric",hourCycle:"h23"}).formatToParts(new Date()),o={};f.forEach(function(p){o[p.type]=p.value});return{day:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(o.weekday),minutes:(+o.hour%24)*60+ +o.minute}}catch(e){var d=new Date();return{day:d.getDay(),minutes:d.getHours()*60+d.getMinutes()}}}
 function status(){var n=nowAt(),w=S.hours,t=w[n.day];if(!t.closed&&n.minutes>=mins(t.open)&&n.minutes<mins(t.close))return[true,"Open now · until "+clock(t.close)];
 for(var k=0;k<7;k++){var i=(n.day+k)%7,d=w[i];if(d.closed)continue;if(k===0&&n.minutes>=mins(d.open))continue;return[false,"Closed · opens "+(k===0?"today":k===1?"tomorrow":S.days[i])+" at "+clock(d.open)]}return[false,"Closed"]}
-var st=$("status");if(st&&S.hours){var s=status();st.className="status"+(s[0]?" open":"");st.lastChild.textContent=s[1]}
-var today=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][nowAt().day],rows=document.querySelectorAll("#hours tr");
+if(S.hours){var s=status();document.querySelectorAll("[data-status]").forEach(function(st){st.className="status"+(s[0]?" open":"");st.lastChild.textContent=s[1]})}
+var today=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][nowAt().day],rows=document.querySelectorAll("table.hoursT tr");
 for(var r=0;r<rows.length;r++){var dd=rows[r].cells[0].textContent.split(" – "),a=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],x=a.indexOf(dd[0]),y=a.indexOf(dd[1]||dd[0]),ti=a.indexOf(today),inR=x<=y?(ti>=x&&ti<=y):(ti>=x||ti<=y);if(inR)rows[r].className="today"}
 var today10=new Date().toISOString().slice(0,10);document.querySelectorAll(".deal[data-ends]").forEach(function(el){var e=el.getAttribute("data-ends");if(e&&e<today10)el.remove()});
+document.querySelectorAll("[data-countdown]").forEach(function(el){var e=el.getAttribute("data-countdown"),d=Math.round((new Date(e+"T23:59:59")-new Date())/864e5);if(d<0){el.textContent="This offer has ended. Call us for current specials."}else if(d<=14){el.textContent=d===0?"Ends today!":"Ends in "+d+" day"+(d===1?"":"s")+" ("+e+")"}});
 function money(n){return "$"+(+n).toFixed(2)}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function fill(sel,vals,label){sel.innerHTML='<option value="">'+label+'</option>'+vals.map(function(v){return'<option>'+esc(v)+'</option>'}).join("");sel.disabled=!vals.length}
@@ -827,19 +931,20 @@ document.addEventListener("click",function(e){var a=e.target.closest&&e.target.c
   var y=qy&&qy.value,m=qm&&qm.value,d=qd&&qd.value;if(y&&m&&d&&!f.elements.vehicle.value)f.elements.vehicle.value=y+" "+m+" "+d});
 var rv=document.querySelectorAll(".rv");if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});rv.forEach(function(el){io.observe(el)})}else rv.forEach(function(el){el.classList.add("in")});
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-scroll]");if(!a)return;var t=document.getElementById(a.getAttribute("data-scroll"));if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});
-var baseTitle=document.title;function route(){var h=location.hash,el=h&&h.indexOf("#service-")===0?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
+var qo=new URLSearchParams(location.search).get("offer");if(qo&&!location.hash){var os="offer-"+qo.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");if(document.getElementById(os))history.replaceState(null,"",location.pathname+location.search+"#"+os)}
+var baseTitle=document.title;function route(){var h=location.hash,el=h&&/^#(service|offer)-/.test(h)?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
 window.addEventListener("hashchange",route);route();
-var form=$("bookForm"),msg=$("formMsg");
-if(form){form.onsubmit=function(e){e.preventDefault();var f=form.elements,v=function(n){return(f[n].value||"").trim()};
+document.querySelectorAll("form.book").forEach(function(form){var msg=form.querySelector(".formMsg");form.onsubmit=function(e){e.preventDefault();var f=form.elements,v=function(n){return f[n]?(f[n].value||"").trim():""};
   msg.className="formMsg";if(v("website"))return;
   var ph=v("phone").replace(/\\D/g,""),em=v("email");
   if(!v("name")){msg.className="formMsg err";msg.textContent="Please tell us your name.";return}
-  if(ph.length<10&&!/^\\S+@\\S+\\.\\S+$/.test(em)){msg.className="formMsg err";msg.textContent="Leave a phone number or email so we can confirm.";return}
+  if(ph.length<10&&!/^\\S+@\\S+\\.\\S+$/.test(em)){msg.className="formMsg err";msg.textContent=f.email?"Leave a phone number or email so we can confirm.":"Leave a phone number so we can confirm.";return}
   if(S.preview||!S.api){msg.className="formMsg ok";msg.textContent=S.preview?"Preview: this is where the request is sent once the site is published.":"Thanks! Please call us to confirm.";return}
   var btn=form.querySelector("button");btn.disabled=true;
+  var note=(v("offer")?"Offer: "+v("offer")+". ":"")+v("note");
   fetch(S.api.url+"/rest/v1/site_requests",{method:"POST",headers:{apikey:S.api.key,Authorization:"Bearer "+S.api.key,"Content-Type":"application/json",Prefer:"return=minimal"},
-    body:JSON.stringify({shop_id:S.api.shopId,name:v("name"),phone:v("phone"),email:em,vehicle:v("vehicle"),service:v("service"),preferred_day:v("day")||null,note:v("note")})})
-  .then(function(r){if(!r.ok)throw new Error(r.status);msg.className="formMsg ok";msg.textContent="Got it! We'll call or text you to confirm your time.";form.reset()})
+    body:JSON.stringify({shop_id:S.api.shopId,name:v("name"),phone:v("phone"),email:em,vehicle:v("vehicle"),service:v("service"),preferred_day:v("day")||null,note:note.slice(0,1000)})})
+  .then(function(r){if(!r.ok)throw new Error(r.status);msg.className="formMsg ok";msg.textContent=v("offer")?"You're all set! We'll call or text to confirm. Your coupon is saved with your request.":"Got it! We'll call or text you to confirm your time.";form.reset()})
   .catch(function(){msg.className="formMsg err";msg.textContent="That didn't go through. Please call us instead."})
-  .then(function(){btn.disabled=false})}}
+  .then(function(){btn.disabled=false})}});
 })();`;
