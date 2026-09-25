@@ -7,6 +7,8 @@
    Nothing internal reaches the payload: no customers, no costs, no labor
    rate, no coupon the owner didn't tick. */
 import { jobLines, orderTotals } from "./invoice.js";
+import { serviceContent } from "./serviceContent.js";
+import { DEFAULT_SERVICE_INTERVALS } from "./serviceReview.js";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -197,6 +199,18 @@ export function openStatus(week, now) {
   return { open: false, text: "Closed" };
 }
 
+/* "How often" for a service page, from the shop's own Service Review
+   table: a due-by interval, or checked-each-visit for filters and wipers. */
+export function intervalText(row) {
+  if (!row) return "";
+  const mi = Number(row.miles) > 0 ? `${Number(row.miles).toLocaleString("en-US")} miles` : "";
+  const mo = Number(row.months) > 0 ? (row.months % 12 === 0 ? `${row.months / 12 === 1 ? "year" : `${row.months / 12} years`}` : `${row.months} months`) : "";
+  if (row.basis === "inspect") return `We check it at every visit and replace it when it's worn${mi ? `, usually around every ${mi}` : ""}.`;
+  if (mi && mo) return `Every ${mi} or ${mo.startsWith("year") ? "1 " + mo : mo}, whichever comes first, unless your owner's manual says otherwise.`;
+  if (mi || mo) return `Every ${mi || mo}, unless your owner's manual says otherwise.`;
+  return "";
+}
+
 /* ---------- history stats ---------- */
 
 /* "Since 2016" and a rounded-down service count from the invoice history.
@@ -308,9 +322,29 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
         .filter((j) => j.name && j.price > 0)
     : [];
   const norm = (s) => str(s).toLowerCase();
+  const intervals = cfg.serviceIntervals && cfg.serviceIntervals.length ? cfg.serviceIntervals : DEFAULT_SERVICE_INTERVALS;
+  const usedSlugs = new Set();
   const services = menu.map((m) => {
-    const prices = m.oil ? pkgs.map((p) => Number(p.price)) : priced.filter((j) => norm(j.category) === norm(m.category)).map((j) => j.price);
-    return { name: m.name, blurb: serviceBlurb(m.oil ? "oil change" : m.category || m.name, w.serviceBlurbs), from: w.showPrices && prices.length ? Math.min(...prices) : null, oil: !!m.oil };
+    const list = m.oil ? pkgs.map((p) => ({ name: str(p.name), price: round2(p.price) })) : priced.filter((j) => norm(j.category) === norm(m.category)).map((j) => ({ name: j.name, price: j.price }));
+    const content = serviceContent(m.oil ? "oil change" : `${m.name} ${m.category || ""}`);
+    let slug = slugify(m.name) || "service";
+    while (usedSlugs.has(slug)) slug += "-2";
+    usedSlugs.add(slug);
+    return {
+      name: m.name,
+      slug,
+      key: content.key,
+      blurb: serviceBlurb(m.oil ? "oil change" : m.category || m.name, w.serviceBlurbs),
+      from: w.showPrices && list.length ? Math.min(...list.map((x) => x.price)) : null,
+      prices: w.showPrices && !m.oil ? list : [], // oil packages have their own cards
+      /* oil follows the reminder sticker the customer sees on the windshield */
+      howOften: intervalText(
+        content.key === "oil" && Number(cfg.reminderMiles) > 0
+          ? { basis: "interval", miles: cfg.reminderMiles, months: cfg.reminderMonths }
+          : intervals.find((r) => r && r.id === content.intervalId && r.enabled !== false)
+      ),
+      oil: !!m.oil,
+    };
   });
 
   const ids = new Set(w.couponIds || []);

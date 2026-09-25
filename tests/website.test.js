@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { autoHighlights, splitHighlight, parseHoursText, hoursRows, hoursText, openStatus, siteStats, quoteVehicles, packagePrice, packageKind, carKind, packagesFor, sitePayload, normalizeWebsite, slugify, validateRequest } from "../src/lib/website.js";
+import { intervalText, autoHighlights, splitHighlight, parseHoursText, hoursRows, hoursText, openStatus, siteStats, quoteVehicles, packagePrice, packageKind, carKind, packagesFor, sitePayload, normalizeWebsite, slugify, validateRequest } from "../src/lib/website.js";
 import { renderSite, defaultTagline } from "../src/lib/siteRender.js";
+import { serviceContent } from "../src/lib/serviceContent.js";
 
 const WEEK = parseHoursText("MON-FRI 8-6 SAT 8-5");
 
@@ -156,4 +157,21 @@ test("selling points come from what the shop can back up", () => {
   assert.deepEqual(splitHighlight("Walk-ins welcome — no appointment needed"), { title: "Walk-ins welcome", sub: "No appointment needed" });
   assert.deepEqual(splitHighlight("Fast: in and out"), { title: "Fast", sub: "In and out" });
   assert.deepEqual(splitHighlight("Family owned"), { title: "Family owned", sub: "" });
+});
+
+test("every menu button finds its service page content", () => {
+  const keys = ["Oil change", "Brakes", "Tires", "Air filters", "Cabin air filters", "Wipers", "Transmission", "Radiator", "Brake fluid", "Fuel system", "Power steering", "Differential fluid"].map((n) => serviceContent(n).key);
+  assert.deepEqual(keys, ["oil", "brakes", "tires", "air", "cabin", "wipers", "trans", "coolant", "brakeFluid", "fuel", "steering", "diff"]);
+  assert.equal(serviceContent("Engine diagnostics").key, "general");
+});
+
+test("service pages: one per menu button, linked from its card, how often from the shop", () => {
+  const p = sitePayload({ cfg: { ...cfg, reminderMiles: 3000, reminderMonths: 3 }, jobs: {}, parts: {}, coupons, orders: {}, specs: {}, today: "2026-09-25" });
+  assert.deepEqual(p.services.map((s) => s.slug), ["oil-change", "brakes"]);
+  assert.equal(p.services[0].howOften, "Every 3,000 miles or 3 months, whichever comes first, unless your owner's manual says otherwise.");
+  const html = renderSite(p, {});
+  assert.ok(html.includes('href="#service-brakes"') && html.includes('id="service-brakes"'));
+  assert.ok(html.includes("Signs your car needs it"));
+  assert.ok(html.includes("images.unsplash.com/photo-"));
+  assert.equal(intervalText({ basis: "inspect", miles: 15000 }), "We check it at every visit and replace it when it's worn, usually around every 15,000 miles.");
 });

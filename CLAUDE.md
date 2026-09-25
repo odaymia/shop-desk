@@ -119,6 +119,11 @@ prices and hours never drift from the counter. Rules:
   content. Its small inline script repeats `openStatus`, `packagePrice`
   and `packagesFor`; change them together.
 - Everything the shop types is escaped; links must be http(s).
+- Each service-menu button gets its own page (`#service-<slug>`, shown with
+  CSS `:target` so the single file still works). The words and photos live
+  in `src/lib/serviceContent.js`; "how often" comes from the shop's Service
+  Review intervals (oil: the reminder-sticker miles/months). Photos are
+  Unsplash-licensed, hot-linked, and credited on the page.
 
 ## Known gaps
 

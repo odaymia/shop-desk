@@ -10,6 +10,7 @@
      portalUrl link to the customer portal; blank hides it
      preview   true in the Settings preview (form doesn't send) */
 import { hoursRows, DAY_NAMES } from "./website.js";
+import { SERVICE_CONTENT, serviceContent, photoUrl } from "./serviceContent.js";
 
 const esc = (s) =>
   String(s == null ? "" : s)
@@ -79,6 +80,8 @@ const ICONS = {
   scissors: '<circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M8 7.5 20 17M8 16.5 20 7"/>',
   shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.9 7.5-9.5V6L12 3z"/><path d="m8.8 12 2.2 2.2 4.3-4.4"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  back: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+  warn: '<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   walk: '<circle cx="13" cy="4" r="2"/><path d="m9 21 3-7 3 3v5M7 12l3-4 4 1 3 3"/>',
@@ -132,6 +135,68 @@ function dealLine(d) {
   return d.services && d.services.length ? `On ${d.services.slice(0, 3).join(", ")}${d.services.length > 3 ? " and more" : ""}` : "On any service";
 }
 
+/* One service's own page: photo header, why it matters, the signs a car
+   needs it, what the shop does, and a side card with how often, prices,
+   matching specials, and a way to book. */
+function servicePage(p, s, i, { tel, garage }) {
+  const content = SERVICE_CONTENT.find((c) => c.key === s.key) || serviceContent(s.oil ? "oil change" : s.name);
+  const photo = content.photo;
+  /* a selling point about this very service (lifetime brake pads on the
+     Brakes page) leads the page */
+  const perkRe = { brakes: /brake/i, oil: /\boil\b/i, tires: /tire/i }[content.key];
+  const perk = perkRe && (p.highlights || []).find((h) => h && typeof h === "object" && h.sub && perkRe.test(h.title));
+  const names = new Set([...(s.prices || []).map((x) => x.name.toLowerCase()), ...(s.oil ? (p.oilPackages || []).map((x) => x.name.toLowerCase()) : [])]);
+  const deals = (p.deals || []).filter((d) => (d.services || []).some((n) => names.has(String(n).toLowerCase()))).slice(0, 2);
+  const priceRows = s.oil
+    ? (p.oilPackages || []).map((k) => `<li><span>${esc(tierName(k.name))}</span><b>${esc(money(k.price))}</b></li>`).join("")
+    : (s.prices || []).map((x) => `<li><span>${esc(x.name)}</span><b>${esc(money(x.price))}</b></li>`).join("");
+  const others = (p.services || []).filter((o) => o !== s).map((o) => `<a href="#service-${esc(o.slug)}">${iconFor(o.oil ? "oil" : o.name)}${esc(o.name)}</a>`).join("");
+  return `<section class="svcPage" id="service-${esc(s.slug || i)}" data-title="${esc(s.name)} · ${esc(p.name)}">
+  <div class="spHero" style="background-image:url('${esc(photoUrl(photo.id))}')">
+    <div class="wrap">
+      <a class="back" href="#services">${icon("back", "ic sm")} All services</a><br>
+      <span class="eyebrow">${esc(p.name)}</span>
+      <h1>${esc(s.name)}</h1>
+      <p class="lead">${esc(content.headline)}</p>
+      <div class="ctas">
+        ${p.booking ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>` : ""}
+        ${p.phone ? `<a class="btn ghost" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
+        ${s.from != null ? `<span class="chip" style="font-size:15px;padding:10px 16px">from ${esc(money(s.from))}</span>` : ""}
+      </div>
+    </div>
+  </div>
+  <div class="wrap spBody">
+    <div>
+      ${perk ? `<div class="perk">${icon("shield")}<div><b>${esc(perk.title)}</b><span>${esc(perk.sub)}</span></div></div>` : ""}
+      <p class="spIntro">${esc(content.intro)}</p>
+      <h2>Why it matters</h2>
+      <div class="benefits">${content.benefits.map(([t, d]) => `<div class="benefit">${icon("check")}<b>${esc(t)}</b><span>${esc(d)}</span></div>`).join("")}</div>
+      ${
+        content.symptoms.length
+          ? `<h2>Signs your car needs it</h2>
+      <ul class="signs">${content.symptoms.map((x) => `<li>${icon("warn")}${esc(x)}</li>`).join("")}</ul>
+      <p class="signsNote">Notice one of these? ${p.booking ? `<a href="#book" data-svc="${esc(s.name)}">Request a time</a> or call us` : "Call us"} and we'll take a look.</p>`
+          : ""
+      }
+      <h2>What we do</h2>
+      <ol class="steps">${content.included.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
+    </div>
+    <aside class="spSide">
+      ${s.howOften ? `<h4>${icon("clock", "ic sm")} How often</h4><p>${esc(s.howOften)}</p>` : ""}
+      ${priceRows ? `<h4>${icon("tag", "ic sm")} Prices</h4><ul>${priceRows}</ul>` : ""}
+      ${deals.map((d) => `<div class="spDeal"><b>${esc(d.off.toUpperCase())}</b>${esc(dealLine(d))}${d.code ? ` · code <strong>${esc(d.code)}</strong>` : ""}</div>`).join("")}
+      ${p.booking ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>` : ""}
+      ${p.phone ? `<a class="btn outline" href="${tel}">${icon("phone", "ic sm")} Call ${esc(p.phone)}</a>` : ""}
+      ${garage ? `<a class="btn outline" href="${esc(garage)}">My Garage</a>` : ""}
+    </aside>
+  </div>
+  <div class="wrap others">
+    ${others ? `<h3>Other services</h3><div>${others}</div>` : ""}
+    <p class="credit" style="margin-top:28px">Photo: ${esc(photo.by)} / <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></p>
+  </div>
+</section>`;
+}
+
 export function renderSite(p, opts = {}) {
   const brand = p.brandColor || "#8e2f2f";
   const accent = p.accentColor || "#1e8fd0";
@@ -173,14 +238,15 @@ export function renderSite(p, opts = {}) {
 
   const services = (p.services || [])
     .map(
-      (s, i) => `<article class="svc rv" style="--d:${(i % 4) * 60}ms">
+      (s, i) => `<a class="svc rv" style="--d:${(i % 4) * 60}ms" href="#service-${esc(s.slug || i)}">
         <div class="svcTop"><span class="svcIc">${iconFor(s.oil ? "oil" : s.name)}</span>${s.from != null ? `<span class="chip">from ${esc(money(s.from))}</span>` : ""}</div>
         <h3>${esc(s.name)}</h3>
         ${s.blurb ? `<p>${esc(s.blurb)}</p>` : "<p></p>"}
-        ${p.booking ? `<a href="#book" data-svc="${esc(s.name)}" class="ask">Book it ${icon("arrow", "ic sm")}</a>` : ""}
-      </article>`
+        <span class="ask">Learn more ${icon("arrow", "ic sm")}</span>
+      </a>`
     )
     .join("");
+  const servicePages = (p.services || []).map((s, i) => servicePage(p, s, i, { tel, garage: opts.portalUrl })).join("");
 
   const tiers = (p.oilPackages || [])
     .map(
@@ -327,8 +393,61 @@ header nav a:hover{color:#fff;background:rgba(255,255,255,.07)}
 .chip{background:var(--dark);color:#fff;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .svc h3{margin:0 0 6px;font-size:26px;text-transform:uppercase;font-weight:700;line-height:1.05}
 .svc p{margin:0 0 18px;color:var(--ink2);font-size:15px;flex:1}
+a.svc{text-decoration:none;color:inherit;cursor:pointer}
 .ask{display:inline-flex;align-items:center;gap:6px;font-weight:700;text-decoration:none;color:var(--brand)}
-.ask:hover .ic{transform:translateX(3px)}.ask .ic{transition:transform .15s}
+.svc:hover .ask .ic{transform:translateX(4px)}.ask .ic{transition:transform .15s}
+
+/* one page per service, shown in place of the home page when its link is
+   followed (#service-…). Plain CSS, so the downloaded file works too. */
+section.svcPage{display:none;padding:0}
+section.svcPage:target{display:block}
+body:has(.svcPage:target) main{display:none}
+.spHero{position:relative;color:#fff;background:var(--dark) center/cover no-repeat;min-height:460px;display:flex;align-items:flex-end;clip-path:polygon(0 0,100% 0,100% calc(100% - 36px),0 100%)}
+.spHero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,13,15,.92) 0%,rgba(12,13,15,.72) 50%,rgba(12,13,15,.2) 100%),linear-gradient(0deg,rgba(12,13,15,.6),transparent 50%)}
+.spHero .wrap{position:relative;width:100%;padding-top:48px;padding-bottom:84px}
+.back{display:inline-flex;align-items:center;gap:8px;color:rgba(255,255,255,.8);text-decoration:none;font-weight:600;font-size:15px;margin-bottom:26px}
+.back:hover{color:#fff}
+.spHero .eyebrow{color:color-mix(in srgb,var(--brand) 40%,#fff)}
+.spHero h1{font-size:clamp(46px,7vw,90px);line-height:.92;margin:0 0 14px;text-transform:uppercase;font-weight:800}
+.spHero .lead{font-size:clamp(19px,2.2vw,24px);color:rgba(255,255,255,.88);margin:0 0 28px;max-width:30em}
+.spHero .ctas{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.spBody{display:grid;grid-template-columns:1fr 360px;gap:48px;align-items:start;padding-top:56px;padding-bottom:40px}
+.perk{display:flex;gap:16px;align-items:center;background:linear-gradient(90deg,var(--brand),color-mix(in srgb,var(--brand) 70%,#000));color:#fff;border-radius:18px;padding:20px 22px;margin:0 0 32px;box-shadow:0 14px 34px color-mix(in srgb,var(--brand) 35%,transparent)}
+.perk .ic{width:44px;height:44px;flex:none}
+.perk b{display:block;font:800 26px/1 var(--display);text-transform:uppercase;margin-bottom:4px}
+.perk span{opacity:.9}
+.spIntro{font-size:21px;line-height:1.65;margin:0 0 44px;color:var(--ink)}
+.spBody h2{font-size:clamp(30px,3.6vw,42px);text-transform:uppercase;margin:0 0 20px;line-height:1}
+.benefits{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:52px}
+.benefit{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+.benefit .ic{width:34px;height:34px;padding:7px;border-radius:10px;background:var(--ok);color:#fff;stroke-width:2.6;margin-bottom:12px}
+.benefit b{display:block;font:700 22px/1.1 var(--display);text-transform:uppercase;margin-bottom:6px}
+.benefit span{color:var(--ink2);font-size:15px}
+.signs{list-style:none;margin:0 0 16px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.signs li{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-left:4px solid #e0a100;border-radius:12px;padding:14px 16px;font-weight:600}
+.signs .ic{color:#c98a00;flex:none}
+.signsNote{color:var(--ink2);margin:0 0 52px}
+.steps{list-style:none;counter-reset:step;margin:0 0 20px;padding:0;display:grid;gap:10px}
+.steps li{counter-increment:step;display:flex;gap:16px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 18px;font-weight:600}
+.steps li:before{content:counter(step);flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--dark);color:#fff;font:800 18px/1 var(--display)}
+.spSide{position:sticky;top:96px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 20px 50px rgba(20,20,20,.1)}
+.spSide h4{font:700 20px/1 var(--display);text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.spSide h4 .ic{color:var(--brand)}
+.spSide p{margin:0 0 20px;color:var(--ink2);font-size:15px}
+.spSide ul{list-style:none;margin:0 0 20px;padding:0}
+.spSide li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:15px}
+.spSide li b{font:700 20px/1 var(--display);white-space:nowrap}
+.spDeal{background:var(--brandSoft);border:1.5px dashed color-mix(in srgb,var(--brand) 50%,#fff);border-radius:12px;padding:12px 14px;margin:0 0 10px;font-size:14px}
+.spDeal b{color:var(--brand);font:800 22px/1 var(--display);display:block;margin-bottom:4px}
+.spSide .btn{width:100%;margin-top:8px}
+.others{padding-top:24px;padding-bottom:72px}
+.others h3{font-size:28px;text-transform:uppercase;margin:0 0 14px}
+.others div{display:flex;flex-wrap:wrap;gap:10px}
+.others a{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:10px 16px;font-weight:600;color:var(--ink);text-decoration:none}
+.others a:hover{border-color:var(--brand);color:var(--brand)}
+.others a .ic{width:20px;height:20px;color:var(--brand)}
+.credit{font-size:12px;color:var(--ink2);margin:0}
+.credit a{color:var(--ink2)}
 
 /* quote */
 .dark{background:var(--dark);color:#fff;position:relative;overflow:hidden}
@@ -452,6 +571,10 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   .hero .wrap,.quote,.about,.bookGrid{grid-template-columns:1fr}
   .hero .wrap{padding:56px 20px 64px;gap:36px}
   .strip{margin-top:-36px}
+  .spBody{grid-template-columns:1fr;padding-top:36px;gap:32px}
+  .spSide{position:static}
+  .benefits,.signs{grid-template-columns:1fr}
+  .spHero{min-height:420px}
   .strip ul{padding:0 20px;gap:12px}
   .heroCard{transform:none}
   .heroCard:before{display:none}
@@ -595,6 +718,8 @@ ${p.booking ? `<section id="book" class="alt"><div class="wrap">
 ${opts.portalUrl ? `<div class="portal"><div class="wrap"><p><b>Already a customer?</b>See your cars, what's due, and every receipt.</p><a class="btn light" href="${esc(opts.portalUrl)}">My Garage ${icon("arrow", "ic sm")}</a></div></div>` : ""}
 </main>
 
+${servicePages}
+
 <footer><div class="wrap">
   <div class="cols">
     <div><p class="name">${esc(p.name)}</p><p>${esc(tagline)}</p></div>
@@ -654,6 +779,8 @@ if(qy&&C.length){
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-svc]");if(!a)return;var f=$("bookForm");if(!f)return;var sel=f.elements.service,v=a.getAttribute("data-svc");for(var i=0;i<sel.options.length;i++)if(sel.options[i].text===v)sel.value=v;
   var y=qy&&qy.value,m=qm&&qm.value,d=qd&&qd.value;if(y&&m&&d&&!f.elements.vehicle.value)f.elements.vehicle.value=y+" "+m+" "+d});
 var rv=document.querySelectorAll(".rv");if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});rv.forEach(function(el){io.observe(el)})}else rv.forEach(function(el){el.classList.add("in")});
+var baseTitle=document.title;function route(){var h=location.hash,el=h&&h.indexOf("#service-")===0?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
+window.addEventListener("hashchange",route);route();
 var form=$("bookForm"),msg=$("formMsg");
 if(form){form.onsubmit=function(e){e.preventDefault();var f=form.elements,v=function(n){return(f[n].value||"").trim()};
   msg.className="formMsg";if(v("website"))return;
