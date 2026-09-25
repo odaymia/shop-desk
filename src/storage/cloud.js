@@ -558,6 +558,27 @@ async function listSiteSignups() {
     if (!data || data.length < 1000) return out;
   }
 }
+/* Add people from an imported list, a batch at a time. `source` says where
+   they came from ("SHOPIFY"). */
+async function addSiteSignups(people, source) {
+  if (!state.linked) throw new Error("Sign this computer in to your shop (Settings → Data) first.");
+  let added = 0;
+  for (let i = 0; i < people.length; i += 500) {
+    const batch = people.slice(i, i + 500).map((p) => ({ shop_id: state.shopId, email: p.email, name: p.name || null, source }));
+    const { error } = await supabase.from("site_signups").insert(batch);
+    if (!error) {
+      added += batch.length;
+      continue;
+    }
+    if (/site_signups|schema cache|does not exist/i.test(error.message)) throw new Error("Run the latest supabase/website.sql in Supabase first.");
+    /* one bad or already-there address fails the batch: go one by one */
+    for (const row of batch) {
+      const { error: e } = await supabase.from("site_signups").insert(row);
+      if (!e) added++;
+    }
+  }
+  return added;
+}
 async function setSignupUnsubscribed(ids, unsubscribed) {
   if (!state.linked || !ids.length) return;
   const { error } = await supabase.from("site_signups").update({ unsubscribed_at: unsubscribed ? new Date().toISOString() : null }).in("id", ids);
@@ -629,6 +650,7 @@ export const cloud = {
   handleSiteRequest,
   listSiteSignups,
   setSignupUnsubscribed,
+  addSiteSignups,
   /* Call a Supabase Edge Function as the signed-in shop user. Used for
      distributor lookups (tire search/order) that must run server-side so
      the wholesale credentials never reach the browser. */

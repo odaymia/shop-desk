@@ -60,3 +60,23 @@ test("CSV: import-ready, no unsubscribed people, no spreadsheet formulas", () =>
   assert.ok(csv.includes("'=cmd@example.com"));
   assert.ok(validEmail("a.b+c@shop.co") && !validEmail("a@b") && !validEmail("a b@c.com"));
 });
+
+test("import a Shopify customer export: consenting people only, nobody twice", async () => {
+  const { importCandidates, parseCsv } = await import("../src/lib/emailList.js");
+  const csv =
+    "﻿Customer ID,First Name,Last Name,Email,Accepts Email Marketing,Default Address Company,Phone\r\n" +
+    '1,Ana,Diaz,ana@example.com,yes,"Diaz, Inc.",\r\n' +
+    "2,Bo,Kim,bo@example.com,no,,\r\n" +
+    "3,Cy,Ng,CY@example.com,yes,,\r\n" +
+    "4,Cy,Ng,cy@example.com,yes,,\r\n" +
+    "5,Di,,not-an-email,yes,,\r\n" +
+    '6,"Eve ""E""",Lo,eve@example.com,yes,"line\nbreak",\r\n';
+  assert.equal(parseCsv(csv)[6][5], "line\nbreak");
+  const { add, skipped } = importCandidates(csv, ["ana@example.com"]);
+  assert.deepEqual(add, [
+    { email: "CY@example.com", name: "Cy Ng" },
+    { email: "eve@example.com", name: 'Eve "E" Lo' },
+  ]);
+  assert.deepEqual(skipped, { noConsent: 1, invalid: 1, already: 1, duplicate: 1 });
+  assert.throws(() => importCandidates("Name,Phone\nA,1\n", []), /no Email column/);
+});

@@ -94,6 +94,15 @@ export function filterEmailList(rows, { who = "all", since = "any", q = "" } = {
   });
 }
 
+/* Where a signup came from, in words: the website, an imported list, or an ad offer */
+export function sourceLabel(r) {
+  if (!r.website) return "";
+  if (r.source === "SHOPIFY") return "Shopify list";
+  if (r.source === "IMPORT") return "Imported list";
+  return r.source ? `Website (${r.source})` : "Website";
+}
+const sourceTags = (r) => (!r.website ? [] : r.source === "SHOPIFY" ? ["shopify"] : r.source === "IMPORT" ? ["imported"] : ["website signup", ...(r.source ? [`offer ${r.source}`] : [])]);
+
 const csvCell = (v) => {
   /* names come from a public form: never let a cell start a spreadsheet formula */
   const s = String(v == null ? "" : v).replace(/^[=+\-@\t\r]/, "'$&");
@@ -107,9 +116,90 @@ export function emailListCsv(rows) {
   const lines = rows
     .filter((r) => !r.unsubscribed)
     .map((r) =>
-      [r.email, r.first, r.last, r.phone, [r.customer && "customer", r.website && "website signup", r.source && `offer ${r.source}`].filter(Boolean).join(", "), ymd(r.lastVisit), r.visits || "", ymd(r.signedUpAt)]
+      [r.email, r.first, r.last, r.phone, [r.customer && "customer", ...sourceTags(r)].filter(Boolean).join(", "), ymd(r.lastVisit), r.visits || "", ymd(r.signedUpAt)]
         .map(csvCell)
         .join(",")
     );
   return [head.join(","), ...lines].join("\r\n") + "\r\n";
+}
+
+/* ---------- importing a list from another system ---------- */
+
+/* RFC 4180 CSV: quoted fields, doubled quotes, commas and newlines inside quotes. */
+export function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let q = false;
+  const t = String(text || "").replace(/^\uFEFF/, "");
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) {
+      if (ch === '"' && t[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') q = false;
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && t[i + 1] === "\n") i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else cell += ch;
+  }
+  if (cell !== "" || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((r) => r.some((c) => str(c)));
+}
+
+/* People to add from an exported list (Shopify's customer export, Mailchimp,
+   or any CSV with an email column). Only people who agreed to marketing email
+   come in when the file says so ("Accepts Email Marketing" = no is skipped);
+   anyone already on the list is left alone.
+   → { add: [{ email, name }], skipped: { noConsent, invalid, already, duplicate } } */
+export function importCandidates(text, existingEmails) {
+  const rows = parseCsv(text);
+  const head = (rows.shift() || []).map((h) => str(h).toLowerCase());
+  const col = (...names) => head.findIndex((h) => names.includes(h));
+  const iEmail = col("email", "email address", "e-mail", "customer email");
+  if (iEmail < 0) throw new Error("That file has no Email column. Export customers from Shopify (Customers → Export) and try again.");
+  const iFirst = col("first name", "firstname", "first");
+  const iLast = col("last name", "lastname", "last");
+  const iName = col("name", "full name");
+  const iConsent = col("accepts email marketing", "accepts marketing", "email marketing consent", "subscribed");
+  const have = new Set([...(existingEmails || [])].map(normEmail));
+  const seen = new Set();
+  const add = [];
+  const skipped = { noConsent: 0, invalid: 0, already: 0, duplicate: 0 };
+  for (const r of rows) {
+    const email = str(r[iEmail]);
+    if (!validEmail(email)) {
+      skipped.invalid++;
+      continue;
+    }
+    if (iConsent >= 0 && !/^(yes|true|y|1|subscribed)$/i.test(str(r[iConsent]))) {
+      skipped.noConsent++;
+      continue;
+    }
+    const k = normEmail(email);
+    if (have.has(k)) {
+      skipped.already++;
+      continue;
+    }
+    if (seen.has(k)) {
+      skipped.duplicate++;
+      continue;
+    }
+    seen.add(k);
+    const name = iName >= 0 ? str(r[iName]) : [iFirst >= 0 ? str(r[iFirst]) : "", iLast >= 0 ? str(r[iLast]) : ""].filter(Boolean).join(" ");
+    add.push({ email, name: name.slice(0, 80) });
+  }
+  return { add, skipped };
 }

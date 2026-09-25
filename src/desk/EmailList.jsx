@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { cloud } from "../storage/index.js";
 import { fmtDate } from "./ui.jsx";
-import { buildEmailList, filterEmailList, emailListCsv } from "../lib/emailList.js";
+import { buildEmailList, filterEmailList, emailListCsv, importCandidates, sourceLabel } from "../lib/emailList.js";
 
 /* Email list: every customer with an email on file plus everyone who signed
    up on the website, one row per address. Copy the addresses or download a
@@ -69,6 +69,30 @@ export function EmailList({ shop, flash }) {
     }
   };
 
+  const [importing, setImporting] = useState(false);
+  const importFile = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    setImporting(true);
+    try {
+      const { add, skipped } = importCandidates(await f.text(), rows.map((r) => r.email));
+      const source = /shopify/i.test(f.name) || /customers_export/i.test(f.name) ? "SHOPIFY" : "IMPORT";
+      const added = add.length ? await cloud.addSiteSignups(add, source) : 0;
+      await loadSignups();
+      const notes = [
+        skipped.already && `${skipped.already.toLocaleString()} already on your list`,
+        skipped.noConsent && `${skipped.noConsent.toLocaleString()} left out because they didn't agree to marketing email`,
+        skipped.invalid && `${skipped.invalid.toLocaleString()} with no valid email`,
+      ].filter(Boolean);
+      flash(`Added ${added.toLocaleString()} ${added === 1 ? "person" : "people"}${notes.length ? ` · ${notes.join(" · ")}` : ""}`);
+    } catch (err) {
+      flash(err.message, "out");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const copy = () => {
     const list = shown.filter((r) => !r.unsubscribed).map((r) => r.email);
     navigator.clipboard.writeText(list.join(", ")).then(
@@ -85,7 +109,7 @@ export function EmailList({ shop, flash }) {
           {[
             ["all", `Everyone (${counts.subscribed.toLocaleString()})`],
             ["customers", `Customers (${counts.customers.toLocaleString()})`],
-            ["website", `Website signups (${counts.website.toLocaleString()})`],
+            ["website", `Signups & imports (${counts.website.toLocaleString()})`],
             ["unsubscribed", `Unsubscribed (${counts.unsub.toLocaleString()})`],
           ].map(([k, label]) => (
             <button key={k} className={who === k ? "on" : ""} onClick={() => setWho(k)}>
@@ -94,6 +118,10 @@ export function EmailList({ shop, flash }) {
           ))}
         </div>
         <div className="grow" />
+        <label className="btn" title="Bring in a list exported from Shopify, Mailchimp, or any CSV with an Email column">
+          {importing ? "Importing…" : "Import list"}
+          <input type="file" accept=".csv,text/csv" style={{ display: "none" }} disabled={importing} onChange={importFile} />
+        </label>
         <button className="btn" onClick={copy} disabled={!shown.length || who === "unsubscribed"}>
           Copy emails
         </button>
@@ -147,7 +175,7 @@ export function EmailList({ shop, flash }) {
                   <td>{r.email}</td>
                   <td>{[r.first, r.last].filter(Boolean).join(" ")}</td>
                   <td className="muted">
-                    {[r.customer && "Customer", r.website && (r.source ? `Website (${r.source})` : "Website")].filter(Boolean).join(" + ")}
+                    {[r.customer && "Customer", sourceLabel(r)].filter(Boolean).join(" + ")}
                   </td>
                   <td className="r num">{r.visits || ""}</td>
                   <td className="muted">{r.lastVisit ? fmtDate(r.lastVisit) : ""}</td>
