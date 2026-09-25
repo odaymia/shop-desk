@@ -522,6 +522,16 @@ header nav{display:flex;gap:2px;margin-left:auto}
 header nav a{color:rgba(255,255,255,.75);text-decoration:none;font-weight:600;font-size:15px;padding:10px 12px;border-radius:8px}
 header nav a:hover{color:#fff;background:rgba(255,255,255,.07)}
 .callTop{min-height:44px;padding:0 18px;font-size:15px}
+/* the three-bar menu on phones */
+.menuBtn{display:none;flex-direction:column;justify-content:center;gap:5px;width:48px;height:48px;padding:0 12px;margin-left:4px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;cursor:pointer}
+.menuBtn span{display:block;height:2.5px;border-radius:2px;background:#fff;transition:transform .2s,opacity .2s}
+.navOpen .menuBtn span:nth-child(1){transform:translateY(7.5px) rotate(45deg)}
+.navOpen .menuBtn span:nth-child(2){opacity:0}
+.navOpen .menuBtn span:nth-child(3){transform:translateY(-7.5px) rotate(-45deg)}
+.mobileNav{display:none;flex-direction:column;padding:8px 20px 18px;border-top:1px solid rgba(255,255,255,.08);background:rgba(18,20,23,.98)}
+.mobileNav a:not(.btn){color:#fff;text-decoration:none;font:700 24px/1 var(--display);text-transform:uppercase;padding:16px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
+.mobileNav .btn{margin-top:16px;width:100%}
+.navOpen .mobileNav{display:flex}
 
 /* hero */
 .hero{position:relative;overflow:hidden;color:#fff;background:var(--dark);padding-bottom:40px;clip-path:polygon(0 0,100% 0,100% calc(100% - 44px),0 100%)}
@@ -816,8 +826,9 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
 .js .rv.in{opacity:1;transform:none}
 
 @media (max-width:900px){
-  header nav{display:none}
+  header .wrap>nav{display:none}
   .callTop{margin-left:auto}
+  .menuBtn{display:flex}
   .hero .wrap,.quote,.about,.bookGrid{grid-template-columns:1fr}
   .hero .wrap{padding:56px 20px 64px;gap:36px}
   .strip{margin-top:-36px}
@@ -845,7 +856,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   .mbar{display:grid;grid-template-columns:1fr 1fr;gap:10px;position:fixed;left:0;right:0;bottom:0;z-index:50;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:rgba(18,20,23,.96);backdrop-filter:blur(8px)}
   .mbar .btn{min-height:52px}
 }
-@media (max-width:520px){.brandmark img{height:40px}.callTop{display:none}}
+@media (max-width:520px){.brandmark img{height:40px}.callTop{display:none}.menuBtn{margin-left:auto}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.status.open i{animation:none}}
 </style>
 </head>
@@ -854,7 +865,13 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   <a class="brandmark" href="#top">${logo ? `<img src="${esc(logo)}" alt="${esc(p.name)}">` : esc(p.name)}</a>
   <nav>${nav.map(([id, l]) => `<a href="#${id}">${esc(l)}</a>`).join("")}${garage ? `<a href="${garage}">My Garage</a>` : ""}</nav>
   ${p.phone ? `<a class="btn primary callTop" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
-</div></header>
+  <button class="menuBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="mobileNav"><span></span><span></span><span></span></button>
+</div>
+<nav class="mobileNav" id="mobileNav" aria-label="Menu">
+  ${nav.map(([id, l]) => `<a href="#${id}">${esc(l)}</a>`).join("")}
+  ${garage ? `<a href="${garage}">My Garage</a>` : ""}
+  ${p.phone ? `<a class="btn primary" href="${tel}">${icon("phone", "ic sm")} Call ${esc(p.phone)}</a>` : ""}
+</nav></header>
 
 <main id="top">
 <div class="hero${hero ? " photo" : ""}">
@@ -1057,6 +1074,7 @@ document.addEventListener("click",function(e){var a=e.target.closest&&e.target.c
 var rv=document.querySelectorAll(".rv");if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});rv.forEach(function(el){io.observe(el)})}else rv.forEach(function(el){el.classList.add("in")});
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-scroll]");if(!a)return;var t=document.getElementById(a.getAttribute("data-scroll"));if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});
 var qo=new URLSearchParams(location.search).get("offer");if(qo&&!location.hash){var os="offer-"+qo.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");if(document.getElementById(os))history.replaceState(null,"",location.pathname+location.search+"#"+os)}
+var mb=document.querySelector(".menuBtn");if(mb){var setNav=function(o){document.body.classList.toggle("navOpen",o);mb.setAttribute("aria-expanded",o?"true":"false")};mb.onclick=function(){setNav(!document.body.classList.contains("navOpen"))};document.querySelectorAll(".mobileNav a").forEach(function(a){a.addEventListener("click",function(){setNav(false)})});window.addEventListener("hashchange",function(){setNav(false)})}
 var baseTitle=document.title;function route(){var h=location.hash,el=h&&/^#(service|offer)-/.test(h)?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
 window.addEventListener("hashchange",route);route();
 document.querySelectorAll("form.signupForm").forEach(function(form){var msg=form.querySelector(".formMsg");form.onsubmit=function(e){e.preventDefault();var f=form.elements,em=(f.email.value||"").trim();
