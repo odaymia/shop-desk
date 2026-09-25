@@ -137,6 +137,8 @@ export function renderSite(p, opts = {}) {
     .filter(([, u]) => u);
   const linkLabel = { google: "Google", yelp: "Yelp", facebook: "Facebook", instagram: "Instagram" };
   const tel = esc(telHref(p.phone));
+  /* returning customers' quickest way to their receipts: the portal */
+  const garage = opts.portalUrl ? esc(opts.portalUrl) : "";
 
   const nav = [
     ["services", "Services"],
@@ -452,7 +454,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
 <body>
 <header class="top"><div class="wrap">
   <a class="brandmark" href="#top">${logo ? `<img src="${esc(logo)}" alt="${esc(p.name)}">` : esc(p.name)}</a>
-  <nav>${nav.map(([id, l]) => `<a href="#${id}">${esc(l)}</a>`).join("")}</nav>
+  <nav>${nav.map(([id, l]) => `<a href="#${id}">${esc(l)}</a>`).join("")}${garage ? `<a href="${garage}">My Garage</a>` : ""}</nav>
   ${p.phone ? `<a class="btn primary callTop" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
 </div></header>
 
@@ -466,7 +468,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
       ${fullAddress ? `<p class="lead">${icon("pin", "ic sm")} ${esc(fullAddress)}</p>` : ""}
       <div class="ctas">
         ${p.phone ? `<a class="btn primary" href="${tel}">${icon("phone", "ic sm")} Call now</a>` : ""}
-        ${p.booking ? `<a class="btn light" href="#book">Request a time</a>` : ""}
+        ${garage ? `<a class="btn light" href="${garage}">My Garage ${icon("arrow", "ic sm")}</a>` : p.booking ? `<a class="btn light" href="#book">Request a time</a>` : ""}
         ${fullAddress ? `<a class="btn ghost" href="${dirUrl}" target="_blank" rel="noopener">Directions</a>` : ""}
       </div>
     </div>
@@ -584,7 +586,7 @@ ${opts.portalUrl ? `<div class="portal"><div class="wrap"><p><b>Already a custom
 
 <div class="mbar">
   ${p.phone ? `<a class="btn primary" href="${tel}">${icon("phone", "ic sm")} Call</a>` : ""}
-  ${p.booking ? `<a class="btn light" href="#book">Book</a>` : `<a class="btn light" href="${dirUrl}">Directions</a>`}
+  ${garage ? `<a class="btn light" href="${garage}">My Garage</a>` : p.booking ? `<a class="btn light" href="#book">Book</a>` : `<a class="btn light" href="${dirUrl}">Directions</a>`}
 </div>
 
 <script>window.SITE=${jsonForScript(pageData)};</script>
