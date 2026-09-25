@@ -458,7 +458,11 @@ export function renderSite(p, opts = {}) {
     dir: fullAddress ? dirUrl : "",
     api: opts.api && opts.api.url && opts.api.key && opts.api.shopId ? opts.api : null,
     preview: !!opts.preview,
+    updatedAt: p.updatedAt || 0,
   };
+  /* on the shop's own domain: say which shop this is, point search engines
+     at the domain, and load the script that pulls newer content */
+  const live = opts.live && opts.live.src && opts.live.slug ? opts.live : null;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -477,6 +481,7 @@ ${logoUrl ? `<link rel="icon" href="${esc(logoUrl)}">` : ""}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>document.documentElement.className="js"</script>
+${live ? `<meta name="bolt-badger-site" content="${esc(live.slug)}">${safeUrl(live.canonical) ? `<link rel="canonical" href="${esc(live.canonical)}">` : ""}` : ""}
 <script type="application/ld+json">${jsonForScript(jsonLd(p, fullAddress))}</script>
 <style>
 :root{--brand:${brand};--accent:${accent};--ink:#15171b;--ink2:#5b616c;--line:#e7e3dc;--paper:#f7f5f0;--card:#fff;--dark:#121417;--dark2:#1b1e23;--ok:#22a25a;
@@ -1008,6 +1013,7 @@ ${
 
 <script>window.SITE=${jsonForScript(pageData)};</script>
 <script>${CLIENT_JS}</script>
+${live ? `<script type="module" src="${esc(live.src)}"></script>` : ""}
 </body>
 </html>`;
 }

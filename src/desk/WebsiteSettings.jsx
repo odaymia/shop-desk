@@ -132,6 +132,42 @@ export function WebsiteSettings({ d, set, shop, flash }) {
         </button>
       </div>
 
+      <h3 className="subhead" style={{ marginTop: 28 }}>
+        Your own domain
+      </h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Put the site on your own address (like www.yourshop.com). Download the page below and host it there; it shows your
+        site with everything already on the page for Google, and each time someone opens it, it pulls in your latest
+        prices, hours, and specials from here. Publish at least once first.
+      </p>
+      <Field label="Your domain">
+        <Text value={w.domain || ""} onChange={(v) => setW({ domain: v.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") })} placeholder="www.yourshop.com" />
+      </Field>
+      <div className="rowBtns" style={{ alignItems: "center" }}>
+        <button
+          className="btn"
+          disabled={!shop || !w.domain}
+          onClick={() =>
+            download(
+              "index.html",
+              renderSite(shop.buildSite({ ...d, website: { ...w, slug } }), {
+                api: cloud.siteApi(),
+                portalUrl: d.portalEnabled ? portalUrl() : "",
+                live: { src: new URL("site/app.js", window.location.href).toString(), slug, canonical: `https://${w.domain}/` },
+              })
+            )
+          }
+        >
+          Download the page for {w.domain || "your domain"}
+        </button>
+      </div>
+      <p className="legalNote" style={{ marginTop: 6 }}>
+        Free hosting that works: a GitHub Pages site with this index.html and a file named CNAME containing{" "}
+        <b>{w.domain || "your domain"}</b>. Then at your domain company (GoDaddy → DNS), point <b>www</b> with a CNAME record to the GitHub
+        Pages address, and the bare domain with A records to 185.199.108.153, 185.199.109.153, 185.199.110.153 and 185.199.111.153.
+        Don't touch the MX records; those carry your email.
+      </p>
+
       {requests.length > 0 && (
         <>
           <h3 className="subhead" style={{ marginTop: 28 }}>

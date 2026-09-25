@@ -19,6 +19,9 @@ export default defineConfig({
         inspect: resolve(__dirname, "inspect/index.html"),
         site: resolve(__dirname, "site/index.html"),
       },
+      /* the website's script keeps a fixed address (site/app.js) so a page on
+         a shop's own domain can load it and pull its latest content */
+      output: { entryFileNames: (c) => (c.name === "site" ? "site/app.js" : "assets/[name]-[hash].js") },
     },
   },
 });

@@ -248,3 +248,13 @@ test("walk-in wording reads naturally", () => {
   assert.ok(html.includes("Oil changes are first come, first served"));
   assert.ok(html.includes("Oil changes and brakes are first come, first served"));
 });
+
+test("own-domain copy: names the shop, points Google at the domain, loads the live updater", () => {
+  const p = sitePayload({ cfg, jobs: {}, parts: {}, coupons: {}, orders: {}, specs: {}, today: "2026-09-25" });
+  const html = renderSite(p, { live: { src: "https://host.example/shop-desk/site/app.js", slug: "test", canonical: "https://www.testlube.com/" } });
+  assert.ok(html.includes('<meta name="bolt-badger-site" content="test">'));
+  assert.ok(html.includes('<link rel="canonical" href="https://www.testlube.com/">'));
+  assert.ok(html.includes('<script type="module" src="https://host.example/shop-desk/site/app.js"></script>'));
+  assert.ok(html.includes(`"updatedAt":${p.updatedAt}`));
+  assert.ok(!renderSite(p, {}).includes("bolt-badger-site")); // the app's own copy doesn't carry it
+});

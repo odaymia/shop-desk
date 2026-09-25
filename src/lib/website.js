@@ -19,6 +19,7 @@ const uidOf = () => "w" + Math.random().toString(36).slice(2, 8);
 export const DEFAULT_WEBSITE = {
   enabled: false, // published at /site/?s=<slug> once turned on
   slug: "", // the web address: letters, numbers, dashes
+  domain: "", // the shop's own domain the site is hosted on, e.g. www.genieautocenter.com (Settings → Website → Your own domain)
   tagline: "", // big line at the top; blank builds one from the shop's services
   about: "", // a paragraph about the shop; blank uses a sensible default
   cityLine: "", // "El Cajon, CA 92021" — completes the street address for maps and Google
