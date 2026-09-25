@@ -975,7 +975,7 @@ ${servicePages}
 ${(p.offers || []).map((o) => offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ })).join("")}
 
 ${
-  p.signup
+  p.signup !== false /* pages published before the box existed get it too */
     ? `<section class="signup" id="signup"><div class="wrap signupGrid">
   <div>
     <span class="eyebrow">Specials by email</span>
