@@ -79,6 +79,10 @@ const ICONS = {
   scissors: '<circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M8 7.5 20 17M8 16.5 20 7"/>',
   shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.9 7.5-9.5V6L12 3z"/><path d="m8.8 12 2.2 2.2 4.3-4.4"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  walk: '<circle cx="13" cy="4" r="2"/><path d="m9 21 3-7 3 3v5M7 12l3-4 4 1 3 3"/>',
+  people: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A5 5 0 0 1 21 19"/>',
 };
 const ICON_RULES = [
   [/brake fluid/i, "brakeFluid"],
@@ -96,6 +100,18 @@ const ICON_RULES = [
   [/batter|electric|start/i, "battery"],
   [/a\/c|air cond|heat/i, "ac"],
 ];
+/* An icon for a selling point, from what it's about */
+const HIGHLIGHT_ICONS = [
+  [/brake/i, "brakes"],
+  [/oil/i, "oil"],
+  [/warrant|guarantee/i, "shield"],
+  [/open|saturday|sunday|hours|walk-?in/i, "clock"],
+  [/price|estimate|surprise|quote/i, "tag"],
+  [/trust|neighbor|since|review|rated/i, "star"],
+  [/people|family|answer|honest/i, "people"],
+  [/tire/i, "tires"],
+];
+const iconForHighlight = (t) => (HIGHLIGHT_ICONS.find(([re]) => re.test(t)) || [])[1] || "check";
 const icon = (name, cls = "ic") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.wrench}</svg>`;
 const iconFor = (name) => icon((ICON_RULES.find(([re]) => re.test(name)) || [])[1] || "wrench");
 
@@ -293,12 +309,14 @@ header nav a:hover{color:#fff;background:rgba(255,255,255,.07)}
 .stats b{display:block;font:800 32px/1 var(--display);color:var(--brand);font-variant-numeric:tabular-nums}
 .stats span{display:block;margin-top:6px;font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em}
 
-/* trust strip */
-.strip{margin-top:-4px}
-.strip ul{list-style:none;margin:0 auto;padding:26px 24px;max-width:1180px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px 28px}
-.strip li{display:flex;gap:12px;align-items:center;font-weight:600;color:var(--ink)}
-.strip li .ic{width:30px;height:30px;padding:6px;border-radius:50%;background:var(--ok);color:#fff;stroke-width:2.6}
-
+/* selling points */
+.strip{position:relative;z-index:2;margin-top:-72px}
+.strip ul{list-style:none;margin:0 auto;padding:0 24px;max-width:1180px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.strip li{display:flex;gap:16px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 20px;box-shadow:0 18px 44px rgba(20,20,20,.12)}
+.hlIc{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--brand);color:#fff;box-shadow:0 8px 18px color-mix(in srgb,var(--brand) 35%,transparent)}
+.hlIc .ic{width:26px;height:26px}
+.strip b{display:block;font:800 22px/1.05 var(--display);text-transform:uppercase;color:var(--ink);margin:2px 0 6px}
+.strip li span:not(.hlIc){display:block;font-size:14px;line-height:1.5;color:var(--ink2)}
 /* services */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
 .svc{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:transform .2s,border-color .2s,box-shadow .2s}
@@ -433,6 +451,8 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   .callTop{margin-left:auto}
   .hero .wrap,.quote,.about,.bookGrid{grid-template-columns:1fr}
   .hero .wrap{padding:56px 20px 64px;gap:36px}
+  .strip{margin-top:-36px}
+  .strip ul{padding:0 20px;gap:12px}
   .heroCard{transform:none}
   .heroCard:before{display:none}
   section{padding:64px 0}
@@ -476,7 +496,10 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   </div>
 </div>
 
-${(p.highlights || []).length ? `<div class="strip"><ul>${p.highlights.map((h) => `<li>${icon("check")}${esc(h)}</li>`).join("")}</ul></div>` : ""}
+${(p.highlights || []).length ? `<div class="strip"><ul>${p.highlights
+  .map((h) => (typeof h === "string" ? { title: h, sub: "" } : h))
+  .map((h, i) => `<li class="rv" style="--d:${i * 80}ms"><span class="hlIc">${icon(iconForHighlight(h.title + " " + h.sub))}</span><div><b>${esc(h.title)}</b>${h.sub ? `<span>${esc(h.sub)}</span>` : ""}</div></li>`)
+  .join("")}</ul></div>` : ""}
 
 <section id="services"><div class="wrap">
   <span class="eyebrow">Services</span>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Field, Text, fmtDate } from "./ui.jsx";
 import { cloud } from "../storage/index.js";
-import { DEFAULT_WEBSITE, DEFAULT_HIGHLIGHTS, DEFAULT_FAQ, DAY_NAMES, parseHoursText, normalizeHoursWeek, hoursText, slugify, couponText } from "../lib/website.js";
+import { DEFAULT_WEBSITE, FALLBACK_HIGHLIGHTS, DEFAULT_FAQ, DAY_NAMES, parseHoursText, normalizeHoursWeek, hoursText, slugify, couponText } from "../lib/website.js";
 import { renderSite } from "../lib/siteRender.js";
 
 /* Settings → Website. The shop's public site is built from what's already
@@ -167,8 +167,8 @@ export function WebsiteSettings({ d, set, shop, flash }) {
       <Field label="About the shop (blank uses a short default)">
         <textarea rows={4} value={w.about} onChange={(e) => setW({ about: e.target.value })} placeholder="Family owned since…" />
       </Field>
-      <Field label="Selling points, one per line">
-        <textarea rows={4} value={(w.highlights || []).join("\n")} onChange={(e) => setW({ highlights: e.target.value.split("\n") })} placeholder={DEFAULT_HIGHLIGHTS.join("\n")} />
+      <Field label="Selling points, one per line: Headline — supporting line (blank picks them from your warranty, oil, hours and history)">
+        <textarea rows={4} value={(w.highlights || []).join("\n")} onChange={(e) => setW({ highlights: e.target.value.split("\n") })} placeholder={FALLBACK_HIGHLIGHTS.join("\n")} />
       </Field>
       <div className="fld">
         <span>Shop photo (behind the headline)</span>

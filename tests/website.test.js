@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseHoursText, hoursRows, hoursText, openStatus, siteStats, quoteVehicles, packagePrice, packageKind, carKind, packagesFor, sitePayload, normalizeWebsite, slugify, validateRequest } from "../src/lib/website.js";
+import { autoHighlights, splitHighlight, parseHoursText, hoursRows, hoursText, openStatus, siteStats, quoteVehicles, packagePrice, packageKind, carKind, packagesFor, sitePayload, normalizeWebsite, slugify, validateRequest } from "../src/lib/website.js";
 import { renderSite, defaultTagline } from "../src/lib/siteRender.js";
 
 const WEEK = parseHoursText("MON-FRI 8-6 SAT 8-5");
@@ -139,4 +139,21 @@ test("appointment request needs a name and a way to reach them", () => {
   assert.match(validateRequest({ name: "Al", phone: "555" }), /phone number or email/);
   assert.equal(validateRequest({ name: "Al", phone: "(619) 555-0100" }), "");
   assert.equal(validateRequest({ name: "Al", email: "al@example.com" }), "");
+});
+
+test("selling points come from what the shop can back up", () => {
+  const cfg = { invoiceFooter: "We warrant parts and labor for 6 months or 6,000 miles. Our brake packages include a lifetime brake-pad replacement warranty." };
+  const pkgs = [{ name: "Valvoline Full Synthetic Oil Change" }];
+  const hl = autoHighlights({ cfg, week: parseHoursText("Mon-Sat 8-5"), stats: { services: 45000, plus: true, sinceYear: 2016 }, pkgs });
+  assert.equal(hl.length, 4);
+  assert.match(hl[0], /^Lifetime brake pads/);
+  assert.match(hl[1], /^Genuine Valvoline oil/);
+  assert.match(hl[3], /^Open Saturdays — 8am to 5pm/);
+  /* nothing to back a claim up: honest generic ones, no lifetime pads, no brand */
+  const bare = autoHighlights({ cfg: {}, week: parseHoursText("Mon-Fri 8-5"), stats: null, pkgs: [] });
+  assert.equal(bare.length, 4);
+  assert.ok(bare.every((h) => !/lifetime|valvoline|saturday/i.test(h)));
+  assert.deepEqual(splitHighlight("Walk-ins welcome — no appointment needed"), { title: "Walk-ins welcome", sub: "No appointment needed" });
+  assert.deepEqual(splitHighlight("Fast: in and out"), { title: "Fast", sub: "In and out" });
+  assert.deepEqual(splitHighlight("Family owned"), { title: "Family owned", sub: "" });
 });

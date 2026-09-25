@@ -24,7 +24,7 @@ export const DEFAULT_WEBSITE = {
   brandColor: "#8e2f2f",
   accentColor: "#1e8fd0",
   heroPhoto: "", // data URL, shrunk on upload
-  highlights: [], // short selling points; blank uses defaults
+  highlights: [], // "Headline — supporting line", one per line; blank draws them from the shop's records
   hoursWeek: null, // [{ closed, open: "08:00", close: "18:00" }] × 7, Sunday first; null = parse cfg.hours
   showPrices: true, // oil change packages and published canned-job prices
   showStats: true, // "since 2016 · 45,000+ services" from the invoice history
@@ -38,12 +38,41 @@ export const DEFAULT_WEBSITE = {
   links: { google: "", yelp: "", facebook: "", instagram: "" },
 };
 
-export const DEFAULT_HIGHLIGHTS = [
-  "Walk-ins welcome",
-  "Prices posted up front",
-  "A written estimate before any work starts",
-  "Parts and labor warranty",
+/* Selling points under the headline. Written as "Headline — supporting
+   line". When the owner hasn't written their own, they're drawn from what
+   the shop can actually back up: its warranty text, the oil it pours, its
+   hours, its history. Nothing is claimed that the records don't show. */
+export const FALLBACK_HIGHLIGHTS = [
+  "No surprises — prices posted up front and a written estimate before any work starts",
+  "Walk-ins welcome — no appointment needed for most services",
+  "Done right the first time — every repair is backed by our warranty",
+  "Real people, straight answers — we tell you what needs fixing now and what can wait",
 ];
+
+/* "Headline — supporting line" → { title, sub } */
+export function splitHighlight(h) {
+  const t = str(h);
+  const m = t.match(/^(.{2,60}?)\s+[—–-]\s+(.+)$/) || t.match(/^([^:]{2,60}):\s+(.+)$/);
+  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  return m ? { title: m[1].trim(), sub: cap(m[2].trim()) } : { title: t, sub: "" };
+}
+
+export function autoHighlights({ cfg, week, stats, pkgs }) {
+  const out = [];
+  const footer = str(cfg.invoiceFooter);
+  if (/lifetime brake[- ]?pad/i.test(footer)) out.push("Lifetime brake pads — buy a brake package once and we replace the pads free for as long as you own the car");
+  const brand = (pkgs || []).map((p) => (str(p.name).match(/\b(Valvoline|Mobil ?1|Castrol|Pennzoil|Quaker State)\b/i) || [])[1]).find(Boolean);
+  if (brand) out.push(`Genuine ${brand} oil — the right oil for your engine, a new filter, and a fluid check with every change`);
+  out.push(FALLBACK_HIGHLIGHTS[0]);
+  const w = normalizeHoursWeek(week);
+  if (!w[6].closed) out.push(`Open Saturdays — ${fmtClock(w[6].open)} to ${fmtClock(w[6].close)}, walk-ins welcome`);
+  else out.push(FALLBACK_HIGHLIGHTS[1]);
+  const wm = footer.match(/(\d+)\s*months?\s*(?:or|\/)\s*([\d,]+)\s*miles/i);
+  if (wm) out.push(`Warranty on every repair — ${wm[1]} months or ${wm[2]} miles on parts and labor`);
+  if (stats && stats.services >= 1000) out.push(`Trusted by our neighbors — ${stats.services.toLocaleString("en-US")}${stats.plus ? "+" : ""} services${stats.sinceYear ? ` since ${stats.sinceYear}` : ""}`);
+  for (const f of FALLBACK_HIGHLIGHTS) if (out.length < 4 && !out.includes(f)) out.push(f);
+  return out.slice(0, 4);
+}
 
 export const DEFAULT_FAQ = [
   { q: "Do I need an appointment?", a: "No. Oil changes and most quick services are first come, first served. For bigger repairs, request a time below and we'll call to confirm." },
@@ -305,7 +334,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     ardNumber: str(cfg.ardNumber),
     timeZone: str(w.timeZone) || DEFAULT_WEBSITE.timeZone,
     hoursWeek: week,
-    highlights: (w.highlights || []).map(str).filter(Boolean).length ? w.highlights.map(str).filter(Boolean) : DEFAULT_HIGHLIGHTS,
+    highlights: ((w.highlights || []).map(str).filter(Boolean).length ? w.highlights.map(str).filter(Boolean) : autoHighlights({ cfg, week, stats: siteStats(orders), pkgs })).map(splitHighlight),
     faq: (w.faq || []).filter((f) => f && str(f.q) && str(f.a)).length ? w.faq.filter((f) => f && str(f.q) && str(f.a)) : DEFAULT_FAQ,
     services,
     oilPackages: w.showPrices ? pkgs.map((p) => ({ name: str(p.name), price: round2(p.price), quarts: Number(p.quarts) || 5, extraQuart: round2(p.extraQuart || 0), details: str(p.details), kind: packageKind(p) })) : [],
