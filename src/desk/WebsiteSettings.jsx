@@ -242,6 +242,7 @@ export function WebsiteSettings({ d, set, shop, flash }) {
         ["quoteTool", "Oil change price finder: customers pick their car, see the oil it takes and their price (from your service specs)"],
         ["showStats", "Your history: the year you started and how many services you've done"],
         ["booking", "Appointment request form (requests show up here)"],
+        ["signup", "\"Get specials by email\" signup box (signups show up on the Email list page)"],
       ].map(([k, label]) => (
         <label key={k} style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "8px 0" }}>
           <input type="checkbox" checked={!!w[k]} onChange={(e) => setW({ [k]: e.target.checked })} />

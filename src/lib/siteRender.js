@@ -566,6 +566,21 @@ form.ofForm{border:1px solid var(--line);border-radius:20px;box-shadow:var(--sha
 .ofVisit{margin:0;width:100%;border:1px solid var(--line)}
 .ofMap{width:100%;height:220px;border:0;border-radius:14px;margin-top:6px;background:#e9e7e1}
 
+/* email signup, above the footer on every page */
+.signup{background:var(--paper);color:#fff;padding:72px 0}
+.signupGrid{position:relative;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;background:var(--dark);border-radius:26px;padding:44px 44px;box-shadow:0 30px 70px rgba(20,20,20,.18)}
+.signupGrid:before{content:"";position:absolute;inset:0;background:radial-gradient(520px 320px at 100% 0%,color-mix(in srgb,var(--brand) 60%,transparent),transparent 70%);pointer-events:none}
+.signupGrid>*{position:relative}
+.signup .eyebrow{color:rgba(255,255,255,.8)}
+.signup h2{margin:0 0 10px;color:#fff}
+.signup p{margin:0;color:rgba(255,255,255,.85);font-size:17px}
+.signupForm{display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:18px;padding:14px}
+.signupForm input{border-color:transparent}
+.signupForm .btn.primary{box-shadow:none}
+.signupForm .formMsg,.signupForm .fine{grid-column:1/-1;font-size:13px;color:rgba(255,255,255,.85)}
+.signupForm .formMsg.ok,.signupForm .formMsg.err{color:#fff;font-weight:700;font-size:15px}
+.signupForm .hp{position:absolute;left:-9999px}
+
 /* first come, first served */
 .walkIn{background:#fff;border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:var(--shadow)}
 .wiNow{margin:0 0 18px}
@@ -802,7 +817,9 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
   .hero .wrap{padding:56px 20px 64px;gap:36px}
   .strip{margin-top:-36px}
   .spBody{grid-template-columns:1fr;padding-top:36px;gap:32px}
-  .ofHero .wrap,.ofBody{grid-template-columns:1fr}
+  .ofHero .wrap,.ofBody,.signupGrid{grid-template-columns:1fr}
+  .signupForm{grid-template-columns:1fr}
+  .signupGrid{padding:28px 22px;margin:0 -4px}
   .ofCoupon{transform:none}
   .ofBody{padding-top:56px}
   .spSide{position:static}
@@ -952,6 +969,26 @@ ${opts.portalUrl ? `<div class="portal"><div class="wrap"><p><b>Already a custom
 ${servicePages}
 ${(p.offers || []).map((o) => offerPage(p, o, { tel, dirUrl, fullAddress, hours, highlightsHtml, mapQ })).join("")}
 
+${
+  p.signup
+    ? `<section class="signup" id="signup"><div class="wrap signupGrid">
+  <div>
+    <span class="eyebrow">Specials by email</span>
+    <h2>Get deals before anyone else</h2>
+    <p>Coupons, seasonal specials, and a heads-up when you're due. A few emails a month at most.</p>
+  </div>
+  <form class="signupForm" novalidate>
+    <input name="name" autocomplete="given-name" placeholder="First name" maxlength="80" aria-label="First name">
+    <input name="email" type="email" autocomplete="email" placeholder="Email address" maxlength="120" required aria-label="Email address">
+    <label class="hp" aria-hidden="true">Leave blank<input name="website" tabindex="-1" autocomplete="off"></label>
+    <button class="btn primary" type="submit">Sign me up</button>
+    <p class="formMsg" role="status"></p>
+    <p class="fine">Unsubscribe anytime. We never sell or share your email.</p>
+  </form>
+</div></section>`
+    : ""
+}
+
 <footer><div class="wrap">
   <div class="cols">
     <div><p class="name">${esc(p.name)}</p><p>${esc(tagline)}</p></div>
@@ -1016,6 +1053,17 @@ document.addEventListener("click",function(e){var a=e.target.closest&&e.target.c
 var qo=new URLSearchParams(location.search).get("offer");if(qo&&!location.hash){var os="offer-"+qo.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");if(document.getElementById(os))history.replaceState(null,"",location.pathname+location.search+"#"+os)}
 var baseTitle=document.title;function route(){var h=location.hash,el=h&&/^#(service|offer)-/.test(h)?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
 window.addEventListener("hashchange",route);route();
+document.querySelectorAll("form.signupForm").forEach(function(form){var msg=form.querySelector(".formMsg");form.onsubmit=function(e){e.preventDefault();var f=form.elements,em=(f.email.value||"").trim();
+  if(f.website.value)return;
+  if(!/^[^@\\s]+@[^@\\s]+\\.[a-z]{2,}$/i.test(em)){msg.className="formMsg err";msg.textContent="That email doesn't look right.";return}
+  var done=function(){msg.className="formMsg ok";msg.textContent="You're on the list! Watch your inbox for our next special.";form.reset()};
+  if(S.preview||!S.api){msg.className="formMsg ok";msg.textContent=S.preview?"Preview: signups are saved once the site is published.":"Thanks!";return}
+  var src=(location.hash.match(/^#offer-(.+)/)||[])[1]||"";var btn=form.querySelector("button");btn.disabled=true;
+  fetch(S.api.url+"/rest/v1/site_signups",{method:"POST",headers:{apikey:S.api.key,Authorization:"Bearer "+S.api.key,"Content-Type":"application/json",Prefer:"return=minimal"},
+    body:JSON.stringify({shop_id:S.api.shopId,email:em,name:(f.name.value||"").trim().slice(0,80),source:src.toUpperCase().slice(0,40)})})
+  .then(function(r){if(r.status===409)return done();if(!r.ok)throw new Error(r.status);done()})
+  .catch(function(){msg.className="formMsg err";msg.textContent="That didn't go through. Please try again in a minute."})
+  .then(function(){btn.disabled=false})}});
 document.querySelectorAll("form.book").forEach(function(form){var msg=form.querySelector(".formMsg");form.onsubmit=function(e){e.preventDefault();var f=form.elements,v=function(n){return f[n]?(f[n].value||"").trim():""};
   msg.className="formMsg";if(v("website"))return;
   var ph=v("phone").replace(/\\D/g,""),em=v("email");

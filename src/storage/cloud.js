@@ -541,6 +541,29 @@ async function handleSiteRequest(id) {
   if (error) throw error;
 }
 
+/* Email signups from the website, every one (the list is small next to
+   the customer records, but page through anyway: the API caps a read). */
+async function listSiteSignups() {
+  if (!state.linked) return [];
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from("site_signups")
+      .select("id, email, name, source, created_at, unsubscribed_at")
+      .eq("shop_id", state.shopId)
+      .order("created_at")
+      .range(from, from + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+async function setSignupUnsubscribed(ids, unsubscribed) {
+  if (!state.linked || !ids.length) return;
+  const { error } = await supabase.from("site_signups").update({ unsubscribed_at: unsubscribed ? new Date().toISOString() : null }).in("id", ids);
+  if (error) throw error;
+}
+
 /* Customer requests from the portal. Read live; handled by staff. */
 async function listPortalRequests() {
   if (!state.linked) return [];
@@ -604,6 +627,8 @@ export const cloud = {
   siteSlugTaken,
   listSiteRequests,
   handleSiteRequest,
+  listSiteSignups,
+  setSignupUnsubscribed,
   /* Call a Supabase Edge Function as the signed-in shop user. Used for
      distributor lookups (tire search/order) that must run server-side so
      the wholesale credentials never reach the browser. */

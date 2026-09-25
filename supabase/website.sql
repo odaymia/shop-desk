@@ -54,3 +54,28 @@ drop policy if exists "public adds site request" on site_requests;
 create policy "public adds site request" on site_requests
   for insert to anon, authenticated
   with check (handled_at is null and exists (select 1 from shop_site s where s.shop_id = site_requests.shop_id and s.published));
+
+-- Email signups from the website ("Get specials by email"). A visitor can
+-- add their address to a published shop's list and nothing else; staff see
+-- the list and mark people unsubscribed. One row per address per shop.
+create table if not exists site_signups (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  email text not null check (length(email) between 3 and 120 and email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[A-Za-z]{2,}$'),
+  name text check (length(name) <= 80),
+  source text check (length(source) <= 40),   -- the offer code or page they signed up from
+  created_at timestamptz not null default now(),
+  unsubscribed_at timestamptz
+);
+create unique index if not exists site_signups_email on site_signups (shop_id, lower(email));
+
+alter table site_signups enable row level security;
+
+drop policy if exists "members rw site signups" on site_signups;
+create policy "members rw site signups" on site_signups
+  for all using (is_member(shop_id)) with check (is_member(shop_id));
+
+drop policy if exists "public adds site signup" on site_signups;
+create policy "public adds site signup" on site_signups
+  for insert to anon, authenticated
+  with check (unsubscribed_at is null and exists (select 1 from shop_site s where s.shop_id = site_signups.shop_id and s.published));

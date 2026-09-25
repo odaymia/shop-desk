@@ -32,6 +32,7 @@ export const DEFAULT_WEBSITE = {
   showStats: true, // "since 2016 · 45,000+ services" from the invoice history
   quoteTool: true, // the pick-your-car oil change quote, from the shop's own specs
   booking: true, // appointment request form
+  signup: true, // "Get specials by email" box above the footer; signups land on the Email list page
   walkIn: [], // service-menu ids that are first come, first served (no appointments), e.g. ["oil"]
   hiddenPackages: [], // oil package ids left off the site (e.g. customer-supplied oil)
   couponIds: [], // coupons the owner chose to advertise; none by default
@@ -410,6 +411,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     stats: w.showStats ? sinceBefore(siteStats(orders), today) : null,
     vehicles: w.quoteTool && w.showPrices && pkgs.length ? quoteVehicles(specs) : [],
     booking: !!w.booking,
+    signup: w.signup !== false,
     links: { ...DEFAULT_WEBSITE.links, ...(w.links || {}) },
     taxNote: cfg.partsTaxable ? "Plus tax on parts." : "",
     updatedAt: Date.now(),

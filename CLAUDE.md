@@ -127,6 +127,12 @@ prices and hours never drift from the counter. Rules:
 - Any coupon can get an ad landing page (`website.offers`, `#offer-<code>` or
   `?offer=<code>`), advertised on the main site or not. Its claim form
   tags the request note with the code so the shop can see which ad worked.
+- Email list (desk page "Email list", `src/lib/emailList.js`): customers
+  with a valid email plus website signups (`site_signups`), one row per
+  address. Unsubscribing sets `customer.emailOptOut` / `unsubscribed_at` and
+  keeps the row, so nobody unsubscribed is ever copied or exported again.
+  The desk doesn't send mail; the CSV goes to Mailchimp or similar, which
+  carries the unsubscribe link CAN-SPAM requires.
 
 ## Known gaps
 
