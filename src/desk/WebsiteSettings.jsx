@@ -253,6 +253,16 @@ export function WebsiteSettings({ d, set, shop, flash }) {
           <span>{label}</span>
         </label>
       ))}
+      {w.showStats && (
+        <div className="fldRow">
+          <Field label="Year you opened (blank uses your records)">
+            <Text value={w.sinceYear || ""} onChange={(v) => setW({ sinceYear: v.replace(/\D/g, "").slice(0, 4) })} placeholder="2015" inputMode="numeric" />
+          </Field>
+          <Field label="Cars serviced, counting past locations (blank counts invoices here)">
+            <Text value={w.carsServiced || ""} onChange={(v) => setW({ carsServiced: v.replace(/[^\d,]/g, "") })} placeholder="100,000" inputMode="numeric" />
+          </Field>
+        </div>
+      )}
       {w.booking && (d.serviceMenu || []).length > 0 && (
         <Field label="First come, first served (no appointments) — these say &quot;just pull in&quot; instead of offering to book">
           <div>

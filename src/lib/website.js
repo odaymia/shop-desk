@@ -31,6 +31,8 @@ export const DEFAULT_WEBSITE = {
   hoursWeek: null, // [{ closed, open: "08:00", close: "18:00" }] × 7, Sunday first; null = parse cfg.hours
   showPrices: true, // oil change packages and published canned-job prices
   showStats: true, // "since 2016 · 45,000+ services" from the invoice history
+  sinceYear: "", // the year the shop opened, when it's older than the records here
+  carsServiced: "", // cars done in all, counting earlier locations; wins over the invoice count when bigger
   quoteTool: true, // the pick-your-car oil change quote, from the shop's own specs
   booking: true, // appointment request form
   signup: true, // "Get specials by email" box above the footer; signups land on the Email list page
@@ -75,7 +77,7 @@ export function autoHighlights({ cfg, week, stats, pkgs }) {
   else out.push(FALLBACK_HIGHLIGHTS[1]);
   const wm = footer.match(/(\d+)\s*months?\s*(?:or|\/)\s*([\d,]+)\s*miles/i);
   if (wm) out.push(`Warranty on every repair — ${wm[1]} months or ${wm[2]} miles on parts and labor`);
-  if (stats && stats.services >= 1000) out.push(`Trusted by our neighbors — ${stats.services.toLocaleString("en-US")}${stats.plus ? "+" : ""} services${stats.sinceYear ? ` since ${stats.sinceYear}` : ""}`);
+  if (stats && stats.services >= 1000) out.push(`Trusted by our neighbors — ${stats.services.toLocaleString("en-US")}${stats.plus ? "+" : ""} ${stats.cars ? "cars" : "services"}${stats.sinceYear ? ` since ${stats.sinceYear}` : ""}`);
   for (const f of FALLBACK_HIGHLIGHTS) if (out.length < 4 && !out.includes(f)) out.push(f);
   return out.slice(0, 4);
 }
@@ -229,6 +231,19 @@ export function siteStats(orders) {
   }
   const step = count >= 10000 ? 1000 : count >= 1000 ? 100 : count >= 100 ? 10 : 1;
   return { sinceYear: first ? new Date(first).getFullYear() : null, services: Math.floor(count / step) * step, plus: count % step !== 0 || step > 1 };
+}
+
+/* What the owner knows beats what the records show: a shop that opened
+   before its invoices were in the desk, or has done cars at other
+   locations, gives its own year and count. */
+export function historyStats(w, orders) {
+  const st = siteStats(orders);
+  const y = Number(str(w && w.sinceYear));
+  const n = Math.floor(Number(String((w && w.carsServiced) || "").replace(/[^\d.]/g, "")) || 0);
+  const out = { ...st };
+  if (y >= 1900 && y <= 2100 && (!st.sinceYear || y < st.sinceYear)) out.sinceYear = y;
+  if (n > st.services) Object.assign(out, { services: n, plus: true, cars: true });
+  return out;
 }
 
 /* "Serving drivers since 2026" says nothing in 2026; keep the year only
@@ -403,14 +418,14 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     ardNumber: str(cfg.ardNumber),
     timeZone: str(w.timeZone) || DEFAULT_WEBSITE.timeZone,
     hoursWeek: week,
-    highlights: ((w.highlights || []).map(str).filter(Boolean).length ? w.highlights.map(str).filter(Boolean) : autoHighlights({ cfg, week, stats: siteStats(orders), pkgs })).map(splitHighlight),
+    highlights: ((w.highlights || []).map(str).filter(Boolean).length ? w.highlights.map(str).filter(Boolean) : autoHighlights({ cfg, week, stats: historyStats(w, orders), pkgs })).map(splitHighlight),
     faq: (w.faq || []).filter((f) => f && str(f.q) && str(f.a)).length ? w.faq.filter((f) => f && str(f.q) && str(f.a)) : DEFAULT_FAQ,
     services,
     oilPackages: w.showPrices ? pkgs.map((p) => ({ name: str(p.name), price: round2(p.price), quarts: Number(p.quarts) || 5, extraQuart: round2(p.extraQuart || 0), details: str(p.details), kind: packageKind(p) })) : [],
     prices: priced.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
     deals,
     offers,
-    stats: w.showStats ? sinceBefore(siteStats(orders), today) : null,
+    stats: w.showStats ? sinceBefore(historyStats(w, orders), today) : null,
     vehicles: w.quoteTool && w.showPrices && pkgs.length ? quoteVehicles(specs) : [],
     booking: !!w.booking,
     signup: w.signup !== false,

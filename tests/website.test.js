@@ -258,3 +258,16 @@ test("own-domain copy: names the shop, points Google at the domain, loads the li
   assert.ok(html.includes(`"updatedAt":${p.updatedAt}`));
   assert.ok(!renderSite(p, {}).includes("bolt-badger-site")); // the app's own copy doesn't carry it
 });
+
+import { historyStats } from "../src/lib/website.js";
+
+test("the owner's own year and car count beat the invoice history", () => {
+  const orders = { a: { status: "invoiced", invoicedAt: new Date(2024, 0, 5).getTime() } };
+  assert.deepEqual(historyStats({}, orders), { sinceYear: 2024, services: 1, plus: false });
+  const s = historyStats({ sinceYear: "2015", carsServiced: "100,000" }, orders);
+  assert.equal(s.sinceYear, 2015);
+  assert.equal(s.services, 100000);
+  assert.ok(s.cars && s.plus);
+  // a later year or a smaller count doesn't hide the real history
+  assert.equal(historyStats({ sinceYear: "2025", carsServiced: "0" }, orders).sinceYear, 2024);
+});

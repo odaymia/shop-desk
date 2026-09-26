@@ -400,7 +400,7 @@ export function renderSite(p, opts = {}) {
 
   const statItems = [
     p.stats && p.stats.sinceYear && [esc(p.stats.sinceYear), "Serving drivers since"],
-    p.stats && p.stats.services >= 100 && [`${esc(p.stats.services.toLocaleString("en-US"))}${p.stats.plus ? "+" : ""}`, "Services done"],
+    p.stats && p.stats.services >= 100 && [`${esc(p.stats.services.toLocaleString("en-US"))}${p.stats.plus ? "+" : ""}`, p.stats.cars ? "Cars serviced" : "Services done"],
     (p.oilPackages || []).length && [esc(money(Math.min(...p.oilPackages.map((x) => x.price)))), "Oil changes from"],
   ].filter(Boolean);
   const stats = statItems.length ? `<div class="stats">${statItems.map(([b, s]) => `<div><b>${b}</b><span>${s}</span></div>`).join("")}</div>` : "";
