@@ -6,8 +6,9 @@ import { buildEmailList, filterEmailList } from "../lib/emailList.js";
 import { composeEmail } from "../lib/emailCompose.js";
 import { fillPlaceholders } from "../lib/emailRender.js";
 import { automationsOf, AUTOMATION_INFO, DEFAULT_AUTOMATIONS } from "../lib/emailAutomations.js";
-import { couponText } from "../lib/website.js";
-import { runAutomations, emailOpts } from "./emailRunner.js";
+import { runAutomations, emailOpts, emailServices } from "./emailRunner.js";
+import { EmailBuilder, EmailPreview } from "./EmailBuilder.jsx";
+import { TEMPLATES, specBlocks } from "../lib/emailBlocks.js";
 import { Postcards } from "./Postcards.jsx";
 
 /* Marketing: write and send email campaigns, set up the automatic emails,
@@ -67,49 +68,19 @@ export function EmailCenter({ shop, cfg, saveCfg, flash }) {
 
 /* ---------- shared bits ---------- */
 
-function Preview({ html, first = "Ana" }) {
-  const doc = useMemo(() => fillPlaceholders(html, { first_name: first, vehicle: "2018 Honda Civic", due_date: "October 12", unsubscribe_url: "#" }), [html, first]);
-  return <iframe title="Email preview" srcDoc={doc} sandbox="" style={{ width: "100%", height: 640, border: "1px solid var(--line)", borderRadius: 10, background: "#f2efe9" }} />;
-}
-
-const activeCoupons = (shop) =>
-  Object.values(shop.coupons || {})
-    .filter((c) => c && c.active !== false && !c.deleted && (!c.endsAt || c.endsAt >= new Date().toISOString().slice(0, 10)))
-    .sort((a, b) => String(a.code).localeCompare(String(b.code)));
-
-function CouponPick({ shop, value, onChange }) {
-  return (
-    <select value={value || ""} onChange={(e) => onChange(e.target.value)}>
-      <option value="">No coupon</option>
-      {activeCoupons(shop).map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.code} — {c.name || couponText(c)}
-          {c.endsAt ? ` (ends ${c.endsAt})` : ""}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function ButtonPick({ value, onChange }) {
-  return (
-    <select value={value || ""} onChange={(e) => onChange(e.target.value)}>
-      <option value="site">Button to our website (or the coupon's page)</option>
-      <option value="review">Button: leave us a Google review</option>
-      <option value="custom">Button to a link I choose</option>
-      <option value="">No button</option>
-    </select>
-  );
-}
+const SAMPLE = { first_name: "Ana", vehicle: "2018 Honda Civic", due_date: "October 12", unsubscribe_url: "#" };
+const previewOf = (msg) => fillPlaceholders(msg.html, SAMPLE);
+const subjectOf = (msg) => fillPlaceholders(msg.subject, SAMPLE, { html: false });
 
 /* ---------- campaigns ---------- */
 
-const blankCampaign = () => ({ name: "", subject: "", preheader: "", headline: "", body: "Hi {first_name},\n\n", couponId: "", button: "site", buttonLabel: "", buttonUrl: "", who: "all", since: "any", when: "" });
+const fromTemplate = (t) => ({ name: "", theme: { header: "dark", corners: "rounded" }, ...t.make(), who: "all", since: "any", when: "" });
 
 function Campaigns({ shop, cfg, flash }) {
   const [list, setList] = useState([]);
   const [err, setErr] = useState("");
   const [draft, setDraftState] = useState(() => lsGet("bb:emailDraft", null));
+  const [picking, setPicking] = useState(false);
   const setDraft = (d) => {
     setDraftState(d);
     lsSet("bb:emailDraft", d);
@@ -131,10 +102,31 @@ function Campaigns({ shop, cfg, flash }) {
   return (
     <div className="deskBody">
       <div className="rowBtns" style={{ marginBottom: 14 }}>
-        <button className="btn primary" onClick={() => setDraft(blankCampaign())}>
+        <button className="btn primary" onClick={() => setPicking(true)}>
           New campaign
         </button>
       </div>
+      {picking && (
+        <Modal title="Start from…" onClose={() => setPicking(false)} size="lg">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="card"
+                style={{ padding: 14, textAlign: "left", cursor: "pointer", border: "1px solid var(--line)" }}
+                onClick={() => {
+                  setDraft(fromTemplate(t));
+                  setPicking(false);
+                }}
+              >
+                <b style={{ display: "block", fontSize: 16 }}>{t.name}</b>
+                <span className="muted">{t.note}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
       {err && <p className="legalNote" style={{ color: "#b42318" }}>{err}</p>}
       <div className="tableCard">
         <table className="dk">
@@ -206,10 +198,11 @@ function Composer({ shop, cfg, flash, draft, setDraft, onDone }) {
   }, []);
   const { rows } = useMemo(() => buildEmailList({ customers: shop.customers, orders: shop.orders, signups, suppressed: supp }), [shop.customers, shop.orders, signups, supp]);
   const audience = useMemo(() => filterEmailList(rows, { who: draft.who, since: draft.since }), [rows, draft.who, draft.since]);
-  const msg = useMemo(() => composeEmail(cfg, shop.coupons, draft, emailOpts()), [cfg, shop.coupons, draft]);
+  const services = useMemo(() => emailServices(shop, cfg), [shop.jobs, shop.parts, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const msg = useMemo(() => composeEmail(cfg, shop.coupons, draft, { ...emailOpts(), services }), [cfg, shop.coupons, draft, services]);
   const label = [WHO.find((w) => w[0] === draft.who)[1], draft.since !== "any" ? SINCE.find((s) => s[0] === draft.since)[1].toLowerCase() : ""].filter(Boolean).join(", ");
   const limit = emailOf(cfg).dailyLimit;
-  const ready = draft.subject.trim() && draft.body.trim();
+  const ready = String(draft.subject || "").trim() && specBlocks(draft).length > 0;
 
   const save = (kind = "campaign") => cloud.saveEmailMessage({ kind, name: draft.name, subject: msg.subject, html: msg.html, text: msg.text, audience: { who: draft.who, since: draft.since, label, count: audience.length } });
 
@@ -261,36 +254,7 @@ function Composer({ shop, cfg, flash, draft, setDraft, onDone }) {
           <Field label="Campaign name (only you see this)">
             <Text value={draft.name} onChange={set("name")} placeholder="October oil change special" />
           </Field>
-          <Field label="Subject line">
-            <Text value={draft.subject} onChange={set("subject")} placeholder="{first_name}, $20 off your next oil change" maxLength={120} />
-          </Field>
-          <Field label="Preview text (the gray line after the subject in the inbox)">
-            <Text value={draft.preheader} onChange={set("preheader")} placeholder="This week only, no appointment needed" maxLength={140} />
-          </Field>
-          <Field label="Headline">
-            <Text value={draft.headline} onChange={set("headline")} placeholder="Save on your next oil change" />
-          </Field>
-          <Field label="Message (a blank line starts a new paragraph; {first_name} becomes their name)">
-            <textarea rows={8} value={draft.body} onChange={(e) => set("body")(e.target.value)} />
-          </Field>
-          <Field label="Coupon">
-            <CouponPick shop={shop} value={draft.couponId} onChange={set("couponId")} />
-          </Field>
-          <div className="fldRow">
-            <Field label="Button">
-              <ButtonPick value={draft.button} onChange={set("button")} />
-            </Field>
-            {draft.button && (
-              <Field label="Button text">
-                <Text value={draft.buttonLabel} onChange={set("buttonLabel")} placeholder={draft.button === "review" ? "Leave us a review" : draft.couponId ? "See the offer" : "Visit our website"} />
-              </Field>
-            )}
-          </div>
-          {draft.button === "custom" && (
-            <Field label="Button link">
-              <Text value={draft.buttonUrl} onChange={set("buttonUrl")} placeholder="https://…" />
-            </Field>
-          )}
+          <EmailBuilder value={draft} onChange={setDraft} shop={shop} services={services} flash={flash} />
 
           <h3 className="subhead" style={{ marginTop: 24 }}>
             Who gets it
@@ -341,10 +305,9 @@ function Composer({ shop, cfg, flash, draft, setDraft, onDone }) {
           </div>
         </div>
         <div>
-          <p className="muted" style={{ margin: "0 0 6px" }}>
-            <b>Subject:</b> {fillPlaceholders(msg.subject, { first_name: "Ana" }, { html: false })}
-          </p>
-          <Preview html={msg.html} />
+          <div style={{ position: "sticky", top: 12 }}>
+            <EmailPreview html={previewOf(msg)} subject={subjectOf(msg)} />
+          </div>
         </div>
       </div>
       {confirm && (
@@ -401,6 +364,7 @@ function Automations({ shop, cfg, saveCfg, flash }) {
       .catch(() => {});
   }, []);
   const setA = (k, patch) => setAuto({ ...auto, [k]: { ...auto[k], ...patch } });
+  const services = useMemo(() => emailServices(shop, cfg), [shop.jobs, shop.parts, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = async (next = auto) => {
     await saveCfg({ ...cfg, email: { ...emailOf(cfg), automations: next } });
     flash("Automations saved");
@@ -438,7 +402,7 @@ function Automations({ shop, cfg, saveCfg, flash }) {
       {Object.keys(DEFAULT_AUTOMATIONS).map((k) => {
         const a = auto[k];
         const info = AUTOMATION_INFO[k];
-        const msg = open === k ? composeEmail(cfg, shop.coupons, a, emailOpts()) : null;
+        const msg = open === k ? composeEmail(cfg, shop.coupons, a, { ...emailOpts(), services }) : null;
         return (
           <div key={k} className="card" style={{ padding: 16, marginBottom: 12 }}>
             <div className="rowBtns" style={{ alignItems: "center", justifyContent: "space-between" }}>
@@ -475,38 +439,30 @@ function Automations({ shop, cfg, saveCfg, flash }) {
                       <input type="number" min={extra[k][2]} max={extra[k][3]} value={a[extra[k][0]]} onChange={(e) => setA(k, { [extra[k][0]]: Number(e.target.value) })} />
                     </Field>
                   )}
-                  <Field label="Subject line">
-                    <Text value={a.subject} onChange={(v) => setA(k, { subject: v })} />
-                  </Field>
-                  <Field label="Headline">
-                    <Text value={a.headline} onChange={(v) => setA(k, { headline: v })} />
-                  </Field>
-                  <Field label={`Message ({first_name}${k === "oil" ? ", {vehicle}, {due_date}" : ""} fill in per person)`}>
-                    <textarea rows={7} value={a.body} onChange={(e) => setA(k, { body: e.target.value })} />
-                  </Field>
-                  <Field label="Coupon">
-                    <CouponPick shop={shop} value={a.couponId} onChange={(v) => setA(k, { couponId: v })} />
-                  </Field>
-                  <Field label="Button">
-                    <ButtonPick value={a.button} onChange={(v) => setA(k, { button: v })} />
-                  </Field>
-                  {a.button === "review" && !((cfg.website || {}).links || {}).google && (
-                    <p className="legalNote">Add your Google review link in Settings → Website → Review and social pages, or the button points to your website.</p>
+                  <EmailBuilder
+                    value={a}
+                    onChange={(v) => setA(k, { ...v, blocks: specBlocks(v) })}
+                    shop={shop}
+                    services={services}
+                    flash={flash}
+                    placeholders={k === "oil" ? "{first_name}, {vehicle}, {due_date}" : "{first_name}"}
+                  />
+                  {specBlocks(a).some((b) => b.link === "review" || b.type === "button") && !((cfg.website || {}).links || {}).google && (
+                    <p className="legalNote">Add your Google review link in Settings → Website → Review and social pages, or review buttons point to your website.</p>
                   )}
                   <div className="rowBtns" style={{ marginTop: 10 }}>
                     <button className="btn primary" onClick={() => save()}>
                       Save
                     </button>
                     <button className="btn" onClick={() => setAuto({ ...auto, [k]: { ...DEFAULT_AUTOMATIONS[k], on: a.on } })}>
-                      Reset the wording
+                      Reset to the default layout
                     </button>
                   </div>
                 </div>
                 <div>
-                  <p className="muted" style={{ margin: "0 0 6px" }}>
-                    <b>Subject:</b> {fillPlaceholders(msg.subject, { first_name: "Ana", vehicle: "2018 Honda Civic", due_date: "October 12" }, { html: false })}
-                  </p>
-                  <Preview html={msg.html} />
+                  <div style={{ position: "sticky", top: 12 }}>
+                    <EmailPreview html={previewOf(msg)} subject={subjectOf(msg)} />
+                  </div>
                 </div>
               </div>
             )}

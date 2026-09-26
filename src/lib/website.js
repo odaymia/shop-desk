@@ -338,6 +338,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     while (usedSlugs.has(slug)) slug += "-2";
     usedSlugs.add(slug);
     return {
+      id: m.id,
       name: m.name,
       slug,
       key: content.key,

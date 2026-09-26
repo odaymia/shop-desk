@@ -17,41 +17,60 @@ const DAY = 86400000;
 const MONTH = 30.4 * DAY;
 const str = (s) => String(s == null ? "" : s).trim();
 
+/* Each automatic email is a subject plus blocks (see emailBlocks.js),
+   laid out to look like a modern marketing email out of the box. */
+const OIL_PHOTO = "1784619588643-d5a7bfda632b";
+const SHOP_PHOTO = "1625047509248-ec889cbff17f";
+const HOOD_PHOTO = "1713757553447-f8f092417cf9";
 export const DEFAULT_AUTOMATIONS = {
   thanks: {
     on: false,
     delayDays: 1,
     subject: "Thanks for coming in, {first_name}!",
-    headline: "Thanks for choosing us",
-    body: "Hi {first_name},\n\nThanks for trusting us with your car. If anything doesn't seem right, call us and we'll make it right.\n\nGot a minute? A quick review helps other drivers find an honest shop.",
-    button: "review", // "review" (the Google review link) | "site" | ""
-    couponId: "",
+    preheader: "It means a lot to a local shop.",
+    theme: { header: "dark", corners: "rounded" },
+    blocks: [
+      { id: "t1", type: "text", title: "Thanks for choosing us", text: "Hi {first_name},\n\nThanks for trusting us with your car. If anything doesn't seem right, call us and we'll make it right." },
+      { id: "t2", type: "text", title: "", text: "Got a minute? A quick review helps other drivers find an honest shop." },
+      { id: "t3", type: "button", label: "Leave us a review", link: "review", url: "" },
+    ],
   },
   oil: {
     on: false,
     leadDays: 3, // send this many days before the date on the window sticker
     subject: "{first_name}, your {vehicle} is due for an oil change",
-    headline: "Time for an oil change",
-    body: "Hi {first_name},\n\nYour {vehicle} is due for its next oil change around {due_date}. Staying on schedule is the cheapest way to keep an engine healthy.\n\nNo appointment needed. Just pull in any time we're open.",
-    button: "site",
-    couponId: "",
+    preheader: "No appointment needed. Just pull in.",
+    theme: { header: "dark", corners: "rounded" },
+    blocks: [
+      { id: "o1", type: "hero", photo: OIL_PHOTO, headline: "Time for an oil change", text: "Hi {first_name}, your {vehicle} is due for its next oil change around {due_date}. Staying on schedule is the cheapest way to keep an engine healthy.", buttonLabel: "See our oil change prices", link: "site", url: "" },
+      { id: "o2", type: "coupon", couponId: "", note: "Show this email at the counter." },
+      { id: "o3", type: "visit", title: "No appointment needed" },
+    ],
   },
   winback: {
     on: false,
     months: 6, // no visit in this many months
     subject: "We miss you, {first_name}",
-    headline: "It's been a while",
-    body: "Hi {first_name},\n\nWe haven't seen you in a while, and your car is probably due for some attention. Here's a little something to bring you back.",
-    button: "site",
-    couponId: "",
+    preheader: "Here's a little something to bring you back.",
+    theme: { header: "dark", corners: "rounded" },
+    blocks: [
+      { id: "w1", type: "hero", photo: SHOP_PHOTO, headline: "It's been a while", text: "Hi {first_name}, we haven't seen you in a while, and your car is probably due for some attention. Here's a little something to bring you back.", buttonLabel: "See what's due", link: "offer", url: "" },
+      { id: "w2", type: "coupon", couponId: "", note: "Show this email at the counter." },
+      { id: "w3", type: "services", title: "Worth a look", ids: [] },
+      { id: "w4", type: "visit", title: "Come see us" },
+    ],
   },
   welcome: {
     on: false,
     subject: "Welcome to the list, {first_name}!",
-    headline: "Thanks for signing up",
-    body: "Hi {first_name},\n\nYou're on the list. We'll send specials and a heads-up when your car is due, a few emails a month at most.\n\nHere's a thank-you for your first visit.",
-    button: "site",
-    couponId: "",
+    preheader: "Here's a thank-you for your first visit.",
+    theme: { header: "dark", corners: "rounded" },
+    blocks: [
+      { id: "n1", type: "hero", photo: HOOD_PHOTO, headline: "Thanks for signing up", text: "Hi {first_name}, you're on the list. We'll send specials and a heads-up when your car is due, a few emails a month at most.", buttonLabel: "", link: "site", url: "" },
+      { id: "n2", type: "coupon", couponId: "", note: "A thank-you for your first visit." },
+      { id: "n3", type: "services", title: "What we do", ids: [] },
+      { id: "n4", type: "visit", title: "Come see us" },
+    ],
   },
 };
 
@@ -64,7 +83,17 @@ export const AUTOMATION_INFO = {
 
 export const automationsOf = (cfg) => {
   const saved = (cfg && cfg.email && cfg.email.automations) || {};
-  return Object.fromEntries(Object.entries(DEFAULT_AUTOMATIONS).map(([k, d]) => [k, { ...d, ...(saved[k] || {}) }]));
+  return Object.fromEntries(
+    Object.entries(DEFAULT_AUTOMATIONS).map(([k, d]) => {
+      const mine = saved[k] || {};
+      /* wording saved before blocks existed (headline, body, coupon, button)
+         is the owner's: keep it rather than the new default layout */
+      const legacy = !mine.blocks && (mine.headline || mine.body || mine.couponId);
+      const merged = { ...d, ...mine };
+      if (legacy) delete merged.blocks;
+      return [k, merged];
+    })
+  );
 };
 
 /* "oil change" lines, the same test the customer portal's reminders use */

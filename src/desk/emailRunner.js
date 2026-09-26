@@ -8,7 +8,17 @@ import { cloud } from "../storage/index.js";
 import { dueAutomations, automationsOf, AUTOMATION_INFO } from "../lib/emailAutomations.js";
 import { composeEmail } from "../lib/emailCompose.js";
 import { duePostcards } from "../lib/postcards.js";
+import { sitePayload } from "../lib/website.js";
 import defaultLogo from "../assets/genie-logo.png";
+
+/* The service menu with prices and page addresses, for Services blocks */
+export function emailServices(shop, cfg) {
+  try {
+    return sitePayload({ cfg, jobs: shop.jobs, parts: shop.parts, coupons: {}, orders: {}, specs: {}, today: new Date().toISOString().slice(0, 10) }).services;
+  } catch {
+    return [];
+  }
+}
 
 export const emailOpts = () => ({ appBase: new URL("./", window.location.href).href, logoUrl: new URL(defaultLogo, window.location.href).href });
 
@@ -40,7 +50,7 @@ export async function runAutomations(shop, cfg) {
   const auto = automationsOf(cfg);
   const result = {};
   for (const [kind, list] of Object.entries(byKind)) {
-    const msg = composeEmail(cfg, shop.coupons, auto[kind], emailOpts());
+    const msg = composeEmail(cfg, shop.coupons, auto[kind], { ...emailOpts(), services: emailServices(shop, cfg) });
     const id = await cloud.saveEmailMessage({ kind, name: AUTOMATION_INFO[kind].title, subject: msg.subject, html: msg.html, text: msg.text });
     const out = await cloud.invoke("email", { action: "queue", messageId: id, recipients: list.map((d) => ({ email: d.email, vars: d.vars, dedupe: d.dedupe })) });
     result[kind] = { found: list.length, queued: out.queued || 0 };

@@ -107,3 +107,41 @@ test("compose: brand from settings, coupon with its landing page, review button"
   const r = composeEmail(cfg, coupons, { subject: "Thanks", body: "x", button: "review" });
   assert.ok(r.html.includes("https://g.page/r/abc/review") && r.html.includes("Leave us a review"));
 });
+
+test("block emails: every block draws, links resolve to the shop's own pages, text is escaped", async () => {
+  const { composeEmail } = await import("../src/lib/emailCompose.js");
+  const { TEMPLATES, newBlock, BLOCK_TYPES, specBlocks } = await import("../src/lib/emailBlocks.js");
+  const cfg = { shopName: "Test Lube", shopAddress: "1 Main St", shopPhone: "619-555-0100", hours: "Mon-Fri 8-6", website: { slug: "t", domain: "www.testlube.example", cityLine: "El Cajon, CA 92021", offers: { c1: {} }, links: { google: "https://g.page/r/abc/review", yelp: "https://yelp.com/biz/t" } } };
+  const coupons = { c1: { id: "c1", code: "WEB20", name: "$20 OFF ANY OIL CHANGE", kind: "amount", value: 20, endsAt: "2026-10-31" } };
+  const services = [{ id: "oil", name: "Oil change", slug: "oil-change", from: 54.99, oil: true }, { id: "brakes", name: "Brakes", slug: "brakes", from: null }];
+  const blocks = BLOCK_TYPES.map(([t]) => newBlock(t)).map((b) =>
+    b.type === "coupon" ? { ...b, couponId: "c1" } : b.type === "review" ? { ...b, quote: "Great <b>service</b>", name: "Maria" } : b.type === "text" ? { ...b, title: "Hi <there>", text: "Line one\n\nLine two" } : b
+  );
+  const m = composeEmail(cfg, coupons, { subject: "Hi {first_name}", blocks, theme: { header: "brand", corners: "square" } }, { services });
+  const h = m.html;
+  assert.ok(h.includes("https://www.testlube.example/?offer=web20")); // hero "Get the coupon"-style links and the coupon go to the offer page
+  assert.ok(h.includes("https://www.testlube.example/#service-oil-change") && h.includes("from <b"));
+  assert.ok(h.includes("$54.99"));
+  assert.ok(h.includes("https://www.google.com/maps/dir/?api=1&amp;destination="));
+  assert.ok(h.includes("Mon – Fri"));
+  assert.ok(h.includes("Great &lt;b&gt;service&lt;/b&gt;") && h.includes("Hi &lt;there&gt;"));
+  assert.ok(h.includes("Code WEB20") && h.includes(">$20 OFF<"));
+  assert.ok(h.includes(">Yelp<") && h.includes('href="{unsubscribe_url}"'));
+  assert.ok(h.includes("images.unsplash.com") && h.includes("fm=jpg") && !/data:image|<script/i.test(h));
+  assert.ok(m.text.includes("Oil change (from $54.99)") && m.text.includes("Unsubscribe: {unsubscribe_url}"));
+  /* every starter template makes a sendable email */
+  for (const t of TEMPLATES) {
+    const spec = t.make();
+    assert.ok(specBlocks(spec).length > 0, t.id);
+    assert.ok(composeEmail(cfg, coupons, spec, { services }).html.includes("</html>"), t.id);
+  }
+});
+
+test("automations: new modern layouts by default, but wording saved the old way is kept", async () => {
+  const { automationsOf } = await import("../src/lib/emailAutomations.js");
+  const fresh = automationsOf({});
+  assert.equal(fresh.oil.blocks[0].type, "hero");
+  const old = automationsOf({ email: { automations: { oil: { on: true, headline: "My own words", body: "Hi {first_name}" } } } });
+  assert.equal(old.oil.blocks, undefined); // its headline/body become blocks when drawn
+  assert.equal(old.oil.headline, "My own words");
+});

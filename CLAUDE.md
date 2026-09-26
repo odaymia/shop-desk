@@ -141,8 +141,14 @@ The desk's Email page writes and sends email through Resend, via the
 `supabase/email.sql`). One Resend account serves every shop; each shop
 sends from its own verified domain (or a shared default sender).
 
+- Emails are built from blocks (`src/lib/emailBlocks.js`: hero, text,
+  coupon, services, photo + text, image, review, button, hours &
+  directions, divider; starter templates). `emailCompose.js` resolves each
+  block's links (website, coupon page, service page, Google reviews) and
+  data; older headline/body/coupon/button specs convert via `specBlocks`.
 - `src/lib/emailRender.js` draws the email (tables, inline styles; no
-  scripts or data: images). Per-person values are placeholders
+  scripts or data: images; photos are fm=jpg because desktop Outlook can't
+  show WebP/AVIF). Per-person values are placeholders
   (`{first_name}`, `{vehicle}`, `{due_date}`, `{unsubscribe_url}`) that the
   function fills at send time, so one copy serves the whole list.
 - `src/lib/emailAutomations.js` decides who's due (thank-you, oil reminder,
