@@ -12,7 +12,7 @@ import { customerName, vehicleName, activeList, ordersOf } from "./useShop.js";
 const US_STATES = "AL AK AZ AR CA CO CT DC DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 const norm = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket" }) {
+export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket", startsAs = "estimate" }) {
   const [plate, setPlate] = useState("");
   const [state, setState] = useState("CA");
   const [step, setStep] = useState("plate"); // plate | confirm | vehicle | edit
@@ -101,7 +101,7 @@ export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket" 
         </dl>
         <div className="rowBtns">
           <button className="btn primary lg" onClick={() => start(chosen)} autoFocus>
-            Yes, start the estimate
+            Yes, start the {startsAs}
           </button>
           <button className="btn lg" onClick={() => setStep("edit")}>
             Fix car details
@@ -170,7 +170,7 @@ export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket" 
         </button>
       </div>
       <p className="legalNote">
-        A plate on file shows the car to confirm, then opens the estimate. A new plate{" "}
+        A plate on file shows the car to confirm, then opens the {startsAs}. A new plate{" "}
         {cfg.plateApiKey ? "is looked up and the car is built from it" : "opens a blank car to fill in"}. The customer's name
         and number go on the ticket whenever they're ready, from the Customer button at the top.
       </p>

@@ -536,6 +536,18 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             </label>
           ))}
 
+          <h3 className="subhead" style={{ marginTop: 28 }}>Oil change tickets</h3>
+          <Field label="Oil & lube tickets">
+            <select value={d.quickLube === false ? "full" : "quick"} onChange={(e) => set("quickLube")(e.target.value === "quick")}>
+              <option value="quick">Quick lube: no estimate, just the lube menu, short receipt</option>
+              <option value="full">Same as repair tickets (estimate first, every tool)</option>
+            </select>
+          </Field>
+          <p className="legalNote" style={{ marginTop: 4 }}>
+            Quick lube tickets open ready to work, show only oil change, filter and fluid services, and print a short receipt with the next oil change
+            due. Add brakes, tires, or repair work and the ticket turns into a full one on its own.
+          </p>
+
           <h3 className="subhead" style={{ marginTop: 28 }}>Signatures on maintenance-only tickets</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             California law (B&amp;P Code §9884.9(e)) doesn't require a written estimate for preventative maintenance (oil and filter changes, fluid services, air and

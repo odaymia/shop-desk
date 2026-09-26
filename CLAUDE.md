@@ -102,6 +102,10 @@ Records are never deleted. Customers, vehicles, parts, vendors, jobs get
 - Maintenance-only tickets (B&P §9884.9(e): oil, fluids, filters, wipers,
   bulbs, rotations, at posted prices) skip the authorization warning unless
   the shop sets `pmSignature: "required"`. Everything still gets an invoice.
+- Quick lube (`isQuickLube`): an oil & lube-only ticket starts as an open
+  ticket (no estimate), shows only the lube menu and tools, and prints a
+  short receipt with the next oil change due. Adding non-lube work turns it
+  back into a full ticket. `cfg.quickLube === false` turns this off.
 
 ## UI
 

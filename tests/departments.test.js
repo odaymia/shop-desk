@@ -79,3 +79,19 @@ test("quick-lube shorthand from real tickets", () => {
   assert.equal(lineDept(L("", "DISPOSAL FEE", 5, "part")), null);
   assert.equal(isMaintenanceOnly({ lines: [oil, L("", "2PT FUEL INJECT SERVICE"), L("", "DISPOSAL FEE", 5, "part")] }), true);
 });
+
+import { isQuickLube, lubeMenu, startStatus } from "../src/lib/departments.js";
+
+test("quick lube: oil-only tickets, no estimate, lube menu only", () => {
+  assert.equal(isQuickLube({ dept: "oil", lines: [] }), true);
+  assert.equal(isQuickLube({ lines: [oil, filter, wipers] }), true);
+  assert.equal(isQuickLube({ dept: "oil", lines: [oil, brakes] }), false);
+  assert.equal(isQuickLube({ dept: "oil", lines: [oil] }, null, { quickLube: false }), false);
+  assert.equal(isQuickLube({ lines: [] }), false);
+  const menu = ["Oil change", "Brakes", "Tires", "Air filters", "Cabin air filters", "Wipers", "Transmission", "Radiator", "Brake fluid", "Fuel system", "Power steering", "Differential fluid"].map((name) => ({ id: name, name }));
+  assert.deepEqual(lubeMenu(menu).map((m) => m.name), ["Oil change", "Air filters", "Cabin air filters", "Wipers", "Transmission", "Radiator", "Brake fluid", "Fuel system", "Power steering", "Differential fluid"]);
+  assert.equal(startStatus("oil", {}), "open");
+  assert.equal(startStatus("oil", { quickLube: false }), "estimate");
+  assert.equal(startStatus("tires", {}), "estimate");
+  assert.equal(startStatus(null, {}), "estimate");
+});

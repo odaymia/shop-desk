@@ -83,6 +83,28 @@ export function deptAmount(order, dept, parts) {
   return round2(n);
 }
 
+/* ---------- quick lube ---------- */
+
+/* An oil & lube ticket and nothing else: it gets the quick-lube screen
+   (just the lube menu, no estimate step, no concern or findings) and the
+   short receipt. Adding brakes or tires turns it back into a full ticket.
+   Shops can turn the quick-lube layout off (cfg.quickLube === false). */
+export function isQuickLube(order, parts, cfg) {
+  if (cfg && cfg.quickLube === false) return false;
+  const ds = orderDepts(order, parts);
+  return ds.length === 1 && ds[0] === "oil";
+}
+/* The service-menu buttons that are lube work (oil change, filters,
+   fluids, wipers), for the quick-lube screen. */
+export function lubeMenu(menu) {
+  return (menu || []).filter((m) => lineDept({ kind: "labor", job: m.name, description: m.name }) === "oil");
+}
+/* Oil changes skip the estimate: posted prices and the customer's OK are
+   enough (B&P 9884.9(e)), so a new one opens ready to work. */
+export function startStatus(dept, cfg) {
+  return dept === "oil" && !(cfg && cfg.quickLube === false) ? "open" : "estimate";
+}
+
 /* ---------- preventative maintenance ---------- */
 
 /* California B&P §9884.9(e): no written estimate is needed for the

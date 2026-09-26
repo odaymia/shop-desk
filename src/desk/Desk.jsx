@@ -20,7 +20,7 @@ import { SignatureStation } from "./Signing.jsx";
 import { BayDisplay } from "./BayDisplay.jsx";
 import { Fleet } from "./Fleet.jsx";
 import { DEMO } from "../lib/demo.js";
-import { activeDepts, DEPTS } from "../lib/departments.js";
+import { activeDepts, DEPTS, startStatus } from "../lib/departments.js";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
@@ -195,7 +195,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       return;
     }
     setStarting(false);
-    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null, dept });
+    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null, dept, status: startStatus(dept, cfg) });
     nav.openOrder(o.id);
   };
 
@@ -308,6 +308,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           shop={shop}
           cfg={cfg}
           title={starting.dept ? `New ${(DEPTS.find((x) => x.id === starting.dept) || {}).noun || "ticket"}` : "New ticket"}
+          startsAs={startStatus(starting.dept, cfg) === "open" ? "ticket" : "estimate"}
           onClose={() => setStarting(false)}
           onStart={(opts) => newTicket({ ...opts, dept: starting.dept, walkIn: !opts.customerId && !opts.vehicleId })}
         />

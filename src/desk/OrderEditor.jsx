@@ -13,7 +13,7 @@ import { addFinding } from "../lib/findings.js";
 import { suggestedWork } from "../lib/repairs.js";
 import { needsReauth, complianceWarnings } from "../lib/compliance.js";
 import { isFleet, fleetName, fleetDiscountLine } from "../lib/fleet.js";
-import { orderDepts, deptLabel, combinable, mergeTickets, isMaintenanceOnly, authorizationRequired } from "../lib/departments.js";
+import { orderDepts, deptLabel, combinable, mergeTickets, isMaintenanceOnly, authorizationRequired, isQuickLube, lubeMenu } from "../lib/departments.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
@@ -98,6 +98,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
   const [combineWith, setCombineWith] = useState(null); // another open ticket for this car, to merge onto this receipt
+  const [fullView, setFullView] = useState(false); // show every tool on a quick-lube ticket
   const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
   const [partCat, setPartCat] = useState(""); // inventory category a menu button opened the part picker to
   const [signing, setSigning] = useState(false);
@@ -534,6 +535,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   /* departments: which ones this ticket's work spans, and other open
      tickets for the same car that could share its receipt */
   const depts = orderDepts(o, shop.parts);
+  /* an oil & lube-only ticket gets the quick-lube screen: the lube menu,
+     no estimate step, no concern or findings, no signature buttons unless
+     the shop requires them */
+  const quick = isQuickLube(o, shop.parts, cfg) && !fullView;
+  const askSign = !quick || cfg.pmSignature === "required";
   const others = locked ? [] : combinable(o, shop.orders);
   const combine = async () => {
     const x = combineWith;
@@ -552,8 +558,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <button className="btn ghost" onClick={() => nav.back()}>
           ← Tickets
         </button>
-        <h1>{orderTitle(o)}</h1>
-        <span className={`st ${o.status}`}>{statusLabel(o.status)}</span>
+        <h1>{quick && o.status === STATUS.open ? `Oil change #${o.number}` : orderTitle(o)}</h1>
+        <span className={`st ${o.status}`}>{quick && o.status === STATUS.open ? "In service" : statusLabel(o.status)}</span>
         {o.status === STATUS.invoiced && (owesBalance(o, t) ? <span className="st due">Balance due</span> : <span className="st paid">Paid</span>)}
         <div className="grow" />
         <div className="tkActions">
@@ -575,6 +581,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           )}
           {(o.status === STATUS.estimate || o.status === STATUS.open || o.status === STATUS.invoiced) && (customer || vehicle) && (
             <>
+              {askSign && (
+                <>
               <button className="btn" onClick={async () => (await flushNow(), setSigning(true))}>
                 Get signature
               </button>
@@ -654,6 +662,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               >
                 Send to pad
               </button>
+                </>
+              )}
               {(cfg.bays || []).length > 0 && (
                 <select
                   className="btn"
@@ -707,7 +717,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               Approve → Repair order
             </button>
           )}
-          {o.status === STATUS.open && (
+          {o.status === STATUS.open && !quick && (
             <button className="btn ghost" onClick={() => moveTo(STATUS.estimate)}>
               Back to estimate
             </button>
@@ -918,7 +928,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           <div className="card" style={{ marginTop: 14 }}>
             {!locked && (
               <div className="addBar">
-                {(cfg.serviceMenu || []).map((m) => (
+                {(quick ? lubeMenu(cfg.serviceMenu) : cfg.serviceMenu || []).map((m) => (
                   <button key={m.id} className={`btn tiny ${m.color === "green" ? "menuGreen" : "menuRed"}`} onClick={() => openServiceMenu(m)}>
                     {m.name}
                   </button>
@@ -937,7 +947,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             )}
             {!locked && (
               <div className="addBar" style={{ paddingTop: 6, marginBottom: 14 }}>
-                {CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
+                {!quick && CATALOGS.filter(([k]) => cfg.catalogs && cfg.catalogs[k]).map(([k, label, url]) => (
                   <button key={k} className="btn tiny" onClick={() => openCatalog(k, url)} title={`Open ${label} in a new tab`}>
                     {label} ↗
                   </button>
@@ -951,21 +961,29 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 >
                   + Part
                 </button>
+                {!quick && (
+                  <>
                 <button className="btn tiny" onClick={() => addLine("labor", { techId: o.topTechId || o.techId || null })}>
                   + Labor
                 </button>
                 <button className="btn tiny" onClick={() => setPick("motor")} title="Look up MOTOR labor times for this vehicle and add them">
                   🔧 Labor guide
                 </button>
+                  </>
+                )}
                 <button className="btn tiny" onClick={() => setPick("serviceReview")} title="What maintenance is due for this vehicle, and what's already been done">
                   🗓 Service review
                 </button>
+                {!quick && (
+                  <>
                 <button className="btn tiny" onClick={() => setPick("motorRef")} title="Browse MOTOR data for this vehicle — fluids, specs, parts, procedures, TSBs, wiring">
                   📚 MOTOR data
                 </button>
                 <button className="btn tiny" onClick={() => addLine("sublet")}>
                   + Sublet
                 </button>
+                  </>
+                )}
                 <button className="btn tiny" onClick={() => addLine("fee")}>
                   + Fee
                 </button>
@@ -978,13 +996,20 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
                 <button className="btn tiny" onClick={() => setPick("checklist")} title="The walk-around checklist, filled from the keyboard">
                   Checklist
                 </button>
+                {(quick || fullView) && (
+                  <button className="btn tiny ghost" style={{ marginLeft: "auto" }} onClick={() => setFullView(!fullView)} title="Quick lube shows only oil change and fluid tools">
+                    {fullView ? "Quick lube view" : "Show all tools"}
+                  </button>
+                )}
                 {o.lines.length > 0 && (
-                  <button className="btn tiny danger" style={{ marginLeft: "auto" }} onClick={clearLines} title="Remove every line and start over">
+                  <button className="btn tiny danger" style={{ marginLeft: quick || fullView ? 0 : "auto" }} onClick={clearLines} title="Remove every line and start over">
                     Clear all
                   </button>
                 )}
               </div>
             )}
+            {!quick && (
+              <>
             <div className="cardHead" style={{ marginBottom: 6 }}>
               <h3 style={{ fontSize: 14 }}>Customer states (prints on the ticket)</h3>
               {!locked && (
@@ -1058,6 +1083,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               placeholder="What the inspection found and what's recommended — the Fix builder writes this for you…"
               readOnly={locked}
             />
+
+              </>
+            )}
 
             <div className="tkLines">
               <table className="lines">
@@ -1166,7 +1194,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             {o.status !== STATUS.void && o.status !== STATUS.estimate && (
               <div className="rowBtns" style={{ marginTop: 12 }}>
                 <button className="btn tiny primary" onClick={() => setPick("pay")}>
-                  {o.status === STATUS.open ? "Take deposit" : "Take payment"}
+                  {o.status === STATUS.open && !quick ? "Take deposit" : "Take payment"}
                 </button>
               </div>
             )}

@@ -7,6 +7,8 @@ import { staffLabel } from "../lib/names.js";
 import { checklistSummary, recommendedServices } from "../lib/checklist.js";
 import { parseAuthText } from "../lib/authForm.js";
 import { isHazmatFee, authRecordText, reauthText } from "../lib/compliance.js";
+import { isQuickLube } from "../lib/departments.js";
+import { stickerData } from "../lib/sticker.js";
 
 /* The paper copy. Black on white, one page for most tickets. */
 export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
@@ -15,6 +17,11 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
   const t = orderTotals(o, cfg, c);
   const lines = (o.lines || []).filter((l) => l.kind !== "note" || l.description);
   const isInvoice = o.status === "invoiced" || o.status === "void";
+  /* an oil & lube-only ticket prints as a short receipt: services and
+     parts, the checklist, and when the next oil change is due; no
+     concern/findings, and no signature line unless the shop wants one */
+  const quick = isQuickLube(o, shop.parts, cfg);
+  const next = quick && v ? stickerData(o, cfg, v) : null;
   const techName = (id) => (employees.find((e) => e.id === id) || {}).name || "";
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -56,7 +63,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
             </div>
             <div className="r">
               <div className="title">
-                {statusLabel(o.status)} #{o.number}
+                {quick && o.status === "open" ? "Oil change" : statusLabel(o.status)} #{o.number}
               </div>
               <div className="shMeta">
                 {fmtDate(o.invoicedAt || o.createdAt)} · {fmtTime(o.invoicedAt || o.createdAt)}
@@ -96,7 +103,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
 
           <CrewLine o={o} cfg={cfg} name={techName} />
 
-          {o.concern && (
+          {!quick && o.concern && (
             <div className="shConcern">
               <strong>Customer states</strong>
               <ul className="shList">
@@ -104,7 +111,7 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               </ul>
             </div>
           )}
-          {o.findings && (
+          {!quick && o.findings && (
             <div className="shConcern">
               <strong>Inspection findings</strong>
               <ul className="shList">
@@ -116,8 +123,8 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
           <table>
             <thead>
               <tr>
-                <th style={{ width: 90 }}>Part # / Type</th>
-                <th>Description</th>
+                {!quick && <th style={{ width: 90 }}>Part # / Type</th>}
+                <th>{quick ? "Service" : "Description"}</th>
                 <th className="r">Qty</th>
                 <th className="r">Each</th>
                 <th className="r">Amount</th>
@@ -125,10 +132,20 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
             </thead>
             <tbody>
               {groups.map((g, gi) => (
-                <GroupRows key={gi} g={g} shop={shop} cfg={cfg} />
+                <GroupRows key={gi} g={g} shop={shop} cfg={cfg} compact={quick} />
               ))}
             </tbody>
           </table>
+
+          {next && (next.nextDate || next.nextMileage) && (
+            <div className="shNext">
+              <strong>Next oil change due</strong>
+              <span>
+                {[next.nextDate, next.nextMileage ? `${next.nextMileage.toLocaleString("en-US")} miles` : ""].filter(Boolean).join(" or ")}
+                {next.nextDate && next.nextMileage ? ", whichever comes first" : ""}
+              </span>
+            </div>
+          )}
 
           {o.checklist && o.checklist.items && o.checklist.items.length > 0 && (
             <div className="shCheck">
@@ -208,13 +225,17 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
             <>
               {cfg.invoiceFooter && <AuthNote text={cfg.invoiceFooter} fill={o.authFill} />}
               <AuthRecord order={o} />
-              <SignBlock sig={(o.signatures || {}).delivery} label="Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty" />
+              {(!quick || cfg.pmSignature === "required" || ((o.signatures || {}).delivery || {}).img) && (
+                <SignBlock sig={(o.signatures || {}).delivery} label="Customer signature — I have received the vehicle and the work listed above, and a copy of the warranty" />
+              )}
             </>
           ) : (
             <>
-              {cfg.authorizationText && <AuthNote text={cfg.authorizationText} fill={o.authFill} />}
+              {cfg.authorizationText && (!quick || cfg.pmSignature === "required") && <AuthNote text={cfg.authorizationText} fill={o.authFill} />}
               <AuthRecord order={o} />
-              <SignBlock sig={(o.signatures || {}).authorization} label="Customer signature" />
+              {(!quick || cfg.pmSignature === "required" || ((o.signatures || {}).authorization || {}).img) && (
+                <SignBlock sig={(o.signatures || {}).authorization} label="Customer signature" />
+              )}
             </>
           )}
         </div>
@@ -312,14 +333,15 @@ function CrewLine({ o, cfg, name }) {
   );
 }
 
-function LineRow({ l, shop, cfg }) {
+function LineRow({ l, shop, cfg, compact }) {
   const vendor = l.kind === "sublet" && l.vendorId && shop && shop.vendors ? shop.vendors[l.vendorId] : null;
   const epaId = isHazmatFee(l) ? String((cfg && cfg.epaId) || "").trim() : "";
   return (
     <tr>
-      <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>
+      {!compact && <td>{l.kind === "part" ? l.number || "Part" : l.kind === "labor" ? "Labor" : l.kind[0].toUpperCase() + l.kind.slice(1)}</td>}
       <td>
         {l.description}
+        {compact && l.kind === "part" && l.number ? <span style={{ color: "#777" }}> · #{l.number}</span> : null}
         {l.kind === "part" ? <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span> : null}
         {vendor ? <span style={{ color: "#777" }}> · Sublet to {vendor.name}{vendor.city ? `, ${vendor.city}` : ""}</span> : null}
         {epaId ? <span style={{ color: "#777" }}> · EPA ID {epaId}</span> : null}
@@ -336,7 +358,7 @@ function LineRow({ l, shop, cfg }) {
    then each included part itemized at $0 (it's covered by the package
    price). The parts still carry their taxable value in the totals. Extra
    quarts and a canister-filter charge print as their own priced lines. */
-function GroupRows({ g, shop, cfg }) {
+function GroupRows({ g, shop, cfg, compact }) {
   const packaged = g.lines.filter((l) => l.packaged);
   const rest0 = g.lines.filter((l) => !l.packaged);
   const pkgAmt = packaged.reduce((a, l) => a + lineAmount(l), 0);
@@ -353,9 +375,9 @@ function GroupRows({ g, shop, cfg }) {
       {packaged.length > 0 ? (
         <>
           <tr>
-            <td>Service</td>
+            {!compact && <td>Service</td>}
             <td>
-              {g.job}
+              <strong>{g.job}</strong>
               {details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{details}</div> : null}
             </td>
             <td className="r">1</td>
@@ -367,9 +389,10 @@ function GroupRows({ g, shop, cfg }) {
             const amt = sur ? lineAmount(sur) : 0;
             return (
               <tr key={l.id}>
-                <td>{l.number || "Part"}</td>
-                <td>
+                {!compact && <td>{l.number || "Part"}</td>}
+                <td style={compact ? { paddingLeft: 14 } : undefined}>
                   {l.description}
+                  {compact && l.number ? <span style={{ color: "#777" }}> · #{l.number}</span> : null}
                   <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span>
                   <span style={{ color: "#777" }}> · {sur ? "Filter not standard, additional charge applied" : "included in package"}</span>
                 </td>
@@ -383,12 +406,12 @@ function GroupRows({ g, shop, cfg }) {
       ) : (
         g.job && (
           <tr className="job">
-            <td colSpan={5}>{g.job}</td>
+            <td colSpan={compact ? 4 : 5}>{g.job}</td>
           </tr>
         )
       )}
       {rest.map((l) => (
-        <LineRow key={l.id} l={l} shop={shop} cfg={cfg} />
+        <LineRow key={l.id} l={l} shop={shop} cfg={cfg} compact={compact} />
       ))}
     </>
   );
