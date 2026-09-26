@@ -86,7 +86,7 @@ function menuPartCat(m) {
    moment after you stop typing. Once posted, the lines lock; only
    payments can change. */
 
-export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
+export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay = false }) {
   const order = shop.orders[orderId];
   const [draft, setDraft] = useState(order);
   const draftRef = useRef(order);
@@ -99,6 +99,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
   const [combineWith, setCombineWith] = useState(null); // another open ticket for this car, to merge onto this receipt
   const [fullView, setFullView] = useState(false); // show every tool on a quick-lube ticket
+  /* opened from the Cashier page: go straight to taking payment */
+  useEffect(() => {
+    if (autoPay) setPick("pay");
+  }, [autoPay]);
   const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
   const [partCat, setPartCat] = useState(""); // inventory category a menu button opened the part picker to
   const [signing, setSigning] = useState(false);
@@ -480,7 +484,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       }
       flash(
         to === STATUS.invoiced
-          ? `Invoice #${saved.number} posted`
+          ? isQuickLube(saved, shop.parts, cfg)
+            ? `#${saved.number} sent to the cashier`
+            : `Invoice #${saved.number} posted`
           : to === STATUS.open
           ? reopening
             ? `Invoice #${saved.number} reopened to a repair order`
@@ -724,7 +730,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           )}
           {(o.status === STATUS.estimate || o.status === STATUS.open) && (
             <button className="btn primary" onClick={askPost}>
-              Post invoice
+              {quick ? "Send to cashier" : "Post invoice"}
             </button>
           )}
           {o.status !== STATUS.void && o.status !== STATUS.estimate && owesBalance(o, t) && (
@@ -1578,7 +1584,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           cfg={cfg}
           customer={customer}
           canCharge={!!cfg.cardPayments && (DEMO || cloud.getState().linked)}
-          onClose={() => setPick(null)}
+          onClose={() => {
+            setPick(null);
+            /* from the Cashier page: once it's paid off, back to the line */
+            if (autoPay && orderTotals(draftRef.current, cfg, customer).balance <= 0.001) nav.back();
+          }}
           onSave={addPayment}
           flash={flash}
         />
@@ -1600,11 +1610,12 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         </Modal>
       )}
       {pick === "confirmPost" && (
-        <Modal title={`Post invoice #${o.number}?`} onClose={() => setPick(null)}>
+        <Modal title={quick ? `Send #${o.number} to the cashier?` : `Post invoice #${o.number}?`} onClose={() => setPick(null)}>
           <p className="muted" style={{ lineHeight: 1.5 }}>
-            Total <Money v={t.total} className="num" /> for {customerName(customer)}. Inventory parts come off the shelf, the
-            tax rate is locked, and the lines can't change after this. Estimates and repair orders can still be edited — post
-            when the work is done.
+            Total <Money v={t.total} className="num" /> for {customerName(customer)}.{" "}
+            {quick
+              ? "This posts the invoice and puts it on the Cashier page to collect payment. Parts come off the shelf and the lines lock."
+              : "Inventory parts come off the shelf, the tax rate is locked, and the lines can't change after this. Estimates and repair orders can still be edited — post when the work is done."}
           </p>
           {!o.customerId && <p className="fldErr">No customer on this ticket. It will post as a walk-in.</p>}
           {o.vehicleId && (
@@ -1620,7 +1631,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           {needsMileage(o) && <p className="fldErr">Enter the car's mileage to post this invoice.</p>}
           <div className="rowBtns" style={{ marginTop: 10 }}>
             <button className="btn primary lg" disabled={needsMileage(o)} onClick={() => moveTo(STATUS.invoiced)}>
-              Post invoice
+              {quick ? "Send to cashier" : "Post invoice"}
             </button>
             <button className="btn lg" onClick={() => setPick(null)}>
               Not yet

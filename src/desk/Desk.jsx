@@ -19,6 +19,7 @@ import { StartTicket } from "./StartTicket.jsx";
 import { SignatureStation } from "./Signing.jsx";
 import { BayDisplay } from "./BayDisplay.jsx";
 import { Fleet } from "./Fleet.jsx";
+import { Cashier, dueOrders } from "./Cashier.jsx";
 import { DEMO } from "../lib/demo.js";
 import { activeDepts, DEPTS, startStatus } from "../lib/departments.js";
 import defaultLogo from "../assets/genie-logo.png";
@@ -27,6 +28,7 @@ import defaultLogo from "../assets/genie-logo.png";
 
 const PAGES = [
   ["orders", "Tickets"],
+  ["cashier", "Cashier"],
   ["customers", "Customers"],
   ["fleet", "Fleet"],
   ["inventory", "Inventory"],
@@ -130,6 +132,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
     setCardsHidden(true);
   };
   const [orderId, setOrderId] = useState(null);
+  const [autoPay, setAutoPay] = useState(false); // open the ticket straight to Take payment (from Cashier)
   const [customerId, setCustomerId] = useState(null);
   const [printId, setPrintId] = useState(null);
   const [starting, setStarting] = useState(false);
@@ -171,9 +174,10 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       setCustomerId(null);
     },
     /* a department page opens its tickets in place, so Back returns there */
-    openOrder(id) {
-      setPage((p) => (p.startsWith("dept:") ? p : "orders"));
+    openOrder(id, opts) {
+      setPage((p) => (p.startsWith("dept:") || p === "cashier" ? p : "orders"));
       setOrderId(id);
+      setAutoPay(!!(opts && opts.pay));
     },
     back() {
       setOrderId(null);
@@ -221,11 +225,12 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   }
 
   const printOrder = printId ? shop.orders[printId] : null;
+  const dueCount = dueOrders(shop, cfg).length;
   /* each department is its own page under Tickets (hidden when the shop
      runs only one) */
   const depts = activeDepts(cfg);
   const navPages = PAGES.flatMap((pg) => (pg[0] === "orders" && depts.length > 1 ? [["orders", "All tickets"], ...depts.map((d) => [`dept:${d.id}`, d.label, true])] : [pg]));
-  const ticketPage = page === "orders" || page.startsWith("dept:");
+  const ticketPage = page === "orders" || page === "cashier" || page.startsWith("dept:");
 
   return (
     <>
@@ -240,6 +245,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {navPages.map(([k, label, sub]) => (
             <button key={k} className={`deskNavBtn ${sub ? "sub" : ""} ${page === k ? "on" : ""}`} onClick={() => nav.go(k)}>
               {label}
+              {k === "cashier" && dueCount > 0 && <span className="navCount">{dueCount}</span>}
               {k === "email" && cardsDue > 0 && (
                 <span title={`${cardsDue} postcards ready to mail`} style={{ marginLeft: 8, background: "var(--amber, #d9a400)", color: "#15171b", borderRadius: 99, padding: "1px 8px", fontSize: 12, fontWeight: 700 }}>
                   {cardsDue}
@@ -270,7 +276,9 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           )}
           {ticketPage &&
             (orderId ? (
-              <OrderEditor key={orderId} orderId={orderId} shop={shop} cfg={cfg} employees={employees} nav={nav} flash={flash} />
+              <OrderEditor key={orderId} orderId={orderId} shop={shop} cfg={cfg} employees={employees} nav={nav} flash={flash} autoPay={autoPay} />
+            ) : page === "cashier" ? (
+              <Cashier shop={shop} cfg={cfg} nav={nav} />
             ) : (
               <Orders key={page} shop={shop} cfg={cfg} nav={nav} onNew={newTicket} flash={flash} dept={page.startsWith("dept:") ? page.slice(5) : null} />
             ))}
