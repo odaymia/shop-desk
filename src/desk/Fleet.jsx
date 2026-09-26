@@ -324,21 +324,22 @@ function FleetDetail({ shop, cfg, nav, flash, onNew, cust: c, onBack, editing, s
   );
 }
 
-/* Find a car already in the desk (by plate, VIN, car, or owner) and move it
-   onto this fleet account, optionally with its past tickets. */
+/* Find cars already in the desk (by plate, VIN, car, or owner) and move
+   them onto this fleet account, optionally with their past tickets. Picks
+   stay ticked across searches, so a whole fleet goes on in one pass. */
 function AddExistingCar({ shop, cfg, fleet, flash, onClose }) {
   const [q, setQ] = useState("");
-  const [pick, setPick] = useState(null);
-  const [moveHistory, setMoveHistory] = useState(true);
+  const [sel, setSel] = useState({}); // vehicleId → move its past tickets too
   const [busy, setBusy] = useState(false);
 
   /* visits per car, counted once (the desk can hold tens of thousands of tickets) */
   const visits = useMemo(() => {
     const m = {};
-    for (const o of Object.values(shop.orders || {})) if (o && o.vehicleId && o.status !== "deleted") m[o.vehicleId] = (m[o.vehicleId] || 0) + 1;
+    for (const o of Object.values(shop.orders || {})) if (o && o.vehicleId && o.status !== "deleted" && o.customerId !== fleet.id) m[o.vehicleId] = (m[o.vehicleId] || 0) + 1;
     return m;
-  }, [shop.orders]);
-  const who = (o) => (!o ? "No owner" : o.ls && o.ls.placeholder ? "Walk-in" : customerName(o));
+  }, [shop.orders, fleet.id]);
+  const isNameless = (o) => !o || (o.ls && o.ls.placeholder) || !(o.first || o.last || o.company || o.phone);
+  const who = (o) => (!o ? "No owner" : isNameless(o) ? "Walk-in" : customerName(o));
 
   const matches = useMemo(() => {
     const needle = q.trim();
@@ -348,29 +349,45 @@ function AddExistingCar({ shop, cfg, fleet, flash, onClose }) {
       if (v.customerId === fleet.id) continue;
       const owner = shop.customers[v.customerId];
       if (searchText(needle, v.plate, v.vin, vehicleName(v), v.unit, owner && customerName(owner), owner && owner.company, owner && owner.phone)) out.push(v);
-      if (out.length >= 40) break;
+      if (out.length >= 60) break;
     }
     return out;
   }, [q, shop.vehicles, shop.customers, fleet.id]);
 
-  const choose = (v) => {
-    const owner = shop.customers[v.customerId];
-    /* a walk-in placeholder or nameless owner: the history is the fleet's */
-    const nameless = !owner || (owner.ls && owner.ls.placeholder) || !(owner.first || owner.last || owner.company || owner.phone);
-    setMoveHistory(!!nameless);
-    setPick(v);
-  };
-
-  const owner = pick ? shop.customers[pick.customerId] : null;
-  const past = pick ? ordersOf(shop.orders, { vehicleId: pick.id }).filter((o) => o.customerId !== fleet.id) : [];
+  /* past tickets come along by default only when the old owner was a walk-in */
+  const toggle = (v) =>
+    setSel((m) => {
+      const next = { ...m };
+      if (v.id in next) delete next[v.id];
+      else next[v.id] = !!isNameless(shop.customers[v.customerId]);
+      return next;
+    });
+  const allShown = matches.length > 0 && matches.every((v) => v.id in sel);
+  const toggleAll = () =>
+    setSel((m) => {
+      const next = { ...m };
+      for (const v of matches) {
+        if (allShown) delete next[v.id];
+        else if (!(v.id in next)) next[v.id] = !!isNameless(shop.customers[v.customerId]);
+      }
+      return next;
+    });
+  const picked = Object.keys(sel).map((id) => shop.vehicles[id]).filter(Boolean);
 
   const save = async () => {
     setBusy(true);
     try {
-      const { vehicle, orders } = moveVehicleToFleet({ vehicle: pick, orders: past, fleet, fromCustomer: owner, cfg, moveHistory });
-      await shop.saveVehicle(vehicle);
+      const all = Object.values(shop.orders || {});
+      const vehs = [];
+      const orders = [];
+      for (const v of picked) {
+        const r = moveVehicleToFleet({ vehicle: v, orders: all, fleet, fromCustomer: shop.customers[v.customerId], cfg, moveHistory: sel[v.id] });
+        vehs.push(r.vehicle);
+        orders.push(...r.orders);
+      }
+      await shop.saveVehiclesBulk(vehs);
       if (orders.length) await shop.saveOrdersBulk(orders);
-      flash(`${vehicleName(pick)} added to ${fleetName(fleet)}${orders.length ? ` with ${orders.length} past ticket${orders.length === 1 ? "" : "s"}` : ""}`);
+      flash(`${vehs.length} car${vehs.length === 1 ? "" : "s"} added to ${fleetName(fleet)}${orders.length ? ` with ${orders.length} past ticket${orders.length === 1 ? "" : "s"}` : ""}`);
       onClose();
     } finally {
       setBusy(false);
@@ -378,64 +395,110 @@ function AddExistingCar({ shop, cfg, fleet, flash, onClose }) {
   };
 
   return (
-    <Modal title={`Add a car to ${fleetName(fleet)}`} onClose={onClose} size="lg">
-      {!pick ? (
+    <Modal title={`Add cars to ${fleetName(fleet)}`} onClose={onClose} size="lg">
+      <input className="search" autoFocus style={{ width: "100%" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Plate, VIN, car, owner name, or phone" />
+      {q.trim().length < 2 ? (
+        <p className="muted">Type at least two letters or numbers. Tick as many cars as you like; your picks stay ticked when you search again.</p>
+      ) : matches.length === 0 ? (
+        <p className="muted">No car matches. Use New car to add one.</p>
+      ) : (
         <>
-          <input className="search" autoFocus style={{ width: "100%" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Plate, VIN, car, owner name, or phone" />
-          {q.trim().length < 2 ? (
-            <p className="muted">Type at least two letters or numbers.</p>
-          ) : matches.length === 0 ? (
-            <p className="muted">No car matches. Use New car to add one.</p>
-          ) : (
-            <table className="dk" style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 4px" }}>
+            <span className="muted">{matches.length >= 60 ? "First 60 matches. Type more to narrow it down." : `${matches.length} match${matches.length === 1 ? "" : "es"}`}</span>
+            <button type="button" className="btn tiny" onClick={toggleAll}>
+              {allShown ? "Untick these" : "Tick all shown"}
+            </button>
+          </div>
+          <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
+            <table className="dk">
               <tbody>
                 {matches.map((v) => {
-                  const o = shop.customers[v.customerId];
                   const n = visits[v.id] || 0;
                   return (
-                    <tr key={v.id} className="row" onClick={() => choose(v)}>
+                    <tr key={v.id} className="row" onClick={() => toggle(v)}>
+                      <td style={{ width: 28 }}>
+                        <input type="checkbox" checked={v.id in sel} readOnly style={{ pointerEvents: "none" }} />
+                      </td>
                       <td>
                         <strong>{vehicleName(v)}</strong>
                         <span className="sub">{[v.plate, v.vin].filter(Boolean).join(" · ")}</span>
                       </td>
-                      <td className="muted">{who(o)}</td>
+                      <td className="muted">{who(shop.customers[v.customerId])}</td>
                       <td className="r num muted">{n ? `${n} visit${n === 1 ? "" : "s"}` : ""}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          )}
-        </>
-      ) : (
-        <>
-          <p style={{ marginTop: 0 }}>
-            <strong>{vehicleName(pick)}</strong>
-            {pick.plate ? ` · ${pick.plate}` : ""}
-            <br />
-            <span className="muted">Now on file under {owner ? (who(owner) === "Walk-in" ? "a walk-in" : who(owner)) : "no one"}. It will move to {fleetName(fleet)}.</span>
-          </p>
-          {past.length > 0 && (
-            <label style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "12px 0" }}>
-              <input type="checkbox" checked={moveHistory} onChange={(e) => setMoveHistory(e.target.checked)} />
-              <span>
-                Move its {past.length} past ticket{past.length === 1 ? "" : "s"} to {fleetName(fleet)} too
-                <span className="sub muted" style={{ display: "block" }}>
-                  They'll count in this account's history and report. Totals don't change: no fleet discount is added to past work, and each invoice keeps the tax it was charged. Leave this off if the car belonged to someone else before.
-                </span>
-              </span>
-            </label>
-          )}
-          <div className="rowBtns">
-            <button className="btn primary" disabled={busy} onClick={save}>
-              {busy ? "Adding…" : "Add to fleet"}
-            </button>
-            <button className="btn ghost" onClick={() => setPick(null)}>
-              Pick a different car
-            </button>
           </div>
         </>
       )}
+
+      {picked.length > 0 && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, gap: 10 }}>
+            <h3 className="subhead" style={{ margin: 0 }}>
+              Adding {picked.length} car{picked.length === 1 ? "" : "s"}
+            </h3>
+            {picked.some((v) => visits[v.id]) && (
+              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={picked.filter((v) => visits[v.id]).every((v) => sel[v.id])}
+                  onChange={(e) => setSel((m) => Object.fromEntries(Object.keys(m).map((id) => [id, e.target.checked])))}
+                />
+                Move all past tickets
+              </label>
+            )}
+          </div>
+          <p className="muted" style={{ margin: "0 0 6px" }}>
+            Tick "past tickets" to move a car's earlier visits onto this account's history and report. Their totals don't change. Leave it off when the car belonged to someone else before.
+          </p>
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            <table className="dk">
+              <tbody>
+                {picked.map((v) => {
+                  const n = visits[v.id] || 0;
+                  return (
+                    <tr key={v.id}>
+                      <td>
+                        <strong>{vehicleName(v)}</strong>
+                        <span className="sub">
+                          {[v.plate, `from ${who(shop.customers[v.customerId])}`].filter(Boolean).join(" · ")}
+                        </span>
+                      </td>
+                      <td>
+                        {n > 0 ? (
+                          <label style={{ display: "flex", gap: 6, alignItems: "center", whiteSpace: "nowrap" }}>
+                            <input type="checkbox" checked={!!sel[v.id]} onChange={(e) => setSel((m) => ({ ...m, [v.id]: e.target.checked }))} />
+                            {n} past ticket{n === 1 ? "" : "s"}
+                          </label>
+                        ) : (
+                          <span className="muted">No past tickets</span>
+                        )}
+                      </td>
+                      <td className="r">
+                        <button type="button" className="btn tiny ghost" onClick={() => toggle(v)} aria-label="Remove">
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <div className="rowBtns" style={{ marginTop: 14 }}>
+        <button className="btn primary" disabled={busy || picked.length === 0} onClick={save}>
+          {busy ? "Adding…" : picked.length ? `Add ${picked.length} car${picked.length === 1 ? "" : "s"} to fleet` : "Add to fleet"}
+        </button>
+        <button className="btn ghost" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
     </Modal>
   );
 }
