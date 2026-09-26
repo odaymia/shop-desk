@@ -232,48 +232,56 @@ export function renderPostcard(cfg, coupons, opts = {}, stepIndex = 0, oil = "")
   const base = `*{box-sizing:border-box;margin:0;padding:0}html,body{width:6.25in;height:4.25in}body{font-family:Inter,Arial,sans-serif;color:#15171b;-webkit-print-color-adjust:exact;print-color-adjust:exact}.d{font-family:"Barlow Condensed","Arial Narrow",Impact,sans-serif;text-transform:uppercase;letter-spacing:.01em}`;
   const ends = list.map((x) => x.endsAt).filter(Boolean).sort()[0] || "";
   const couponRows = list
-    .map((x) => `<div class="code"><div><b class="d">${esc(couponText(x).toUpperCase())}</b>${lineOf(x) && list.length > 1 ? `<i>${esc(lineOf(x))}</i>` : ""}</div>${str(x.code) ? `<span>${esc(x.code)}</span>` : ""}</div>`)
+    .map((x) => `<table class="code"><tr><td><b class="d">${esc(couponText(x).toUpperCase())}</b>${lineOf(x) && list.length > 1 ? `<i>${esc(lineOf(x))}</i>` : ""}</td>${str(x.code) ? `<td style="text-align:right"><span>${esc(x.code)}</span></td>` : ""}</tr></table>`)
     .join("");
 
+  /* Lob draws cards with an older WebKit engine: no flexbox, grid, `inset`
+     or unprefixed transforms. Everything here is absolute positioning,
+     tables, and -webkit- prefixes so the proof and the print match what
+     the desk shows. The dark shade is a real element, not a pseudo one. */
   const front = `<!DOCTYPE html><html><head><meta charset="utf-8">${font}<style>${base}
-.f{position:relative;width:6.25in;height:4.25in;overflow:hidden;background:#121417 url('${esc(photo)}') center/cover no-repeat}
-.f:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,13,15,.9) 0%,rgba(12,13,15,.6) 55%,rgba(12,13,15,.1) 100%),linear-gradient(0deg,rgba(12,13,15,.85) 0%,transparent 45%)}
-.in{position:absolute;left:.4in;top:.38in;right:.4in;bottom:.42in;color:#fff;display:flex;flex-direction:column;align-items:flex-start}
-.logo{display:inline-block;background:#fff;border-radius:.08in;padding:.05in .1in}.logo img{height:.46in;display:block}
-.name{font-size:.3in;font-weight:800}
-h1{font-size:.72in;line-height:.88;margin:auto 0 .12in;max-width:3.9in}
-.sub{font-size:.15in;font-weight:600;color:rgba(255,255,255,.9)}
-.tag{position:absolute;right:0;top:.05in;background:#fff;color:${main};border:.04in dashed ${main};border-radius:.12in;padding:.1in .16in;text-align:center;transform:rotate(3deg)}
-.tag b{display:block;font-size:.5in;line-height:.95}.tag span{display:block;font-size:.12in;font-weight:700;color:#15171b;max-width:1.5in}
-.bar{position:absolute;left:0;right:0;bottom:0;height:.1in;background:${main}}
-</style></head><body><div class="f"><div class="in">
-${logo ? `<span class="logo"><img src="${esc(logo)}" alt=""></span>` : `<div class="name d">${esc(cfg.shopName)}</div>`}
-${off ? `<div class="tag"><b class="d">${esc(off)}</b>${line ? `<span class="d">${esc(line)}</span>` : ""}</div>` : ""}
-<h1 class="d">${esc(st.headline)}</h1>
-<p class="sub">No appointment needed${str(cfg.shopPhone) ? ` · ${esc(cfg.shopPhone)}` : ""}${home && w.domain ? ` · ${esc(str(w.domain).replace(/^www\./, ""))}` : ""}</p>
-</div><div class="bar"></div></div></body></html>`;
+.f{position:relative;width:6.25in;height:4.25in;overflow:hidden;background:#121417 url('${esc(photo)}') no-repeat center center;background-size:cover}
+.shade{position:absolute;left:0;top:0;width:6.25in;height:4.25in;background:-webkit-linear-gradient(left,rgba(12,13,15,.92) 0%,rgba(12,13,15,.7) 50%,rgba(12,13,15,.35) 100%);background:linear-gradient(90deg,rgba(12,13,15,.92) 0%,rgba(12,13,15,.7) 50%,rgba(12,13,15,.35) 100%)}
+.shade2{position:absolute;left:0;bottom:0;width:6.25in;height:2.2in;background:-webkit-linear-gradient(bottom,rgba(12,13,15,.85) 0%,rgba(12,13,15,0) 100%);background:linear-gradient(0deg,rgba(12,13,15,.85) 0%,rgba(12,13,15,0) 100%)}
+.logo{position:absolute;left:.4in;top:.38in;background:#fff;border-radius:.08in;padding:.05in .1in}.logo img{height:.46in;display:block}
+.name{position:absolute;left:.4in;top:.4in;color:#fff;font-size:.3in;font-weight:800}
+.txt{position:absolute;left:.4in;bottom:.46in;width:3.2in;color:#fff}
+h1{font-size:.66in;line-height:.9;margin:0 0 .1in}
+.sub{font-size:.14in;font-weight:600;color:#fff}
+.tag{position:absolute;right:.32in;top:.3in;width:2.35in;background:${main};color:#fff;border-radius:.16in;padding:.07in;-webkit-transform:rotate(4deg);transform:rotate(4deg);-webkit-box-shadow:0 .06in .2in rgba(0,0,0,.45);box-shadow:0 .06in .2in rgba(0,0,0,.45)}
+.tag .in{border:.035in dashed rgba(255,255,255,.85);border-radius:.11in;padding:.1in .08in .12in;text-align:center}
+.tag .off{display:block;font-size:${off.length > 8 ? ".62in" : ".82in"};line-height:.9}
+.tag .ln{display:block;font-size:.15in;line-height:1.1;margin-top:.04in}
+.tag .cd{display:inline-block;margin-top:.08in;background:#fff;color:#15171b;font:700 .16in "Courier New",monospace;letter-spacing:.04in;padding:.03in .1in;border-radius:.05in}
+.bar{position:absolute;left:0;bottom:0;width:6.25in;height:.1in;background:${main}}
+</style></head><body><div class="f"><div class="shade"></div><div class="shade2"></div>
+${logo ? `<div class="logo"><img src="${esc(logo)}" alt=""></div>` : `<div class="name d">${esc(cfg.shopName)}</div>`}
+${off ? `<div class="tag"><div class="in"><b class="off d">${esc(off)}</b>${line ? `<span class="ln d">${esc(line)}</span>` : ""}${str(c.code) ? `<span class="cd">${esc(c.code)}</span>` : ""}</div></div>` : ""}
+<div class="txt"><h1 class="d">${esc(st.headline)}</h1>
+<p class="sub">No appointment needed${str(cfg.shopPhone) ? ` · ${esc(cfg.shopPhone)}` : ""}${home && w.domain ? ` · ${esc(str(w.domain).replace(/^www\./, ""))}` : ""}</p></div>
+<div class="bar"></div></div></body></html>`;
 
   const back = `<!DOCTYPE html><html><head><meta charset="utf-8">${font}<style>${base}
 .b{position:relative;width:6.25in;height:4.25in;background:#fff}
-.col{position:absolute;left:.35in;top:.35in;width:2.25in;bottom:.35in;display:flex;flex-direction:column}
-.hi{font-size:${list.length > 1 ? ".115in" : ".13in"};line-height:1.4;color:#33373d}
-.codes{margin:.1in 0 .08in;display:grid;gap:.05in}
-.code{border:.03in dashed ${main};border-radius:.08in;padding:.05in .09in;display:flex;align-items:center;justify-content:space-between;gap:.06in}
+.col{position:absolute;left:.35in;top:.35in;width:2.25in}
+.hi{font-size:${list.length > 2 ? ".105in" : list.length > 1 ? ".115in" : ".13in"};line-height:1.4;color:#33373d}
+.code{width:100%;border-collapse:separate;border:.03in dashed ${main};border-radius:.08in;margin-top:.05in}
+.code td{padding:.04in .08in;vertical-align:middle}
 .code b{display:block;font-size:${list.length > 1 ? ".2in" : ".3in"};line-height:1;color:${main}}.code i{display:block;font-style:normal;font-size:.075in;font-weight:700;text-transform:uppercase;color:#33373d;margin-top:.01in}
 .code span{font:700 ${list.length > 1 ? ".12in" : ".17in"} "Courier New",monospace;letter-spacing:.03in;background:#15171b;color:#fff;padding:.03in .07in;border-radius:.05in;white-space:nowrap}
-.qr{display:flex;gap:.1in;align-items:center;margin-top:auto}.qr div{width:.78in;height:.78in}.qr svg{width:100%;height:100%}
-.qr p{font-size:.1in;line-height:1.35;color:#5b616c}.qr p b{color:#15171b;font-size:.12in}
-.shop{font-size:.1in;line-height:1.4;color:#5b616c;margin-top:.08in}.shop b{color:#15171b;font-size:.12in}
-.top{position:absolute;left:3.3in;top:.35in;right:.35in;height:1.05in;border-left:.02in solid #e7e3dc;padding-left:.15in}
+.codes{margin:.08in 0 .06in}
+.qrt{width:100%;border-collapse:collapse}.qrt td{vertical-align:top;padding:0}
+.qrc{width:.8in;text-align:center}.qrc svg{width:.8in;height:.8in;display:block}.qrc p{font-size:.075in;line-height:1.2;color:#5b616c;margin-top:.03in}
+.shop{position:absolute;left:.35in;bottom:.3in;width:2.25in;font-size:.1in;line-height:1.4;color:#5b616c}.shop b{color:#15171b;font-size:.12in}
+.top{position:absolute;left:3.3in;top:.3in;width:2.6in;height:1.2in;border-left:.02in solid #e7e3dc;padding-left:.15in}
 .top .d{font-size:.26in;line-height:.95;color:${main}}.top p{font-size:.1in;color:#5b616c;margin-top:.05in}
 </style></head><body><div class="b">
 <div class="col">
 <p class="hi">${esc(st.message).replace(/\n/g, "<br>")}</p>
 ${list.length ? `<div class="codes">${couponRows}</div><p class="hi" style="font-size:.1in">Bring this card or mention the code${list.length > 1 ? "s. One per visit" : ""}${ends ? `. Ends ${esc(ends)}` : ""}.</p>` : ""}
-${qrUrl ? `<div class="qr"><div>${qrSvg(qrUrl)}</div><p><b>Scan with your phone</b><br>${c ? "for your coupon, hours, and directions" : "for hours, prices, and directions"}</p></div>` : ""}
-<div class="shop"><b>${esc(cfg.shopName)}</b><br>${esc(addr)}${str(cfg.shopPhone) ? ` · ${esc(cfg.shopPhone)}` : ""}${hours ? `<br>${esc(hours)}` : ""}</div>
 </div>
-<div class="top"><div class="d">${stepIndex ? "Was due" : "Due around"}<br>{due_date}</div><p>{vehicle}</p></div>
+<div class="shop"><b>${esc(cfg.shopName)}</b><br>${esc(addr)}${str(cfg.shopPhone) ? ` · ${esc(cfg.shopPhone)}` : ""}${hours ? `<br>${esc(hours)}` : ""}</div>
+<div class="top"><table class="qrt"><tr><td><div class="d">${stepIndex ? "Was due" : "Due around"}<br>{due_date}</div><p>{vehicle}</p></td>${qrUrl ? `<td class="qrc">${qrSvg(qrUrl)}<p>Scan for ${c ? "your coupon" : "hours &amp; directions"}</p></td>` : ""}</tr></table></div>
 </div></body></html>`;
 
   return { front, back, qrUrl };

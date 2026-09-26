@@ -169,6 +169,9 @@ owner approves each week's batch; nothing mails on its own.
   4x6 design. Lob takes at most 10,000 characters of HTML a side, so the
   QR code is drawn as one compact path; keep both sides under the limit.
   The back's lower right is Lob's address and postage area: keep it empty.
+  Lob renders with an older WebKit: no flexbox, grid, `inset`, or
+  pseudo-element overlays; use absolute positioning, tables and -webkit-
+  prefixes, or the proof won't match the desk's preview.
 - Each reminder is reserved in `mail_keys` before Lob is called, and
   released if Lob refuses the card, so none is mailed twice. Lob calls
   carry an Idempotency-Key.
