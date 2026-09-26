@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { cloud } from "../storage/index.js";
 import { Field, Text, Modal, fmtDate } from "./ui.jsx";
-import { duePostcards, renderPostcard, mailOf, DEFAULT_STEPS, STEP_LABELS, PHOTO_LIBRARY, photoOf } from "../lib/postcards.js";
+import { duePostcards, renderPostcard, mailOf, DEFAULT_STEPS, STEP_LABELS, PHOTO_LIBRARY, photoOf, OIL_TYPES, couponIdsFor } from "../lib/postcards.js";
 import { photoUrl } from "../lib/serviceContent.js";
 import { couponText } from "../lib/website.js";
 import { emailOpts } from "./emailRunner.js";
@@ -10,6 +10,8 @@ import { emailOpts } from "./emailRunner.js";
    Edge Function. The owner approves each week's batch before anything is
    mailed; the desk shows who, where, and what it costs first. */
 
+const OIL_NAME = { ...Object.fromEntries(OIL_TYPES), own: "Their own oil", "": "Not sure" };
+const OIL_SETS = [...OIL_TYPES, ["", "Everyone else (their own oil, or not sure)"]];
 const money = (n) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 const fillCard = (html, vars) => html.replace(/\{(first_name|vehicle|due_date)\}/g, (_, k) => vars[k] || "");
 
@@ -68,6 +70,7 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
   const [confirm, setConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [view, setView] = useState(0); // which card in the series the preview shows
+  const [viewOil, setViewOil] = useState("synthetic"); // and for which oil
   const [uploading, setUploading] = useState(false);
 
   const load = () => {
@@ -93,17 +96,24 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
   const batch = useMemo(() => (mailed ? duePostcards({ cfg: cfgNow, customers: shop.customers, vehicles: shop.vehicles, orders: shop.orders, mailed }) : []), [mailed, shop.customers, shop.vehicles, shop.orders, m.aheadDays, m.steps, cfg.reminderMonths]); // eslint-disable-line react-hooks/exhaustive-deps
   const skipKey = (b) => `${b.customerId}|${b.step}`;
   const chosen = batch.filter((b) => !skip.has(skipKey(b)));
-  const designs = useMemo(() => [0, 1, 2].map((k) => renderPostcard(cfgNow, shop.coupons, emailOpts(), k)), [cfg, m, shop.coupons]); // eslint-disable-line react-hooks/exhaustive-deps
-  const card = designs[view];
-  const firstOf = (k) => chosen.find((b) => b.step === k);
-  const sample = (firstOf(view) || batch[0] || {}).vars || { first_name: "Maria", vehicle: "2018 Honda Civic", due_date: "October 12" };
+  /* one design per card in the series and per oil type (they differ only in coupons) */
+  const design = useMemo(() => {
+    const cache = {};
+    return (k, oil) => (cache[`${k}|${oil}`] = cache[`${k}|${oil}`] || renderPostcard(cfgNow, shop.coupons, emailOpts(), k, oil));
+  }, [cfg, m, shop.coupons]); // eslint-disable-line react-hooks/exhaustive-deps
+  const card = design(view, viewOil);
+  /* "own oil" and "not sure" share the Everyone else coupons */
+  const oilSet = (b) => (OIL_TYPES.some(([t]) => t === b.oil) ? b.oil : "");
+  const firstOf = (k, oil) => chosen.find((b) => b.step === k && oilSet(b) === oil) || chosen.find((b) => b.step === k);
+  const sample = (firstOf(view, viewOil) || batch[0] || {}).vars || { first_name: "Maria", vehicle: "2018 Honda Civic", due_date: "October 12" };
   const counts = [0, 1, 2].map((k) => chosen.filter((b) => b.step === k).length);
   const cost = chosen.length * (Number(m.costPerCard) || 0);
 
+  const setOilSet = (k, oil, ids) => (oil ? setStep(k, { byOil: { ...m.steps[k].byOil, [oil]: ids } }) : setStep(k, { couponIds: ids }));
   const setStep = (k, patch) => setM({ ...m, steps: m.steps.map((st, i) => (i === k ? { ...st, ...patch } : st)) });
-  const toggleCoupon = (k, id) => {
-    const cur = m.steps[k].couponIds || [];
-    setStep(k, { couponIds: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(0, 3) });
+  const toggleCoupon = (k, oil, id) => {
+    const cur = oil ? m.steps[k].byOil[oil] || [] : m.steps[k].couponIds || [];
+    setOilSet(k, oil, cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(0, 3));
   };
   const upload = async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -129,7 +139,7 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
   const proof = async () => {
     setBusy("proof");
     try {
-      const first = firstOf(view);
+      const first = firstOf(view, viewOil);
       const out = await cloud.invoke("mail", { action: "proof", front: card.front, back: card.back, card: first ? { to: first.to, vars: first.vars } : undefined });
       if (out.url) window.open(out.url, "_blank", "noopener");
       flash("Proof made. Lob's PDF opens in a new tab (it can take a few seconds to be ready). Nothing was mailed.");
@@ -148,10 +158,16 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
     const failed = [];
     try {
       /* each card in the series has its own design, so mail them step by step */
-      for (const k of [0, 1, 2]) {
-        const group = chosen.filter((b) => b.step === k);
-        for (let i = 0; i < group.length; i += 25) {
-          const out = await cloud.invoke("mail", { action: "send", batchId, front: designs[k].front, back: designs[k].back, cards: group.slice(i, i + 25).map((b) => ({ to: b.to, vars: b.vars, dedupe: b.dedupe, customerId: b.customerId })) });
+      const groups = new Map();
+      for (const b of chosen) {
+        const oil = oilSet(b);
+        const g = `${b.step}|${couponIdsFor(m.steps[b.step], oil).join(",")}`;
+        if (!groups.has(g)) groups.set(g, { d: design(b.step, oil), list: [] });
+        groups.get(g).list.push(b);
+      }
+      for (const { d, list } of groups.values()) {
+        for (let i = 0; i < list.length; i += 25) {
+          const out = await cloud.invoke("mail", { action: "send", batchId, front: d.front, back: d.back, cards: list.slice(i, i + 25).map((b) => ({ to: b.to, vars: b.vars, dedupe: b.dedupe, customerId: b.customerId })) });
           mailedN += out.mailed || 0;
           already += out.already || 0;
           failed.push(...(out.failed || []));
@@ -196,6 +212,13 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
           <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)} disabled={k > 0 && !m.steps[k].on}>
             {l}
             {k > 0 && !m.steps[k].on ? " (off)" : ""}
+          </button>
+        ))}
+      </div>
+      <div className="seg" style={{ marginBottom: 10 }}>
+        {OIL_SETS.map(([k, l]) => (
+          <button key={k || "other"} className={viewOil === k ? "on" : ""} onClick={() => setViewOil(k)}>
+            {k ? l : "Everyone else"}
           </button>
         ))}
       </div>
@@ -266,20 +289,33 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
               <Field label="Message (back; {first_name}, {vehicle}, {due_date} fill in per card)">
                 <textarea rows={3} maxLength={220} value={st.message} onChange={(e) => setStep(k, { message: e.target.value })} />
               </Field>
-              <Field label={`Coupons (up to 3; the first one also goes on the front)${(st.couponIds || []).length ? ` · ${st.couponIds.length} picked` : ""}`}>
-                <div style={{ maxHeight: 150, overflow: "auto", border: "1px solid var(--line)", borderRadius: 8, padding: "4px 10px" }}>
-                  {Object.values(shop.coupons || {}).filter((c) => c && c.active !== false && !c.deleted).map((c) => (
-                    <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "5px 0" }}>
-                      <input type="checkbox" checked={(st.couponIds || []).includes(c.id)} disabled={!(st.couponIds || []).includes(c.id) && (st.couponIds || []).length >= 3} onChange={() => toggleCoupon(k, c.id)} />
-                      <span>
-                        {(st.couponIds || []).indexOf(c.id) === 0 ? "★ " : ""}
-                        <b>{c.code}</b> — {c.name || couponText(c)}
-                        {c.endsAt ? ` (ends ${c.endsAt})` : ""}
-                      </span>
-                    </label>
-                  ))}
+              <div className="fld">
+                <span>Coupons by the oil the car gets (up to 3 each; ★ is the one on the front). A type left empty gets the "Everyone else" coupons.</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
+                  {OIL_SETS.map(([oil, label]) => {
+                    const ids = oil ? st.byOil[oil] || [] : st.couponIds || [];
+                    return (
+                      <div key={oil || "other"} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "6px 10px" }}>
+                        <b style={{ fontSize: 14 }}>{label}</b>
+                        {ids.length ? <span className="muted"> · {ids.length} picked</span> : oil ? <span className="muted"> · uses Everyone else</span> : null}
+                        <div style={{ maxHeight: 130, overflow: "auto", marginTop: 4 }}>
+                          {Object.values(shop.coupons || {})
+                            .filter((c) => c && c.active !== false && !c.deleted)
+                            .map((c) => (
+                              <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 0", fontSize: 14 }}>
+                                <input type="checkbox" checked={ids.includes(c.id)} disabled={!ids.includes(c.id) && ids.length >= 3} onChange={() => toggleCoupon(k, oil, c.id)} />
+                                <span>
+                                  {ids.indexOf(c.id) === 0 ? "★ " : ""}
+                                  <b>{c.code}</b> — {c.name || couponText(c)}
+                                </span>
+                              </label>
+                            ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </Field>
+              </div>
               <button className="btn tiny" onClick={() => setStep(k, { headline: DEFAULT_STEPS[k].headline, message: DEFAULT_STEPS[k].message })}>
                 Reset the wording
               </button>
@@ -325,6 +361,7 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
               <th>Customer</th>
               <th>Address</th>
               <th>Car</th>
+              <th>Oil</th>
               <th>Sticker date</th>
               <th className="r" />
             </tr>
@@ -332,7 +369,7 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
           <tbody>
             {batch.length === 0 && (
               <tr>
-                <td colSpan={7} className="emptyNote">
+                <td colSpan={8} className="emptyNote">
                   {mailed ? "Nobody's due for a postcard this week." : "Loading…"}
                 </td>
               </tr>
@@ -357,6 +394,7 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
                   {b.to.address_line1}, {b.to.address_city} {b.to.address_zip}
                 </td>
                 <td>{b.vars.vehicle}</td>
+                <td className="muted">{OIL_NAME[b.oil || ""] || "Not sure"}</td>
                 <td>{b.vars.due_date}</td>
                 <td className="r">
                   <button className="btn tiny" onClick={() => neverMail(b)}>

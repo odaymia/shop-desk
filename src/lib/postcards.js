@@ -58,12 +58,45 @@ export function mailOf(cfg) {
       if (saved.couponId) st.couponIds = [saved.couponId];
     }
     st.couponIds = (st.couponIds || []).filter(Boolean).slice(0, 3);
+    st.byOil = Object.fromEntries(OIL_TYPES.map(([k]) => [k, ((st.byOil || {})[k] || []).filter(Boolean).slice(0, 3)]));
     if (i === 0) st.on = true;
     return st;
   });
   return { ...DEFAULT_MAIL, ...saved, steps };
 }
 export const photoOf = (m) => (/^https:\/\//.test(str(m.photo)) ? str(m.photo) : photoUrl(str(m.photo) || PHOTO_LIBRARY[0].id, 1400));
+
+/* ---------- which oil the car gets ---------- */
+
+/* From the last oil change's lines, as the desk and the imported LubeSoft
+   history word them ("Valv Synpower Sae 0W20", "Synthetic Blend Charge",
+   "Valv Prem Conv Sae 5W30", "Customer's Motor Oil"). Other fluids on the
+   same ticket (Max-Life ATF is transmission fluid) and extra-quart and
+   coupon lines are ignored. */
+export const OIL_TYPES = [
+  ["synthetic", "Full synthetic"],
+  ["blend", "Synthetic blend / high mileage"],
+  ["conventional", "Conventional"],
+];
+export function oilTypeOf(order) {
+  const t = (order && order.lines ? order.lines : [])
+    .filter((l) => l.kind !== "note" && l.kind !== "discount")
+    .map((l) => `${l.job || ""}: ${l.description || ""}`)
+    .filter((x) => !/extra oil over|coupon|\batf\b|trans|differential|gear oil|power steering|brake fluid|coolant/i.test(x))
+    .join(" | ");
+  if (/customer'?s (motor )?oil/i.test(t)) return "own";
+  if (/blend|max-?life(?! atf)/i.test(t) && !/full syn/i.test(t)) return "blend";
+  if (/synth|synpo?w|\bsyn\b|full syn/i.test(t)) return "synthetic";
+  if (/\bconv|conventional|prem(ium)? blue/i.test(t)) return "conventional";
+  return "";
+}
+
+/* The coupons a card carries for a car on this oil: its oil type's own
+   list when the shop set one, otherwise the card's regular coupons. */
+export function couponIdsFor(step, oil) {
+  const own = step && step.byOil && oil && step.byOil[oil];
+  return (own && own.length ? own : (step && step.couponIds) || []).filter(Boolean).slice(0, 3);
+}
 
 /* ---------- addresses ---------- */
 
@@ -95,7 +128,7 @@ export function mailingAddress(c, shopStreet = "") {
 
 /* ---------- this week's batch ---------- */
 
-/* → [{ customerId, step (0-2), dedupe: [keys], to, vars: { first_name, vehicle, due_date }, due }]
+/* → [{ customerId, step (0-2), oil, dedupe: [keys], to, vars: { first_name, vehicle, due_date }, due }]
    mailed: Set of dedupe keys already mailed */
 export const stepKey = (vid, orderId, step) => `card:oil:${vid}:${orderId}${step ? `:s${step + 1}` : ""}`;
 export function duePostcards({ cfg, customers, vehicles, orders, mailed, now = Date.now() }) {
@@ -140,12 +173,13 @@ export function duePostcards({ cfg, customers, vehicles, orders, mailed, now = D
     const key = stepKey(vid, last.id, step);
     const g = `${cid}|${step}`;
     const had = cards.get(g);
+    const oil = oilTypeOf(last);
     if (had) {
       had.dedupe.push(key);
-      if (due < had.due) Object.assign(had, { due, vars: { ...had.vars, vehicle: vehicleName(v), due_date: fmtDay(due) } });
+      if (due < had.due) Object.assign(had, { due, oil, vars: { ...had.vars, vehicle: vehicleName(v), due_date: fmtDay(due) } });
       continue;
     }
-    cards.set(g, { customerId: cid, step, dedupe: [key], to, due, vars: { first_name: str(c.first) || "there", vehicle: vehicleName(v), due_date: fmtDay(due) } });
+    cards.set(g, { customerId: cid, step, oil, dedupe: [key], to, due, vars: { first_name: str(c.first) || "there", vehicle: vehicleName(v), due_date: fmtDay(due) } });
   }
   return [...cards.values()].sort((a, b) => a.step - b.step || a.due - b.due);
 }
@@ -177,13 +211,13 @@ export function qrSvg(url) {
    Placeholders {first_name} {vehicle} {due_date} are filled per card by the
    server. The back's lower right is left empty: Lob prints the address and
    postage there. */
-export function renderPostcard(cfg, coupons, opts = {}, stepIndex = 0) {
+export function renderPostcard(cfg, coupons, opts = {}, stepIndex = 0, oil = "") {
   const m = mailOf(cfg);
   const st = m.steps[stepIndex] || m.steps[0];
   const w = (cfg && cfg.website) || {};
   const main = /^#[0-9a-f]{6}$/i.test(w.brandColor || "") ? w.brandColor : "#8e2f2f";
   const home = siteHome(cfg, opts.appBase);
-  const list = st.couponIds.map((id) => coupons && coupons[id]).filter(Boolean);
+  const list = couponIdsFor(st, oil).map((id) => coupons && coupons[id]).filter(Boolean);
   const c = list[0] || null;
   const off = c ? couponText(c).toUpperCase() : "";
   const lineOf = (x) => str(x.name).replace(/^\$?\d+(\.\d+)?%?\s*off\b[\s:,-]*/i, "");

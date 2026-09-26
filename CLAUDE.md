@@ -177,6 +177,11 @@ owner approves each week's batch; nothing mails on its own.
   (optional) N days after it if the car hasn't been back, each only after
   the one before went out (`stepKey`). Each card has its own headline,
   message and up to 3 coupons, and is mailed with its own design.
+- Coupons can differ by the oil the car gets (`oilTypeOf` reads the last
+  oil change: full synthetic, blend/high mileage, conventional, or the
+  customer's own oil; Max-Life ATF on the same ticket is transmission fluid
+  and must not count). A type with no coupons of its own falls back to the
+  card's "Everyone else" coupons (`couponIdsFor`).
 - The front photo is an Unsplash id from `PHOTO_LIBRARY` or the shop's
   own upload (public bucket `public-media/<shop>/…`, since printers fetch
   it by URL; see supabase/mail.sql).

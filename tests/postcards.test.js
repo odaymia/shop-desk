@@ -93,3 +93,36 @@ test("a card with several coupons: all codes on the back, the first on the front
   assert.ok(front.includes("$10 OFF") && front.includes("https://cdn.example/storefront.jpg"));
   assert.ok(front.length < 10000 && back.length < 10000);
 });
+
+test("oil type from the last oil change, the way the desk and LubeSoft history word it", async () => {
+  const { oilTypeOf, couponIdsFor } = await import("../src/lib/postcards.js");
+  const o = (...d) => ({ lines: d.map((x) => ({ kind: "part", job: "Full service oil change", description: x })) });
+  assert.equal(oilTypeOf(o("Full Service Oil Change", "Synthetic Oil Charge", "Valv Synpower Sae 0W20 (included)")), "synthetic");
+  assert.equal(oilTypeOf(o("Full Service Oil Change", "Valv Prem Conv Sae 5W30 (included)")), "conventional");
+  assert.equal(oilTypeOf(o("Synthetic Blend Charge", "Valv Maxlife Sae 5W30 (included)")), "blend");
+  assert.equal(oilTypeOf(o("Customer'S Motor Oil (included)", "Customer'S Oil Credit")), "own");
+  /* Max-Life ATF on the same ticket is transmission fluid, not a blend */
+  assert.equal(oilTypeOf(o("Valv Prem Conv Sae 5W20 (included)", "Valvoline Max-Life Atf (included)")), "conventional");
+  /* extra quarts and coupons don't decide it */
+  assert.equal(oilTypeOf(o("Valv Prem Conv Sae 5W30 (included)", "Extra oil over 5 qt — Valv Synpower Sae 0W20", "Coupon 10MGR")), "conventional");
+  assert.equal(oilTypeOf({ lines: [{ kind: "labor", job: "Valvoline MaxLife High Mileage Synthetic Blend Oil Change", description: "x" }] }), "blend");
+  assert.equal(oilTypeOf({ lines: [{ kind: "labor", job: "Valvoline Full Synthetic Oil Change", description: "x" }] }), "synthetic");
+  assert.equal(oilTypeOf(o("Vo84 Oil Filter")), "");
+  const step = { couponIds: ["any"], byOil: { synthetic: ["syn", "fluid"], blend: [], conventional: ["conv", "syn"] } };
+  assert.deepEqual(couponIdsFor(step, "synthetic"), ["syn", "fluid"]);
+  assert.deepEqual(couponIdsFor(step, "conventional"), ["conv", "syn"]);
+  assert.deepEqual(couponIdsFor(step, "blend"), ["any"]); // none set for blend: the regular ones
+  assert.deepEqual(couponIdsFor(step, "own"), ["any"]);
+});
+
+test("each card in a batch knows its car's oil, and gets that oil's coupons", () => {
+  const customers = { a: { id: "a", first: "Ana", last: "Diaz", ...addr } };
+  const vehicles = { va: { id: "va", customerId: "a", year: 2018, make: "Honda", model: "Civic" } };
+  const syn = { id: "1", customerId: "a", vehicleId: "va", status: "invoiced", invoicedAt: monthsAgo(3, 5), lines: [{ kind: "part", job: "Full service oil change", description: "Valv Synpower Sae 0W20 (included)" }] };
+  const [card] = duePostcards({ cfg, customers, vehicles, orders: { 1: syn }, now });
+  assert.equal(card.oil, "synthetic");
+  const coupons = { s: { id: "s", code: "SYN15", name: "$15 OFF FULL SYNTHETIC", kind: "amount", value: 15 }, g: { id: "g", code: "ANY5", name: "$5 OFF", kind: "amount", value: 5 } };
+  const c2 = { ...cfg, website: { cityLine: "El Cajon, CA 92021" }, mail: { steps: [{ couponIds: ["g"], byOil: { synthetic: ["s"] } }] } };
+  assert.ok(renderPostcard(c2, coupons, {}, 0, card.oil).back.includes("SYN15"));
+  assert.ok(renderPostcard(c2, coupons, {}, 0, "conventional").back.includes("ANY5"));
+});
