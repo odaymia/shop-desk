@@ -3,6 +3,7 @@ import { Modal, Money, fmtDate } from "./ui.jsx";
 import { customerName, vehicleName, searchText, isLive } from "./useShop.js";
 import { orderTotals, statusLabel, owesBalance, STATUS } from "../lib/invoice.js";
 import { workSummary } from "./Customers.jsx";
+import { DEPTS, orderDepts, deptAmount } from "../lib/departments.js";
 
 const FILTERS = [
   ["estimate", "Estimates"],
@@ -14,7 +15,11 @@ const FILTERS = [
 
 const LIMIT = 400; // render a page at a time; the search box reaches the rest
 
-export function Orders({ shop, cfg, nav, onNew, flash }) {
+/* All tickets, or one department's (dept = "oil" | "tires" | "mech"): a
+   department page is that department's own ticket book. A ticket with work
+   from several departments shows in each, marked with the others. */
+export function Orders({ shop, cfg, nav, onNew, flash, dept = null }) {
+  const D = dept ? DEPTS.find((d) => d.id === dept) : null;
   const [filter, setFilter] = useState("open");
   const [q, setQ] = useState("");
   const [toDelete, setToDelete] = useState(null);
@@ -24,8 +29,14 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
      totaling every one of them here (and again on every sync tick) is what
      dragged the counter PC. Totals are computed below, only for the page we
      actually draw. */
-  const matched = useMemo(() => {
+  /* this page's tickets: all of them, or the department's */
+  const deptLive = useMemo(() => {
     const live = Object.values(shop.orders).filter(isLive);
+    return dept ? live.filter((o) => orderDepts(o, shop.parts).includes(dept)) : live;
+  }, [shop.orders, shop.parts, dept]);
+
+  const matched = useMemo(() => {
+    const live = deptLive;
     /* A real duplicate number means two devices, offline, both grabbed the
        same next number for a NEW ticket. Imported history doesn't count:
        LubeSoft and Mitchell reused invoice numbers across numbering runs,
@@ -47,7 +58,7 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
       )
       .sort((a, b) => (b.o.invoicedAt || b.o.createdAt) - (a.o.invoicedAt || a.o.createdAt));
     return { out, numbers };
-  }, [shop.orders, shop.customers, shop.vehicles, cfg, filter, q]);
+  }, [deptLive, shop.customers, shop.vehicles, cfg, filter, q]);
 
   const rows = useMemo(
     () =>
@@ -59,20 +70,35 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
 
   const counts = useMemo(() => {
     const n = { estimate: 0, open: 0, invoiced: 0, due: 0 };
-    for (const o of Object.values(shop.orders)) {
-      if (!isLive(o)) continue;
+    for (const o of deptLive) {
       if (n[o.status] != null) n[o.status]++;
       /* pricing is only needed to spot an open balance, and only a real
          invoice can have one — skip the imported history entirely */
       if (o.status === STATUS.invoiced && !o.imported && owesBalance(o, orderTotals(o, cfg, shop.customers[o.customerId]))) n.due++;
     }
     return n;
-  }, [shop.orders, shop.customers, cfg]);
+  }, [deptLive, shop.customers, cfg]);
+
+  /* the department's day at a glance: cars through, its own sales (just
+     its lines, before tax), and what's still in the bay */
+  const today = useMemo(() => {
+    if (!dept) return null;
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    let cars = 0;
+    let sales = 0;
+    for (const o of deptLive) {
+      if (o.status !== STATUS.invoiced || (o.invoicedAt || 0) < start.getTime()) continue;
+      cars++;
+      sales += deptAmount(o, dept, shop.parts);
+    }
+    return { cars, sales };
+  }, [deptLive, dept, shop.parts]);
 
   return (
     <>
       <header className="deskHead">
-        <h1>Tickets</h1>
+        <h1>{D ? `${D.icon} ${D.label}` : "Tickets"}</h1>
         <div className="seg">
           {FILTERS.map(([k, label]) => (
             <button key={k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>
@@ -83,11 +109,33 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
         </div>
         <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ticket #, name, plate, vehicle" />
         <div className="grow" />
-        <button className="btn primary" onClick={() => onNew()}>
-          New ticket
+        <button className="btn primary" onClick={() => onNew(dept ? { dept } : undefined)}>
+          {D ? `New ${D.noun}` : "New ticket"}
         </button>
       </header>
       <div className="deskBody">
+        {today && (
+          <div className="deptToday">
+            <div>
+              <b>{today.cars}</b>
+              <span>{today.cars === 1 ? "car" : "cars"} done today</span>
+            </div>
+            <div>
+              <b>
+                <Money v={today.sales} />
+              </b>
+              <span>{D.label.toLowerCase()} sales today</span>
+            </div>
+            <div>
+              <b>{counts.open}</b>
+              <span>open repair order{counts.open === 1 ? "" : "s"}</span>
+            </div>
+            <div>
+              <b>{counts.estimate}</b>
+              <span>estimate{counts.estimate === 1 ? "" : "s"}</span>
+            </div>
+          </div>
+        )}
         <div className="tableCard scroll">
           <table className="dk">
             <thead>
@@ -122,7 +170,10 @@ export function Orders({ shop, cfg, nav, onNew, flash }) {
                     {vehicleName(v)}
                     {v && v.plate ? <span className="sub">{v.plate}</span> : null}
                   </td>
-                  <td className="muted">{workSummary(o)}</td>
+                  <td className="muted">
+                    {workSummary(o)}
+                    <DeptTags order={o} parts={shop.parts} here={dept} />
+                  </td>
                   <td className="r num">
                     <Money v={t.total} />
                   </td>
@@ -195,5 +246,24 @@ export function ConfirmDelete({ order, onClose, onConfirm }) {
         </button>
       </div>
     </Modal>
+  );
+}
+
+/* Which departments a ticket's work spans, shown when it's more than one
+   (leaving out the page you're on). */
+export function DeptTags({ order, parts, here }) {
+  const ds = orderDepts(order, parts);
+  if (ds.length < 2) return null;
+  return (
+    <span className="deptTags">
+      {ds
+        .filter((d) => d !== here)
+        .map((d) => (
+          <span key={d} className="deptTag">
+            {here ? "+ " : ""}
+            {DEPTS.find((x) => x.id === d).label}
+          </span>
+        ))}
+    </span>
   );
 }

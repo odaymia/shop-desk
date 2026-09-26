@@ -12,7 +12,7 @@ import { customerName, vehicleName, activeList, ordersOf } from "./useShop.js";
 const US_STATES = "AL AK AZ AR CA CO CT DC DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 const norm = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-export function StartTicket({ shop, cfg, onStart, onClose }) {
+export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket" }) {
   const [plate, setPlate] = useState("");
   const [state, setState] = useState("CA");
   const [step, setStep] = useState("plate"); // plate | confirm | vehicle | edit
@@ -112,7 +112,7 @@ export function StartTicket({ shop, cfg, onStart, onClose }) {
   }
 
   return (
-    <Modal title="New ticket" onClose={onClose} size="wide">
+    <Modal title={title} onClose={onClose} size="wide">
       <p className="muted" style={{ marginTop: 0 }}>
         Start with the plate.
       </p>

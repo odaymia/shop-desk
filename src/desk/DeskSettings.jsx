@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DEPTS } from "../lib/departments.js";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -62,6 +63,7 @@ const SETTINGS_SECTIONS = [
   ["website", "Website"],
   ["pricing", "Pricing & parts"],
   ["menus", "Service menu"],
+  ["departments", "Departments & signatures"],
   ["builder", "Symptom & fix lists"],
   ["oilchange", "Oil change"],
   ["commissions", "Commissions"],
@@ -512,6 +514,41 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             {toNum(split.advisor)} / {toNum(split.top)} / {toNum(split.pit)} (advisor / top / pit).
           </p>
 
+          </>
+          )}
+          {show("departments") && (
+          <>
+          <h3 className="subhead">Departments</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Each department gets its own page under Tickets, with its own ticket list, New button, and today's cars and sales. A ticket with work from more than
+            one (an oil change and two tires) shows on each page and still prints as one receipt. Turn off the ones this shop doesn't run.
+          </p>
+          {DEPTS.map((dp) => (
+            <label key={dp.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}>
+              <input
+                type="checkbox"
+                checked={((d.departments || {})[dp.id]) !== false}
+                onChange={(e) => set("departments")({ ...(d.departments || {}), [dp.id]: e.target.checked })}
+              />
+              <span>
+                {dp.icon} {dp.label}
+              </span>
+            </label>
+          ))}
+
+          <h3 className="subhead" style={{ marginTop: 28 }}>Signatures on maintenance-only tickets</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            California law (B&amp;P Code §9884.9(e)) doesn't require a written estimate for preventative maintenance (oil and filter changes, fluid services, air and
+            cabin filters, wipers, bulbs, tire rotations) when the customer OKs it and the price is posted where they can see it or they're shown it at the
+            counter. Every job still gets an invoice. Brakes, repairs, new tires, and anything not on your posted menu always need the estimate and
+            authorization.
+          </p>
+          <Field label="Before posting a maintenance-only ticket">
+            <select value={d.pmSignature === "required" ? "required" : "optional"} onChange={(e) => set("pmSignature")(e.target.value)}>
+              <option value="optional">Don't ask for a signature (prices are posted)</option>
+              <option value="required">Still ask for a signature or recorded OK</option>
+            </select>
+          </Field>
           </>
           )}
           {show("oilchange") && (

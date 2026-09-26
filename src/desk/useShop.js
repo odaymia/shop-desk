@@ -284,11 +284,12 @@ export function useShop(cfg) {
   }, [cfg.nextOrderNumber, commit]);
 
   const createOrder = useCallback(
-    async ({ customerId = null, vehicleId = null, status = STATUS.estimate, writerId = null } = {}) => {
+    async ({ customerId = null, vehicleId = null, status = STATUS.estimate, writerId = null, dept = null } = {}) => {
       const number = await takeNumber();
       return saveOrder({
         number,
         status,
+        dept, // the department it was started in (oil, tires, mech); its work adds the rest
         customerId,
         vehicleId,
         mileageIn: "", // entered fresh at the counter, not prefilled from the car's last visit

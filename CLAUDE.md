@@ -93,6 +93,15 @@ Records are never deleted. Customers, vehicles, parts, vendors, jobs get
 - Premium pay, overtime and payroll live in the time clock. Nothing here
   knows about pay beyond a tech id on a labor line. The shared staff list
   carries PINs and hourly rates for the clock; never display them here.
+- A car can't post without mileage (in or out). Counter sales with no car can.
+- Departments (oil & lube, tires, mechanical) are views, not separate books:
+  one ticket, one number sequence, one receipt. A ticket's departments are
+  derived from its lines (`src/lib/departments.js`) plus `order.dept`, the
+  one it was started in. Combining two open tickets for the same car moves
+  the work onto one and marks the other deleted with `mergedInto`.
+- Maintenance-only tickets (B&P §9884.9(e): oil, fluids, filters, wipers,
+  bulbs, rotations, at posted prices) skip the authorization warning unless
+  the shop sets `pmSignature: "required"`. Everything still gets an invoice.
 
 ## UI
 

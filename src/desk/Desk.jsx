@@ -20,6 +20,7 @@ import { SignatureStation } from "./Signing.jsx";
 import { BayDisplay } from "./BayDisplay.jsx";
 import { Fleet } from "./Fleet.jsx";
 import { DEMO } from "../lib/demo.js";
+import { activeDepts, DEPTS } from "../lib/departments.js";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
@@ -29,7 +30,7 @@ const PAGES = [
   ["customers", "Customers"],
   ["fleet", "Fleet"],
   ["inventory", "Inventory"],
-  ["tires", "Tires"],
+  ["tires", "Tire inventory"],
   ["jobs", "Canned jobs"],
   ["coupons", "Coupons"],
   ["email", "Marketing"],
@@ -169,9 +170,13 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       setOrderId(null);
       setCustomerId(null);
     },
+    /* a department page opens its tickets in place, so Back returns there */
     openOrder(id) {
-      setPage("orders");
+      setPage((p) => (p.startsWith("dept:") ? p : "orders"));
       setOrderId(id);
+    },
+    back() {
+      setOrderId(null);
     },
     openCustomer(id) {
       setPage("customers");
@@ -183,12 +188,14 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   /* from a customer or vehicle page the car is known; from anywhere else
      the ticket starts with the plate */
   const newTicket = async (opts) => {
+    /* a ticket started from a department page belongs to it */
+    const dept = (opts && opts.dept) || (page.startsWith("dept:") ? page.slice(5) : null);
     if (!opts || (!opts.customerId && !opts.vehicleId && !opts.walkIn)) {
-      setStarting(true);
+      setStarting({ dept });
       return;
     }
     setStarting(false);
-    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null });
+    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null, dept });
     nav.openOrder(o.id);
   };
 
@@ -214,6 +221,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   }
 
   const printOrder = printId ? shop.orders[printId] : null;
+  /* each department is its own page under Tickets (hidden when the shop
+     runs only one) */
+  const depts = activeDepts(cfg);
+  const navPages = PAGES.flatMap((pg) => (pg[0] === "orders" && depts.length > 1 ? [["orders", "All tickets"], ...depts.map((d) => [`dept:${d.id}`, d.label, true])] : [pg]));
+  const ticketPage = page === "orders" || page.startsWith("dept:");
 
   return (
     <>
@@ -225,8 +237,8 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
             <span>Front desk</span>
             {DEMO && <span className="brandDemoNote">Your shop's logo &amp; name go here — set them in Settings</span>}
           </div>
-          {PAGES.map(([k, label]) => (
-            <button key={k} className={`deskNavBtn ${page === k ? "on" : ""}`} onClick={() => nav.go(k)}>
+          {navPages.map(([k, label, sub]) => (
+            <button key={k} className={`deskNavBtn ${sub ? "sub" : ""} ${page === k ? "on" : ""}`} onClick={() => nav.go(k)}>
               {label}
               {k === "email" && cardsDue > 0 && (
                 <span title={`${cardsDue} postcards ready to mail`} style={{ marginLeft: 8, background: "var(--amber, #d9a400)", color: "#15171b", borderRadius: 99, padding: "1px 8px", fontSize: 12, fontWeight: 700 }}>
@@ -256,11 +268,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
               </button>
             </div>
           )}
-          {page === "orders" &&
+          {ticketPage &&
             (orderId ? (
               <OrderEditor key={orderId} orderId={orderId} shop={shop} cfg={cfg} employees={employees} nav={nav} flash={flash} />
             ) : (
-              <Orders shop={shop} cfg={cfg} nav={nav} onNew={newTicket} flash={flash} />
+              <Orders key={page} shop={shop} cfg={cfg} nav={nav} onNew={newTicket} flash={flash} dept={page.startsWith("dept:") ? page.slice(5) : null} />
             ))}
           {page === "customers" && (
             <Customers shop={shop} cfg={cfg} nav={nav} flash={flash} customerId={customerId} onNew={newTicket} />
@@ -295,8 +307,9 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
         <StartTicket
           shop={shop}
           cfg={cfg}
+          title={starting.dept ? `New ${(DEPTS.find((x) => x.id === starting.dept) || {}).noun || "ticket"}` : "New ticket"}
           onClose={() => setStarting(false)}
-          onStart={(opts) => newTicket({ ...opts, walkIn: !opts.customerId && !opts.vehicleId })}
+          onStart={(opts) => newTicket({ ...opts, dept: starting.dept, walkIn: !opts.customerId && !opts.vehicleId })}
         />
       )}
       {printOrder && <PrintTicket order={printOrder} shop={shop} cfg={cfg} employees={roster} onClose={() => setPrintId(null)} />}

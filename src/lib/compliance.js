@@ -3,6 +3,8 @@
    has grown past what the customer approved (a top BAR violation), the EPA ID
    a hazardous-waste disposal fee must carry, and a soft pre-post checklist. */
 
+import { authorizationRequired } from "./departments.js";
+
 const CENT = 0.005;
 
 /* A fee line that is a hazardous-waste / disposal fee (needs an EPA ID). */
@@ -67,9 +69,11 @@ export function needsReauth(order, currentTotal) {
 
 /* Soft warnings to show before posting an invoice — never blocks, just flags
    the common BAR gaps so the writer can fix or knowingly proceed. */
-export function complianceWarnings(order, cfg, total) {
+export function complianceWarnings(order, cfg, total, parts) {
   const w = [];
-  if (!isAuthorized(order)) w.push("No customer authorization is on record (no signature or recorded phone/electronic approval).");
+  /* maintenance-only work (an oil change at posted prices) needs no written
+     estimate under B&P 9884.9(e); the shop can still require a signature */
+  if (!isAuthorized(order) && authorizationRequired(order, cfg, parts)) w.push("No customer authorization is on record (no signature or recorded phone/electronic approval).");
   if (needsReauth(order, total)) {
     const authd = authorizedTotal(order);
     w.push(`The total (${fmtMoney(total)}) is above what the customer authorized (${fmtMoney(authd)}). Record the customer's approval for the additional work.`);

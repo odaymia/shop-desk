@@ -19,6 +19,8 @@
   padding:11px 12px; border-radius:9px; font-size:15px; margin-bottom:2px;
 }
 .deskNavBtn.on { color:var(--signal); background:#fff; border-color:var(--line); font-weight:600; }
+.deskNavBtn.sub { padding:8px 12px 8px 26px; font-size:14px; }
+.deskNavBtn.sub::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.45; margin-left:-12px; }
 .deskNavBtn:hover { color:var(--ink); }
 .deskNavBtn .k { margin-left:auto; font-size:12px; color:var(--muted); }
 .deskNavFoot { margin-top:auto; display:flex; flex-direction:column; gap:6px; }
@@ -765,3 +767,13 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .paySplitSum b {
   font-size: 18px;
 }
+
+/* department pages: the day at a glance, and tags on combined tickets */
+.deptToday { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:14px; }
+.deptToday > div { background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:2px; }
+.deptToday b { font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--ink); }
+.deptToday > div > span { font-size:13px; color:var(--muted); }
+.deptTags { display:inline-flex; flex-wrap:wrap; gap:4px; margin-left:6px; vertical-align:middle; }
+.deptTag { font-size:11px; font-weight:600; padding:1px 7px; border-radius:99px; background:#eef2ff; color:#3730a3; white-space:nowrap; }
+.deptBar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:10px 14px; border-radius:10px; background:#eef2ff; border:1px solid #c7d2fe; color:#312e81; font-size:14px; }
+.deptBar.combine { background:#fffbeb; border-color:#fcd34d; color:#78350f; }

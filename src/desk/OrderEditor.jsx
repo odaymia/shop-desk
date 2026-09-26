@@ -13,6 +13,7 @@ import { addFinding } from "../lib/findings.js";
 import { suggestedWork } from "../lib/repairs.js";
 import { needsReauth, complianceWarnings } from "../lib/compliance.js";
 import { isFleet, fleetName, fleetDiscountLine } from "../lib/fleet.js";
+import { orderDepts, deptLabel, combinable, mergeTickets, isMaintenanceOnly, authorizationRequired } from "../lib/departments.js";
 import { makeRevision, withRevision, revisionCount } from "../lib/revisions.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { Sticker } from "./Sticker.jsx";
@@ -96,6 +97,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
   const saveRef = useRef(shop.saveOrder);
   saveRef.current = shop.saveOrder;
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
+  const [combineWith, setCombineWith] = useState(null); // another open ticket for this car, to merge onto this receipt
   const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
   const [partCat, setPartCat] = useState(""); // inventory category a menu button opened the part picker to
   const [signing, setSigning] = useState(false);
@@ -450,7 +452,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     /* soft BAR compliance check before posting — flags the common gaps but
        never blocks; the writer can fix or knowingly proceed */
     if (to === STATUS.invoiced) {
-      const warns = complianceWarnings(latest, cfg, orderTotals(latest, cfg, customer).total);
+      const warns = complianceWarnings(latest, cfg, orderTotals(latest, cfg, customer).total, shop.parts);
       if (warns.length && !window.confirm(`Before posting, note:\n\n• ${warns.join("\n• ")}\n\nPost the invoice anyway?`)) return;
     }
     try {
@@ -529,10 +531,25 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
 
   const writerName = (id) => (employees.find((e) => e.id === id) || {}).name;
 
+  /* departments: which ones this ticket's work spans, and other open
+     tickets for the same car that could share its receipt */
+  const depts = orderDepts(o, shop.parts);
+  const others = locked ? [] : combinable(o, shop.orders);
+  const combine = async () => {
+    const x = combineWith;
+    setCombineWith(null);
+    await flushNow();
+    const { into, from } = mergeTickets(draftRef.current, shop.orders[x.id] || x);
+    update(() => into);
+    await flushNow();
+    await shop.saveOrder(from);
+    flash(`#${x.number} combined onto this ticket`);
+  };
+
   return (
     <>
       <header className="deskHead">
-        <button className="btn ghost" onClick={() => nav.go("orders")}>
+        <button className="btn ghost" onClick={() => nav.back()}>
           ← Tickets
         </button>
         <h1>{orderTitle(o)}</h1>
@@ -732,7 +749,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
         <div>
           {locked && (
             <div className="warnBox" style={{ marginBottom: 14 }}>
-              {o.status === STATUS.deleted
+              {o.status === STATUS.deleted && o.mergedInto
+                ? `This ticket was combined into #${(shop.orders[o.mergedInto] || {}).number || "another ticket"}, so it goes on that receipt.`
+                : o.status === STATUS.deleted
                 ? `This ticket was deleted ${fmtDateTime(o.deletedAt)}.`
                 : o.status === STATUS.void
                 ? `This invoice was voided ${fmtDateTime(o.voidedAt)}. It stays on file; nothing on it can change.`
@@ -750,6 +769,33 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
               </button>
             </div>
           )}
+          {depts.length > 1 && !locked && (
+            <div className="deptBar" style={{ marginBottom: 14 }}>
+              <span>
+                One receipt for {depts.map(deptLabel).join(" + ")}. This ticket shows on each department's page.
+              </span>
+            </div>
+          )}
+          {others.map((x) => (
+            <div key={x.id} className="deptBar combine" style={{ marginBottom: 14 }}>
+              <span>
+                This car also has {x.status === STATUS.estimate ? "estimate" : "repair order"} <strong>#{x.number}</strong> open
+                {(() => {
+                  const ds = orderDepts(x, shop.parts);
+                  return ds.length ? ` (${ds.map(deptLabel).join(" + ")})` : "";
+                })()}
+                .
+              </span>
+              <span className="rowActs">
+                <button className="btn tiny" onClick={() => nav.openOrder(x.id)}>
+                  Open it
+                </button>
+                <button className="btn tiny primary" onClick={() => setCombineWith(x)}>
+                  Combine onto one receipt
+                </button>
+              </span>
+            </div>
+          ))}
           {isFleet(customer) && (
             <div className="fleetBar" style={{ marginBottom: 14 }}>
               <span>
@@ -1509,6 +1555,22 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
           flash={flash}
         />
       )}
+      {combineWith && (
+        <Modal title={`Combine #${combineWith.number} onto #${o.number}?`} onClose={() => setCombineWith(null)}>
+          <p className="muted" style={{ lineHeight: 1.5 }}>
+            Its work, notes, and any deposit move onto this ticket, so the customer gets one receipt. #{combineWith.number} is closed out
+            and points here. {isMaintenanceOnly(o, shop.parts) && authorizationRequired({ ...o, lines: [...o.lines, ...(combineWith.lines || [])] }, cfg, shop.parts) ? "The combined ticket includes repair work, so it needs the customer's authorization for the full amount." : ""}
+          </p>
+          <div className="rowBtns" style={{ marginTop: 10 }}>
+            <button className="btn primary lg" onClick={combine}>
+              Combine
+            </button>
+            <button className="btn lg" onClick={() => setCombineWith(null)}>
+              Not now
+            </button>
+          </div>
+        </Modal>
+      )}
       {pick === "confirmPost" && (
         <Modal title={`Post invoice #${o.number}?`} onClose={() => setPick(null)}>
           <p className="muted" style={{ lineHeight: 1.5 }}>
@@ -1546,7 +1608,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             const latest = await flushNow();
             await shop.setStatus(latest, STATUS.deleted, customer);
             flash(`Ticket #${o.number} deleted`, "out");
-            nav.go("orders");
+            nav.back();
           }}
         />
       )}
