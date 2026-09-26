@@ -512,7 +512,6 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       };
     });
     await flushNow();
-    setPick(null);
     flash("Payment recorded");
   };
   const removePayment = (id) =>
@@ -1495,6 +1494,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
       {pick === "pay" && (
         <PaymentModal
           balance={t.balance}
+          total={t.total}
           order={o}
           cfg={cfg}
           customer={customer}
@@ -1682,10 +1682,13 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
 const PAY_ICONS = { cash: "💵", card: "💳", check: "🧾", account: "🏢", other: "•" };
 const PAY_LABELS = { account: "On account" };
 
-function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSave, flash }) {
+function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose, onSave, flash }) {
   const due = balance > 0 ? round2(balance) : 0;
   const [method, setMethod] = useState("card");
   const [amount, setAmount] = useState(due ? due.toFixed(2) : "");
+  /* payments taken while this window is open: a split (half cash, half
+     card, or two cards) is several payments in a row */
+  const [taken, setTaken] = useState([]);
   const [ref, setRef] = useState("");
   const [cardType, setCardType] = useState("Visa");
   const [cash, setCash] = useState("");
@@ -1701,6 +1704,18 @@ function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSav
   // instead of just recording it.
   const chargeHere = method === "card" && canCharge && !manualCard;
 
+  /* record one payment; stay open for the next part until it's paid off */
+  const record = async (p) => {
+    await onSave(p);
+    const left = round2(due - toNum(p.amount));
+    if (left <= 0.001 || toNum(p.amount) < 0) return onClose();
+    setTaken((xs) => [...xs, p]);
+    setAmount(left.toFixed(2));
+    setRef("");
+    setCash("");
+    setManualCard(false);
+    setErr("");
+  };
   const save = () => {
     if (!amt) return setErr("Enter an amount. Use a negative number for a refund.");
     if (short) return setErr("Cash given is less than the amount owed.");
@@ -1710,11 +1725,31 @@ function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSav
       p.cashGiven = cashGiven;
       p.change = change;
     }
-    onSave(p);
+    record(p);
   };
+  const splits = due > 0 ? [["All", due], ["Half", round2(due / 2)], ["A third", round2(due / 3)]] : [];
+  const partial = amt > 0 && due > 0 && amt < due - 0.001;
 
   return (
-    <Modal title="Record a payment" onClose={onClose}>
+    <Modal title={taken.length ? "Next payment" : "Record a payment"} onClose={onClose}>
+      {due > 0 && (
+        <div className="paySplitSum">
+          {taken.length > 0 && (
+            <ul className="payList" style={{ margin: "0 0 8px" }}>
+              {taken.map((p, i) => (
+                <li key={i}>
+                  <span>✓ {paymentDesc(p)}</span>
+                  <Money v={p.amount} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", fontVariantNumeric: "tabular-nums" }}>
+            <span className="muted">{taken.length ? "Still owed" : total && round2(total) !== due ? "Balance due" : "Total due"}</span>
+            <b>{fmtMoney(due)}</b>
+          </div>
+        </div>
+      )}
       <Field label="How">
         <div className="payMethods">
           {PAY_METHODS.map((m) => (
@@ -1726,9 +1761,23 @@ function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSav
         </div>
       </Field>
 
-      <Field label={method === "cash" ? "Amount owed" : "Amount"}>
+      <Field label={method === "cash" ? "Amount paid in cash" : method === "card" ? "Amount on this card" : "Amount"}>
         <Num value={amount} onChange={setAmount} autoFocus={method !== "cash"} />
       </Field>
+      {splits.length > 0 && (
+        <div className="chipRow" style={{ marginTop: -6, marginBottom: 12 }}>
+          {splits.map(([label, v]) => (
+            <button key={label} type="button" className={`payChip ${Math.abs(amt - v) < 0.005 ? "on" : ""}`} onClick={() => setAmount(v.toFixed(2))}>
+              {label} {fmtMoney(v)}
+            </button>
+          ))}
+        </div>
+      )}
+      {partial && (
+        <p className="legalNote" style={{ marginTop: -4 }}>
+          Splitting it: after this, you'll take the other {fmtMoney(due - amt)} (another card, cash, and so on).
+        </p>
+      )}
 
       {chargeHere && (
         <CardCharge
@@ -1736,7 +1785,7 @@ function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSav
           cfg={cfg}
           customer={customer}
           amount={amt}
-          onPaid={(rec) => onSave(rec)}
+          onPaid={(rec) => record(rec)}
           onLinkSent={() => {
             flash("Pay link sent — the ticket updates when they pay");
             onClose();
@@ -1806,8 +1855,13 @@ function PaymentModal({ balance, order, cfg, customer, canCharge, onClose, onSav
         <>
           {err && <p className="fldErr">{err}</p>}
           <button className="btn primary lg full" onClick={save}>
-            Save payment
+            {partial ? `Save ${fmtMoney(amt)} and take the rest` : "Save payment"}
           </button>
+          {taken.length > 0 && (
+            <button type="button" className="btn ghost sm full" style={{ marginTop: 8 }} onClick={onClose}>
+              Done for now (leave {fmtMoney(due)} owing)
+            </button>
+          )}
           {method === "card" && canCharge && manualCard && (
             <button type="button" className="btn ghost sm full" style={{ marginTop: 8 }} onClick={() => setManualCard(false)}>
               ← Charge the card here instead

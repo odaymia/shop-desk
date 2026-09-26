@@ -752,3 +752,15 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .authChk.on { border-color:var(--live); background:var(--live); box-shadow:none; }
 .authChk:active { transform:scale(.94); }
 .authBlank { display:inline-block; min-width:64px; border-bottom:2px solid var(--ink); text-align:center; padding:2px 4px; margin:0 3px; }
+
+/* split payments: what's been taken so far and what's left */
+.paySplitSum {
+  background: var(--panel2, #f4f5f7);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+.paySplitSum b {
+  font-size: 18px;
+}
