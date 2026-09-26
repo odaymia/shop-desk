@@ -54,8 +54,9 @@ function legacyBlocks(m) {
 export function renderEmail(brand, msg) {
   const b = brand || {};
   const m = msg || {};
-  const main = color(b.color, "#8e2f2f");
   const theme = { header: "dark", corners: "rounded", ...(m.theme || {}) };
+  /* the email's accent: a holiday color, or the shop's brand color */
+  const main = color(theme.color, color(b.color, "#8e2f2f"));
   const r = theme.corners === "square" ? 0 : 16;
   const rs = theme.corners === "square" ? 0 : 10;
   const logo = safeUrl(b.logo);

@@ -8,7 +8,7 @@ import { fillPlaceholders } from "../lib/emailRender.js";
 import { automationsOf, AUTOMATION_INFO, DEFAULT_AUTOMATIONS } from "../lib/emailAutomations.js";
 import { runAutomations, emailOpts, emailServices } from "./emailRunner.js";
 import { EmailBuilder, EmailPreview } from "./EmailBuilder.jsx";
-import { TEMPLATES, specBlocks } from "../lib/emailBlocks.js";
+import { TEMPLATES, specBlocks, upcomingHolidays, emailPhotoUrl } from "../lib/emailBlocks.js";
 import { Postcards } from "./Postcards.jsx";
 
 /* Marketing: write and send email campaigns, set up the automatic emails,
@@ -97,6 +97,10 @@ function Campaigns({ shop, cfg, flash }) {
     load();
   }, []);
 
+  const pick = (t) => {
+    setDraft(fromTemplate(t));
+    setPicking(false);
+  };
   if (draft) return <Composer shop={shop} cfg={cfg} flash={flash} draft={draft} setDraft={setDraft} onDone={() => (setDraft(null), load())} />;
 
   return (
@@ -108,22 +112,34 @@ function Campaigns({ shop, cfg, flash }) {
       </div>
       {picking && (
         <Modal title="Start from…" onClose={() => setPicking(false)} size="lg">
+          <h3 style={{ margin: "0 0 8px" }}>Everyday</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
             {TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className="card"
-                style={{ padding: 14, textAlign: "left", cursor: "pointer", border: "1px solid var(--line)" }}
-                onClick={() => {
-                  setDraft(fromTemplate(t));
-                  setPicking(false);
-                }}
-              >
+              <button key={t.id} type="button" className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", margin: 0, padding: 14, textAlign: "left", cursor: "pointer", border: "1px solid var(--line)" }} onClick={() => pick(t)}>
                 <b style={{ display: "block", fontSize: 16 }}>{t.name}</b>
                 <span className="muted">{t.note}</span>
               </button>
             ))}
+          </div>
+          <h3 style={{ margin: "20px 0 4px" }}>Holidays</h3>
+          <p className="muted" style={{ margin: "0 0 8px" }}>Coming up first. Each one has its own photo, colors, and wording; pick a coupon after you open it.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+            {upcomingHolidays().map((h) => {
+              const days = Math.round((h.next - new Date(new Date().toDateString())) / 86400000);
+              return (
+                <button key={h.id} type="button" className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", margin: 0, padding: 0, overflow: "hidden", textAlign: "left", cursor: "pointer", border: "1px solid var(--line)" }} onClick={() => pick(h)}>
+                  <img src={emailPhotoUrl(h.make().blocks[0].photo, 400, 160)} alt="" loading="lazy" style={{ display: "block", width: "100%", height: 90, objectFit: "cover", borderBottom: `4px solid ${h.color}` }} />
+                  <span style={{ display: "block", padding: "10px 12px 12px" }}>
+                    <b style={{ display: "block", fontSize: 16 }}>{h.name}</b>
+                    <span style={{ display: "block", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                      {h.next.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                      {days === 0 ? " · today" : days < 60 ? ` · in ${days} day${days === 1 ? "" : "s"}` : ""}
+                    </span>
+                    <span className="muted" style={{ fontSize: 13 }}>{h.sendNote}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </Modal>
       )}
@@ -254,7 +270,7 @@ function Composer({ shop, cfg, flash, draft, setDraft, onDone }) {
           <Field label="Campaign name (only you see this)">
             <Text value={draft.name} onChange={set("name")} placeholder="October oil change special" />
           </Field>
-          <EmailBuilder value={draft} onChange={setDraft} shop={shop} services={services} flash={flash} />
+          <EmailBuilder value={draft} onChange={setDraft} shop={shop} services={services} flash={flash} brandColor={(cfg.website && cfg.website.brandColor) || ""} />
 
           <h3 className="subhead" style={{ marginTop: 24 }}>
             Who gets it
@@ -445,6 +461,7 @@ function Automations({ shop, cfg, saveCfg, flash }) {
                     shop={shop}
                     services={services}
                     flash={flash}
+                    brandColor={(cfg.website && cfg.website.brandColor) || ""}
                     placeholders={k === "oil" ? "{first_name}, {vehicle}, {due_date}" : "{first_name}"}
                   />
                   {specBlocks(a).some((b) => b.link === "review" || b.type === "button") && !((cfg.website || {}).links || {}).google && (

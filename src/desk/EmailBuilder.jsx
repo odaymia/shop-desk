@@ -268,7 +268,7 @@ function summary(b, shop) {
   }
 }
 
-export function EmailBuilder({ value, onChange, shop, services, flash, showSubject = true, placeholders = "{first_name}" }) {
+export function EmailBuilder({ value, onChange, shop, services, flash, showSubject = true, placeholders = "{first_name}", brandColor = "" }) {
   const blocks = specBlocks(value);
   const theme = { ...DEFAULT_THEME, ...(value.theme || {}) };
   const [open, setOpen] = useState(blocks[0] ? blocks[0].id : null);
@@ -309,6 +309,16 @@ export function EmailBuilder({ value, onChange, shop, services, flash, showSubje
             <option value="rounded">Rounded</option>
             <option value="square">Square</option>
           </select>
+        </Field>
+        <Field label="Accent color">
+          <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="color" value={theme.color || brandColor || "#8e2f2f"} onChange={(e) => onChange({ ...value, theme: { ...theme, color: e.target.value } })} style={{ width: 48, height: 38, padding: 2, flexShrink: 0 }} />
+            {theme.color && (
+              <button type="button" className="btn ghost sm" onClick={() => onChange({ ...value, theme: { ...theme, color: "" } })}>
+                Reset
+              </button>
+            )}
+          </span>
         </Field>
       </div>
 

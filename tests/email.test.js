@@ -145,3 +145,36 @@ test("automations: new modern layouts by default, but wording saved the old way 
   assert.equal(old.oil.blocks, undefined); // its headline/body become blocks when drawn
   assert.equal(old.oil.headline, "My own words");
 });
+
+import { HOLIDAYS, nextDate, upcomingHolidays } from "../src/lib/emailBlocks.js";
+import { composeEmail } from "../src/lib/emailCompose.js";
+
+test("holiday dates land on the right days", () => {
+  const on = (id, y) => HOLIDAYS.find((h) => h.id === id).date(y).toDateString();
+  assert.equal(on("thanksgiving", 2026), new Date(2026, 10, 26).toDateString());
+  assert.equal(on("blackfriday", 2026), new Date(2026, 10, 27).toDateString());
+  assert.equal(on("cybermonday", 2026), new Date(2026, 10, 30).toDateString());
+  assert.equal(on("memorial", 2027), new Date(2027, 4, 31).toDateString());
+  assert.equal(on("labor", 2026), new Date(2026, 8, 7).toDateString());
+  assert.equal(on("mothers", 2026), new Date(2026, 4, 10).toDateString());
+  assert.equal(on("spring", 2026), new Date(2026, 3, 5).toDateString());
+  assert.equal(on("spring", 2027), new Date(2027, 2, 28).toDateString());
+});
+
+test("holidays sort by the next one coming up, rolling into next year", () => {
+  const up = upcomingHolidays(new Date(2026, 8, 26));
+  assert.deepEqual(up.slice(0, 3).map((h) => h.id), ["halloween", "veterans", "thanksgiving"]);
+  assert.equal(up.at(-1).id, "labor");
+  assert.equal(up.at(-1).next.getFullYear(), 2027);
+  assert.equal(nextDate(HOLIDAYS.find((h) => h.id === "halloween"), new Date(2026, 9, 31)).getFullYear(), 2026);
+});
+
+test("every holiday template renders with its own accent color and a coupon slot", () => {
+  for (const h of HOLIDAYS) {
+    const spec = h.make();
+    assert.ok(spec.subject && spec.blocks.some((b) => b.type === "coupon"), h.id);
+    assert.equal(spec.theme.color, h.color);
+    const { html } = composeEmail({ shopName: "Test Shop", website: { brandColor: "#123456" } }, {}, spec, {});
+    assert.ok(html.includes(h.color), h.id);
+  }
+});
