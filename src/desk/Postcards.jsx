@@ -72,6 +72,7 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
   const [view, setView] = useState(0); // which card in the series the preview shows
   const [viewOil, setViewOil] = useState("synthetic"); // and for which oil
   const [uploading, setUploading] = useState(false);
+  const [proofOut, setProofOut] = useState(null); // { url } or { error }: stays on the page, unlike a flash
 
   const load = () => {
     cloud
@@ -140,11 +141,13 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
     setBusy("proof");
     try {
       const first = firstOf(view, viewOil);
+      setProofOut(null);
       const out = await cloud.invoke("mail", { action: "proof", front: card.front, back: card.back, card: first ? { to: first.to, vars: first.vars } : undefined });
-      if (out.url) window.open(out.url, "_blank", "noopener");
-      flash("Proof made. Lob's PDF opens in a new tab (it can take a few seconds to be ready). Nothing was mailed.");
+      /* a link to click, not a tab opened for them: browsers block tabs that
+         open seconds after the click */
+      setProofOut(out.url ? { url: out.url, label: `${STEP_LABELS[view]} · ${OIL_NAME[viewOil] || "Everyone else"}` } : { error: "Lob made the proof but didn't send a link back. Look under Postcards in your Lob dashboard (test mode)." });
     } catch (e) {
-      flash(await errText(e), "out");
+      setProofOut({ error: await errText(e) });
     } finally {
       setBusy("");
     }
@@ -336,6 +339,24 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
         2nd and 3rd cards to cars that still haven't been back. Only customers with a full mailing address, and never the
         same card twice. Cards arrive in about 3–5 business days. Untick anyone to skip them this time.
       </p>
+      {!status && <p className="legalNote" style={{ color: "#b42318", marginTop: 0 }}>Proofs and mailing are off: the mail function isn't answering. Check it's deployed in Supabase as "mail".</p>}
+      {status && !status.hasTest && <p className="legalNote" style={{ color: "#b42318", marginTop: 0 }}>Proofs are off: add your Lob secret test key as LOB_TEST_KEY in Supabase → Edge Functions → Secrets.</p>}
+      {status && !status.from && <p className="legalNote" style={{ color: "#b42318", marginTop: 0 }}>Add your city, state and ZIP in Settings → Website so the cards have a return address.</p>}
+      {proofOut && (
+        <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: proofOut.error ? "#b42318" : undefined }}>
+          {proofOut.error ? (
+            <span style={{ color: "#b42318" }}>Proof didn't work: {proofOut.error}</span>
+          ) : (
+            <span style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <b>Proof ready ({proofOut.label}).</b> Nothing was printed or mailed.
+              <a className="btn primary" href={proofOut.url} target="_blank" rel="noreferrer">
+                Open the proof (PDF)
+              </a>
+              <span className="muted">If it says it can't be found, wait 10 seconds and click again. Lob is still drawing it.</span>
+            </span>
+          )}
+        </div>
+      )}
       <div className="rowBtns" style={{ alignItems: "center", marginBottom: 10 }}>
         <button className="btn" disabled={!!busy || !status || !status.hasTest} onClick={proof} title="Makes a PDF of the first card with Lob's test key. Nothing is printed or mailed.">
           {busy === "proof" ? "Making proof…" : `Free proof of the ${STEP_LABELS[view]} (PDF)`}
