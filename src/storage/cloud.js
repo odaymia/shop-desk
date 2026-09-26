@@ -635,6 +635,16 @@ async function listMailKeys() {
     if (!data || data.length < 1000) return out;
   }
 }
+/* A photo anyone can fetch by address (a postcard printer has to):
+   public-media/<shop>/<folder>/<random>.jpg → its public URL */
+async function uploadPublicImage(blob, folder = "images") {
+  if (!state.linked) throw new Error("Sign this computer in to your shop (Settings → Data) first.");
+  const path = `${state.shopId}/${folder}/${crypto.randomUUID()}.jpg`;
+  const bucket = supabase.storage.from("public-media");
+  const { error } = await bucket.upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+  if (error) throw /bucket|not found/i.test(error.message) ? new Error("Run the latest supabase/mail.sql in Supabase to turn on photo uploads.") : error;
+  return bucket.getPublicUrl(path).data.publicUrl;
+}
 async function listMailSends(limit = 100) {
   if (!state.linked) return [];
   const { data, error } = await supabase.from("mail_sends").select("id, batch_id, name, address, status, expected_delivery, error, created_at").eq("shop_id", state.shopId).order("created_at", { ascending: false }).limit(limit);
@@ -714,6 +724,7 @@ export const cloud = {
   setSuppressed,
   listMailKeys,
   listMailSends,
+  uploadPublicImage,
   /* Call a Supabase Edge Function as the signed-in shop user. Used for
      distributor lookups (tire search/order) that must run server-side so
      the wholesale credentials never reach the browser. */

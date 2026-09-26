@@ -38,3 +38,23 @@ drop policy if exists "members read mail keys" on mail_keys;
 create policy "members read mail keys" on mail_keys for select using (is_member(shop_id));
 drop policy if exists "members read mail sends" on mail_sends;
 create policy "members read mail sends" on mail_sends for select using (is_member(shop_id));
+
+-- Photos the shop uploads for its postcards (and anything else printed or
+-- mailed that a printer has to fetch by address). Public to read, since
+-- Lob's printers fetch them; only the shop's own staff can add or remove
+-- files, and only inside their shop's folder: public-media/<shop id>/…
+insert into storage.buckets (id, name, public) values ('public-media', 'public-media', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "members write public media" on storage.objects;
+create policy "members write public media" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'public-media' and is_member(((storage.foldername(name))[1])::uuid));
+drop policy if exists "members change public media" on storage.objects;
+create policy "members change public media" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'public-media' and is_member(((storage.foldername(name))[1])::uuid));
+drop policy if exists "members remove public media" on storage.objects;
+create policy "members remove public media" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'public-media' and is_member(((storage.foldername(name))[1])::uuid));

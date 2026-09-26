@@ -56,3 +56,40 @@ test("the card: fits Lob's size limit, scannable QR to the coupon's page, placeh
   assert.ok(front.includes("$20 OFF") && front.includes("https://x.example/logo.png"));
   assert.ok(back.includes('<path d="M'));
 });
+
+test("the series: 2nd and 3rd cards only for cars that haven't been back, each after the one before", async () => {
+  const { stepKey, mailOf } = await import("../src/lib/postcards.js");
+  const customers = { a: { id: "a", first: "Ana", last: "Diaz", ...addr } };
+  const vehicles = { va: { id: "va", customerId: "a", year: 2018, make: "Honda", model: "Civic" } };
+  const orders = { 1: oil("1", "a", "va", monthsAgo(3, -25)) }; // sticker date was 25 days ago
+  const series = { ...cfg, mail: { steps: [{}, { on: true, afterDays: 21 }, { on: true, afterDays: 42 }] } };
+  /* card 1 never went out: no card 2 either */
+  assert.equal(duePostcards({ cfg: series, customers, vehicles, orders, now }).length, 0);
+  /* card 1 went out: card 2 is due now (25 days after, window 21–35) */
+  const b2 = duePostcards({ cfg: series, customers, vehicles, orders, mailed: new Set([stepKey("va", "1", 0)]), now });
+  assert.deepEqual(b2.map((b) => [b.step, b.dedupe[0]]), [[1, "card:oil:va:1:s2"]]);
+  /* card 2 is off: nothing */
+  const off = { ...cfg, mail: { steps: [{}, { on: false, afterDays: 21 }, { on: true, afterDays: 42 }] } };
+  assert.equal(duePostcards({ cfg: off, customers, vehicles, orders, mailed: new Set([stepKey("va", "1", 0)]), now }).length, 0);
+  /* they came back for an oil change: the old series stops, a new one starts from card 1 later */
+  const back = { ...orders, 2: oil("2", "a", "va", now - 2 * DAY) };
+  assert.equal(duePostcards({ cfg: series, customers, vehicles, orders: back, mailed: new Set([stepKey("va", "1", 0)]), now }).length, 0);
+  /* old one-card settings carry into card 1 */
+  const old = mailOf({ mail: { headline: "Old", couponId: "x" } });
+  assert.equal(old.steps[0].headline, "Old");
+  assert.deepEqual(old.steps[0].couponIds, ["x"]);
+});
+
+test("a card with several coupons: all codes on the back, the first on the front, still under Lob's limit", () => {
+  const coupons = {
+    a: { id: "a", code: "OIL10", name: "$10 OFF ANY OIL CHANGE", kind: "amount", value: 10 },
+    b: { id: "b", code: "FLUID10", name: "$10 OFF ANY FLUID EXCHANGE SERVICE", kind: "amount", value: 10 },
+    c: { id: "c", code: "BRAKE20", name: "$20 OFF ANY BRAKE SERVICE", kind: "amount", value: 20, endsAt: "2026-12-31" },
+  };
+  const c = { ...cfg, shopName: "T", website: { cityLine: "El Cajon, CA 92021" }, mail: { photo: "https://cdn.example/storefront.jpg", steps: [{ couponIds: ["a", "b", "c"] }] } };
+  const { front, back } = renderPostcard(c, coupons, {});
+  for (const code of ["OIL10", "FLUID10", "BRAKE20"]) assert.ok(back.includes(code));
+  assert.ok(back.includes("Ends 2026-12-31"));
+  assert.ok(front.includes("$10 OFF") && front.includes("https://cdn.example/storefront.jpg"));
+  assert.ok(front.length < 10000 && back.length < 10000);
+});

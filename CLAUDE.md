@@ -173,6 +173,13 @@ owner approves each week's batch; nothing mails on its own.
   released if Lob refuses the card, so none is mailed twice. Lob calls
   carry an Idempotency-Key.
 - `customer.mailOptOut` stops postcards for that customer.
+- A series per oil change: card 1 around the sticker date, cards 2 and 3
+  (optional) N days after it if the car hasn't been back, each only after
+  the one before went out (`stepKey`). Each card has its own headline,
+  message and up to 3 coupons, and is mailed with its own design.
+- The front photo is an Unsplash id from `PHOTO_LIBRARY` or the shop's
+  own upload (public bucket `public-media/<shop>/…`, since printers fetch
+  it by URL; see supabase/mail.sql).
 
 ## Known gaps
 

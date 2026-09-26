@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { cloud } from "../storage/index.js";
 import { Field, Text, Modal, fmtDate } from "./ui.jsx";
-import { duePostcards, renderPostcard, mailOf, DEFAULT_MAIL } from "../lib/postcards.js";
+import { duePostcards, renderPostcard, mailOf, DEFAULT_STEPS, STEP_LABELS, PHOTO_LIBRARY, photoOf } from "../lib/postcards.js";
+import { photoUrl } from "../lib/serviceContent.js";
 import { couponText } from "../lib/website.js";
 import { emailOpts } from "./emailRunner.js";
 
@@ -20,6 +21,25 @@ async function errText(e) {
     /* not JSON */
   }
   return (e && e.message) || "Something went wrong";
+}
+
+/* Shrink an uploaded photo to print size (a 6x4 card at 300 dpi is 1875px wide) */
+function shrinkPhoto(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1900 / img.width);
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob((b) => (b ? res(b) : rej(new Error("Couldn't read that photo"))), "image/jpeg", 0.85);
+    };
+    img.onerror = () => rej(new Error("That file isn't a photo the browser can read."));
+    img.src = url;
+  });
 }
 
 /* a 6.25" x 4.25" card drawn at 96px an inch, scaled to fit */
@@ -47,6 +67,8 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
   const [busy, setBusy] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [view, setView] = useState(0); // which card in the series the preview shows
+  const [uploading, setUploading] = useState(false);
 
   const load = () => {
     cloud
@@ -68,21 +90,46 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
   useEffect(load, []);
 
   const cfgNow = { ...cfg, mail: m };
-  const batch = useMemo(() => (mailed ? duePostcards({ cfg: cfgNow, customers: shop.customers, vehicles: shop.vehicles, orders: shop.orders, mailed }) : []), [mailed, shop.customers, shop.vehicles, shop.orders, m.aheadDays, cfg.reminderMonths]); // eslint-disable-line react-hooks/exhaustive-deps
-  const chosen = batch.filter((b) => !skip.has(b.customerId));
-  const card = useMemo(() => renderPostcard(cfgNow, shop.coupons, emailOpts()), [cfg, m, shop.coupons]); // eslint-disable-line react-hooks/exhaustive-deps
-  const sample = batch[0] ? batch[0].vars : { first_name: "Maria", vehicle: "2018 Honda Civic", due_date: "October 12" };
+  const batch = useMemo(() => (mailed ? duePostcards({ cfg: cfgNow, customers: shop.customers, vehicles: shop.vehicles, orders: shop.orders, mailed }) : []), [mailed, shop.customers, shop.vehicles, shop.orders, m.aheadDays, m.steps, cfg.reminderMonths]); // eslint-disable-line react-hooks/exhaustive-deps
+  const skipKey = (b) => `${b.customerId}|${b.step}`;
+  const chosen = batch.filter((b) => !skip.has(skipKey(b)));
+  const designs = useMemo(() => [0, 1, 2].map((k) => renderPostcard(cfgNow, shop.coupons, emailOpts(), k)), [cfg, m, shop.coupons]); // eslint-disable-line react-hooks/exhaustive-deps
+  const card = designs[view];
+  const firstOf = (k) => chosen.find((b) => b.step === k);
+  const sample = (firstOf(view) || batch[0] || {}).vars || { first_name: "Maria", vehicle: "2018 Honda Civic", due_date: "October 12" };
+  const counts = [0, 1, 2].map((k) => chosen.filter((b) => b.step === k).length);
   const cost = chosen.length * (Number(m.costPerCard) || 0);
 
+  const setStep = (k, patch) => setM({ ...m, steps: m.steps.map((st, i) => (i === k ? { ...st, ...patch } : st)) });
+  const toggleCoupon = (k, id) => {
+    const cur = m.steps[k].couponIds || [];
+    setStep(k, { couponIds: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(0, 3) });
+  };
+  const upload = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    setUploading(true);
+    try {
+      const url = await cloud.uploadPublicImage(await shrinkPhoto(f), "postcards");
+      setM({ ...m, photo: url });
+      flash("Photo added. Save to use it on your cards.");
+    } catch (err) {
+      flash(err.message, "out");
+    } finally {
+      setUploading(false);
+    }
+  };
   const saveSettings = async () => {
-    await saveCfg({ ...cfg, mail: { ...m, aheadDays: Math.max(3, Math.floor(Number(m.aheadDays) || 12)), costPerCard: Number(m.costPerCard) || 0 } });
+    const { headline, message, couponId, ...rest } = m; // eslint-disable-line no-unused-vars
+    await saveCfg({ ...cfg, mail: { ...rest, aheadDays: Math.max(3, Math.floor(Number(m.aheadDays) || 12)), costPerCard: Number(m.costPerCard) || 0, steps: m.steps.map((st) => ({ ...st, afterDays: Math.max(0, Math.floor(Number(st.afterDays) || 0)) })) } });
     flash("Postcard settings saved");
     setEditing(false);
   };
   const proof = async () => {
     setBusy("proof");
     try {
-      const first = chosen[0];
+      const first = firstOf(view);
       const out = await cloud.invoke("mail", { action: "proof", front: card.front, back: card.back, card: first ? { to: first.to, vars: first.vars } : undefined });
       if (out.url) window.open(out.url, "_blank", "noopener");
       flash("Proof made. Lob's PDF opens in a new tab (it can take a few seconds to be ready). Nothing was mailed.");
@@ -100,11 +147,15 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
     let already = 0;
     const failed = [];
     try {
-      for (let i = 0; i < chosen.length; i += 25) {
-        const out = await cloud.invoke("mail", { action: "send", batchId, front: card.front, back: card.back, cards: chosen.slice(i, i + 25).map((b) => ({ to: b.to, vars: b.vars, dedupe: b.dedupe, customerId: b.customerId })) });
-        mailedN += out.mailed || 0;
-        already += out.already || 0;
-        failed.push(...(out.failed || []));
+      /* each card in the series has its own design, so mail them step by step */
+      for (const k of [0, 1, 2]) {
+        const group = chosen.filter((b) => b.step === k);
+        for (let i = 0; i < group.length; i += 25) {
+          const out = await cloud.invoke("mail", { action: "send", batchId, front: designs[k].front, back: designs[k].back, cards: group.slice(i, i + 25).map((b) => ({ to: b.to, vars: b.vars, dedupe: b.dedupe, customerId: b.customerId })) });
+          mailedN += out.mailed || 0;
+          already += out.already || 0;
+          failed.push(...(out.failed || []));
+        }
       }
       flash(`${mailedN} postcard${mailedN === 1 ? "" : "s"} on the way${already ? ` · ${already} had already been mailed` : ""}${failed.length ? ` · ${failed.length} couldn't be mailed (see below)` : ""}`, failed.length ? "out" : undefined);
     } catch (e) {
@@ -140,6 +191,14 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
       </div>
       {err && <p className="legalNote" style={{ color: "#b42318" }}>{err}</p>}
 
+      <div className="seg" style={{ marginBottom: 10 }}>
+        {STEP_LABELS.map((l, k) => (
+          <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)} disabled={k > 0 && !m.steps[k].on}>
+            {l}
+            {k > 0 && !m.steps[k].on ? " (off)" : ""}
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 10 }}>
         <CardPreview html={fillCard(card.front, sample)} label="Front" />
         <CardPreview html={fillCard(card.back, sample).replace("</body>", '<div style="position:absolute;right:.275in;bottom:.25in;width:3.28in;height:2.375in;border:2px dashed #ccc;font:12px sans-serif;color:#999;padding:6px">Address and postage go here</div></body>')} label="Back" />
@@ -150,64 +209,119 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
         </button>
       </div>
       {editing && (
-        <div className="card" style={{ padding: 16, marginBottom: 18, maxWidth: 720 }}>
-          <Field label="Headline (front)">
-            <Text value={m.headline} onChange={(v) => setM({ ...m, headline: v })} maxLength={40} />
-          </Field>
-          <Field label="Message (back; {first_name}, {vehicle}, {due_date} fill in per card)">
-            <textarea rows={3} maxLength={260} value={m.message} onChange={(e) => setM({ ...m, message: e.target.value })} />
-          </Field>
-          <Field label="Coupon (the QR code opens its page when it has one)">
-            <select value={m.couponId || ""} onChange={(e) => setM({ ...m, couponId: e.target.value })}>
-              <option value="">No coupon</option>
-              {Object.values(shop.coupons || {})
-                .filter((c) => c && c.active !== false && !c.deleted)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} — {c.name || couponText(c)}
-                    {c.endsAt ? ` (ends ${c.endsAt})` : ""}
-                  </option>
-                ))}
-            </select>
-          </Field>
-          <div className="fldRow">
-            <Field label="Mail cards for sticker dates up to (days out)">
-              <input type="number" min={3} max={30} value={m.aheadDays} onChange={(e) => setM({ ...m, aheadDays: e.target.value })} />
-            </Field>
-            <Field label="Cost per card (for the estimate)">
-              <input type="number" step="0.01" min={0} value={m.costPerCard} onChange={(e) => setM({ ...m, costPerCard: e.target.value })} />
-            </Field>
+        <div className="card" style={{ padding: 16, marginBottom: 18 }}>
+          <h3 className="subhead" style={{ marginTop: 0 }}>
+            Background photo (front)
+          </h3>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {PHOTO_LIBRARY.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                title={p.label}
+                onClick={() => setM({ ...m, photo: p.id })}
+                style={{ padding: 0, border: photoOf(m) === photoUrl(p.id, 1400) ? "3px solid var(--accent, #d9a400)" : "3px solid transparent", borderRadius: 8, background: "none", cursor: "pointer" }}
+              >
+                <img src={photoUrl(p.id, 240)} alt={p.label} style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 5, display: "block" }} />
+              </button>
+            ))}
+            {/^https:\/\//.test(m.photo || "") && (
+              <img src={m.photo} alt="Your photo" style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 8, border: "3px solid var(--accent, #d9a400)" }} />
+            )}
+            <label className="btn">
+              {uploading ? "Uploading…" : "Upload your own photo"}
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={upload} disabled={uploading} />
+            </label>
           </div>
-          <div className="rowBtns">
-            <button className="btn primary" onClick={saveSettings}>
-              Save
-            </button>
-            <button className="btn" onClick={() => setM({ ...DEFAULT_MAIL, couponId: m.couponId })}>
-              Reset the wording
-            </button>
-          </div>
+          <p className="legalNote">A wide photo works best. Your storefront or bays make the card feel like yours.</p>
+
+          <h3 className="subhead" style={{ marginTop: 22 }}>
+            The cards
+          </h3>
+          {m.steps.map((st, k) => (
+            <div key={k} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: 14, marginBottom: 12 }}>
+              <div className="rowBtns" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                <b>{STEP_LABELS[k]}</b>
+                {k > 0 ? (
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 600 }}>
+                    <input type="checkbox" checked={!!st.on} onChange={(e) => setStep(k, { on: e.target.checked })} />
+                    {st.on ? "On" : "Off"}
+                  </label>
+                ) : (
+                  <span className="muted">Always on</span>
+                )}
+              </div>
+              {k === 0 ? (
+                <Field label="Mail it for sticker dates up to this many days out">
+                  <input type="number" min={3} max={30} value={m.aheadDays} onChange={(e) => setM({ ...m, aheadDays: e.target.value })} />
+                </Field>
+              ) : (
+                <Field label={`If the car still hasn't been back, mail it this many days after the sticker date`}>
+                  <input type="number" min={7} max={120} value={st.afterDays} onChange={(e) => setStep(k, { afterDays: e.target.value })} />
+                </Field>
+              )}
+              <Field label="Headline (front)">
+                <Text value={st.headline} onChange={(v) => setStep(k, { headline: v })} maxLength={40} />
+              </Field>
+              <Field label="Message (back; {first_name}, {vehicle}, {due_date} fill in per card)">
+                <textarea rows={3} maxLength={220} value={st.message} onChange={(e) => setStep(k, { message: e.target.value })} />
+              </Field>
+              <Field label={`Coupons (up to 3; the first one also goes on the front)${(st.couponIds || []).length ? ` · ${st.couponIds.length} picked` : ""}`}>
+                <div style={{ maxHeight: 150, overflow: "auto", border: "1px solid var(--line)", borderRadius: 8, padding: "4px 10px" }}>
+                  {Object.values(shop.coupons || {}).filter((c) => c && c.active !== false && !c.deleted).map((c) => (
+                    <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "5px 0" }}>
+                      <input type="checkbox" checked={(st.couponIds || []).includes(c.id)} disabled={!(st.couponIds || []).includes(c.id) && (st.couponIds || []).length >= 3} onChange={() => toggleCoupon(k, c.id)} />
+                      <span>
+                        {(st.couponIds || []).indexOf(c.id) === 0 ? "★ " : ""}
+                        <b>{c.code}</b> — {c.name || couponText(c)}
+                        {c.endsAt ? ` (ends ${c.endsAt})` : ""}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </Field>
+              <button className="btn tiny" onClick={() => setStep(k, { headline: DEFAULT_STEPS[k].headline, message: DEFAULT_STEPS[k].message })}>
+                Reset the wording
+              </button>
+            </div>
+          ))}
+          <Field label="Cost per card (for the estimate)">
+            <input type="number" step="0.01" min={0} value={m.costPerCard} onChange={(e) => setM({ ...m, costPerCard: e.target.value })} />
+          </Field>
+          <button className="btn primary" onClick={saveSettings}>
+            Save
+          </button>
         </div>
       )}
 
       <h3 className="subhead">This week's postcards</h3>
       <p className="legalNote" style={{ marginTop: 0 }}>
-        Customers whose oil change sticker date is between a week ago and {m.aheadDays} days from now, with a full mailing
-        address, who haven't been mailed this reminder. Cards arrive in about 3–5 business days. Untick anyone to skip them
-        this time.
+        1st cards go to customers whose oil change sticker date is between a week ago and {m.aheadDays} days from now;
+        2nd and 3rd cards to cars that still haven't been back. Only customers with a full mailing address, and never the
+        same card twice. Cards arrive in about 3–5 business days. Untick anyone to skip them this time.
       </p>
       <div className="rowBtns" style={{ alignItems: "center", marginBottom: 10 }}>
         <button className="btn" disabled={!!busy || !status || !status.hasTest} onClick={proof} title="Makes a PDF of the first card with Lob's test key. Nothing is printed or mailed.">
-          {busy === "proof" ? "Making proof…" : "Get a free proof (PDF)"}
+          {busy === "proof" ? "Making proof…" : `Free proof of the ${STEP_LABELS[view]} (PDF)`}
         </button>
         <button className="btn primary" disabled={!!busy || !chosen.length || !status || !status.hasLive} onClick={() => setConfirm(true)}>
           {busy === "send" ? "Mailing…" : `Mail ${chosen.length} postcard${chosen.length === 1 ? "" : "s"} — about ${money(cost)}`}
         </button>
+        {chosen.length > 0 && (
+          <span className="muted">
+            {counts
+              .map((n, k) => (n ? `${n} × ${STEP_LABELS[k]}` : ""))
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        )}
       </div>
       <div className="tableCard">
         <table className="dk">
           <thead>
             <tr>
               <th />
+              <th>Card</th>
               <th>Customer</th>
               <th>Address</th>
               <th>Car</th>
@@ -218,25 +332,26 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
           <tbody>
             {batch.length === 0 && (
               <tr>
-                <td colSpan={6} className="emptyNote">
+                <td colSpan={7} className="emptyNote">
                   {mailed ? "Nobody's due for a postcard this week." : "Loading…"}
                 </td>
               </tr>
             )}
             {batch.map((b) => (
-              <tr key={b.customerId}>
+              <tr key={`${b.customerId}|${b.step}`}>
                 <td>
                   <input
                     type="checkbox"
-                    checked={!skip.has(b.customerId)}
+                    checked={!skip.has(skipKey(b))}
                     onChange={() => {
                       const n = new Set(skip);
-                      if (n.has(b.customerId)) n.delete(b.customerId);
-                      else n.add(b.customerId);
+                      if (n.has(skipKey(b))) n.delete(skipKey(b));
+                      else n.add(skipKey(b));
                       setSkip(n);
                     }}
                   />
                 </td>
+                <td>{STEP_LABELS[b.step]}</td>
                 <td>{b.to.name}</td>
                 <td className="muted">
                   {b.to.address_line1}, {b.to.address_city} {b.to.address_zip}
