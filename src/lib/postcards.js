@@ -253,7 +253,7 @@ export function renderPostcard(cfg, coupons, opts = {}, stepIndex = 0, oil = "")
   const base = `*{box-sizing:border-box;margin:0;padding:0}html,body{width:6.25in;height:4.25in}body{font-family:Inter,Arial,sans-serif;color:#15171b;-webkit-print-color-adjust:exact;print-color-adjust:exact}.d{font-family:"Barlow Condensed","Arial Narrow",Impact,sans-serif;text-transform:uppercase;letter-spacing:.01em}`;
   const ends = list.map((x) => x.endsAt).filter(Boolean).sort()[0] || "";
   const couponRows = list
-    .map((x) => `<table class="code"><tr><td><b class="d">${esc(couponText(x).toUpperCase())}</b>${lineOf(x) && list.length > 1 ? `<i>${esc(lineOf(x))}</i>` : ""}</td>${str(x.code) ? `<td style="text-align:right"><span>${esc(x.code)}</span></td>` : ""}</tr></table>`)
+    .map((x) => `<table class="code"><tr><td><b class="d">${esc(couponText(x).toUpperCase())}</b>${lineOf(x) && list.length > 1 ? `<i>${esc(lineOf(x))}</i>` : ""}</td>${str(x.code) ? `<td style="text-align:right;vertical-align:bottom"><span>CODE ${esc(x.code)}</span></td>` : ""}</tr></table>`)
     .join("");
 
   /* Lob draws cards with an older WebKit engine: no flexbox, grid, `inset`
@@ -273,11 +273,11 @@ h1{font-size:.66in;line-height:.9;margin:0 0 .1in}
 .tag .in{border:.035in dashed rgba(255,255,255,.85);border-radius:.11in;padding:.1in .08in .12in;text-align:center}
 .tag .off{display:block;font-size:${off.length > 8 ? ".62in" : ".82in"};line-height:.9}
 .tag .ln{display:block;font-size:.15in;line-height:1.1;margin-top:.04in}
-.tag .cd{display:inline-block;margin-top:.08in;background:#fff;color:#15171b;font:700 .16in "Courier New",monospace;letter-spacing:.04in;padding:.03in .1in;border-radius:.05in}
+.tag .cd{display:block;margin-top:.06in;font:600 .085in Inter,Arial,sans-serif;letter-spacing:.02in;color:rgba(255,255,255,.8)}
 .bar{position:absolute;left:0;bottom:0;width:6.25in;height:.1in;background:${main}}
 </style></head><body><div class="f"><img class="ph" src="${esc(photo)}" alt="">${SHADE}
 ${logo ? `<div class="logo"><img src="${esc(logo)}" alt=""></div>` : `<div class="name d">${esc(cfg.shopName)}</div>`}
-${off ? `<div class="tag"><div class="in"><b class="off d">${esc(off)}</b>${line ? `<span class="ln d">${esc(line)}</span>` : ""}${str(c.code) ? `<span class="cd">${esc(c.code)}</span>` : ""}</div></div>` : ""}
+${off ? `<div class="tag"><div class="in"><b class="off d">${esc(off)}</b>${line ? `<span class="ln d">${esc(line)}</span>` : ""}${str(c.code) ? `<span class="cd">CODE ${esc(c.code)}</span>` : ""}</div></div>` : ""}
 <div class="txt"><h1 class="d">${esc(st.headline)}</h1>
 <p class="sub">No appointment needed${str(cfg.shopPhone) ? ` · ${esc(cfg.shopPhone)}` : ""}${home && w.domain ? ` · ${esc(str(w.domain).replace(/^www\./, ""))}` : ""}</p></div>
 <div class="bar"></div></div></body></html>`;
@@ -289,7 +289,7 @@ ${off ? `<div class="tag"><div class="in"><b class="off d">${esc(off)}</b>${line
 .code{width:100%;border-collapse:separate;border:.03in dashed ${main};border-radius:.08in;margin-top:.05in}
 .code td{padding:.04in .08in;vertical-align:middle}
 .code b{display:block;font-size:${list.length > 1 ? ".2in" : ".3in"};line-height:1;color:${main}}.code i{display:block;font-style:normal;font-size:.075in;font-weight:700;text-transform:uppercase;color:#33373d;margin-top:.01in}
-.code span{font:700 ${list.length > 1 ? ".12in" : ".17in"} "Courier New",monospace;letter-spacing:.03in;background:#15171b;color:#fff;padding:.03in .07in;border-radius:.05in;white-space:nowrap}
+.code span{font:600 .075in Inter,Arial,sans-serif;letter-spacing:.015in;color:#7a7f87;white-space:nowrap}
 .codes{margin:.08in 0 .06in}
 .qrt{width:100%;border-collapse:collapse}.qrt td{vertical-align:top;padding:0}
 .qrc{width:.8in;text-align:center}.qrc svg{width:.8in;height:.8in;display:block}.qrc p{font-size:.075in;line-height:1.2;color:#5b616c;margin-top:.03in}
