@@ -196,6 +196,16 @@ export function laborHours(order) {
 /* The three commission roles a quick-lube oil change needs recorded:
    advisor (writer), top tech (hood), pit tech (under car). Used to make
    assigning the crew mandatory before an oil change is posted. */
+/* A ticket with a car on it can't post without the odometer reading
+   (in or out): it goes on the invoice, the car's history, and the next
+   service reminder. Counter sales with no car don't need one. */
+export function needsMileage(order) {
+  const o = order || {};
+  if (!o.vehicleId) return false;
+  const miles = (v) => Number(String(v == null ? "" : v).replace(/[^\d.]/g, "")) || 0;
+  return !(miles(o.mileageIn) > 0 || miles(o.mileageOut) > 0);
+}
+
 export function crewAssigned(order) {
   const o = order || {};
   return !!(o.advisorId || o.writerId) && !!(o.topTechId || o.techId) && !!o.pitTechId;

@@ -37,6 +37,7 @@ import {
   paymentDesc,
   PART_CONDITIONS,
   crewAssigned,
+  needsMileage,
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
@@ -438,6 +439,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
     const latest = await flushNow();
     /* an oil change can't be posted until the crew is recorded — set it on
        the reminder-sticker screen or in Details */
+    if (to === STATUS.invoiced && needsMileage(latest)) {
+      setPick("confirmPost");
+      return flash("Enter the mileage before posting.", "out");
+    }
     if (to === STATUS.invoiced && hasOilChange(latest) && !crewAssigned(latest)) {
       setSticker({ id: latest.id });
       return flash("Assign the advisor, top tech, and pit tech before posting an oil change.", "out");
@@ -1512,8 +1517,19 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash }) {
             when the work is done.
           </p>
           {!o.customerId && <p className="fldErr">No customer on this ticket. It will post as a walk-in.</p>}
+          {o.vehicleId && (
+            <div className="fldRow">
+              <Field label={`Mileage in${needsMileage(o) ? " (required)" : ""}`}>
+                <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} autoFocus={needsMileage(o)} placeholder={vehicle && vehicle.mileage ? `Last time: ${Number(vehicle.mileage).toLocaleString("en-US")}` : ""} />
+              </Field>
+              <Field label="Mileage out">
+                <Num value={o.mileageOut} onChange={(v) => update({ mileageOut: v })} />
+              </Field>
+            </div>
+          )}
+          {needsMileage(o) && <p className="fldErr">Enter the car's mileage to post this invoice.</p>}
           <div className="rowBtns" style={{ marginTop: 10 }}>
-            <button className="btn primary lg" onClick={() => moveTo(STATUS.invoiced)}>
+            <button className="btn primary lg" disabled={needsMileage(o)} onClick={() => moveTo(STATUS.invoiced)}>
               Post invoice
             </button>
             <button className="btn lg" onClick={() => setPick(null)}>

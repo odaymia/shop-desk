@@ -267,3 +267,13 @@ test("cash receipts show what was handed over and the change", () => {
   assert.deepEqual(cashTenderLines({ method: "cash", amount: 20 }), []);
   assert.deepEqual(cashTenderLines({ method: "card", amount: 20, cashGiven: 50 }), []);
 });
+
+import { needsMileage } from "../src/lib/invoice.js";
+
+test("a ticket with a car needs mileage to post", () => {
+  assert.equal(needsMileage({ vehicleId: "v1", mileageIn: "", mileageOut: "" }), true);
+  assert.equal(needsMileage({ vehicleId: "v1", mileageIn: "0" }), true);
+  assert.equal(needsMileage({ vehicleId: "v1", mileageIn: "84,211" }), false);
+  assert.equal(needsMileage({ vehicleId: "v1", mileageOut: 84211 }), false);
+  assert.equal(needsMileage({ vehicleId: "", mileageIn: "" }), false);
+});
