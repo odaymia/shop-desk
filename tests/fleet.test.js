@@ -58,3 +58,23 @@ test("fleetStats rolls up invoiced totals, categories, and on-account balance", 
   assert.equal(s.onAccount, 500);
   assert.equal(s.byCat.tires, 480); // from o1
 });
+
+import { moveVehicleToFleet } from "../src/lib/fleet.js";
+import { orderTotals } from "../src/lib/invoice.js";
+
+test("moving a car onto a fleet keeps past invoices' totals", () => {
+  const cfg = { taxRate: 10 };
+  const fleet = { id: "f1", taxExempt: true, fleet: { discounts: { oil: 10 } } };
+  const was = { id: "c1" };
+  const vehicle = { id: "v1", customerId: "c1" };
+  const inv = { id: "o1", vehicleId: "v1", customerId: "c1", status: "invoiced", lines: [{ kind: "part", desc: "Filter", qty: 1, price: 100, taxable: true }] };
+  const other = { id: "o2", vehicleId: "v2", customerId: "c1", status: "invoiced", lines: [] };
+  const off = moveVehicleToFleet({ vehicle, orders: [inv, other], fleet, fromCustomer: was, cfg, moveHistory: false });
+  assert.equal(off.vehicle.customerId, "f1");
+  assert.equal(off.orders.length, 0);
+  const on = moveVehicleToFleet({ vehicle, orders: [inv, other], fleet, fromCustomer: was, cfg, moveHistory: true });
+  assert.deepEqual(on.orders.map((o) => o.id), ["o1"]);
+  const before = orderTotals(inv, cfg, was).total;
+  assert.equal(orderTotals(on.orders[0], cfg, fleet).total, before);
+  assert.equal(on.orders[0].movedFrom, "c1");
+});

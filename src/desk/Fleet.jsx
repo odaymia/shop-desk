@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Money, fmtDate } from "./ui.jsx";
+import { Money, Modal, fmtDate } from "./ui.jsx";
 import { CustomerForm, VehicleForm } from "./forms.jsx";
-import { vehicleName, vehiclesOf, ordersOf, searchText } from "./useShop.js";
+import { vehicleName, vehiclesOf, ordersOf, searchText, customerName, activeList } from "./useShop.js";
 import { workSummary } from "./Customers.jsx";
-import { isFleet, fleetName, fleetStats, DEFAULT_FLEET } from "../lib/fleet.js";
+import { isFleet, fleetName, fleetStats, DEFAULT_FLEET, moveVehicleToFleet } from "../lib/fleet.js";
 import { orderTotals, statusLabel } from "../lib/invoice.js";
 
 /* Fleet accounts: businesses with a house account, automatic per-category
@@ -108,6 +108,7 @@ function FleetDetail({ shop, cfg, nav, flash, onNew, cust: c, onBack, editing, s
   const [po, setPo] = useState(!!(c.fleet && c.fleet.poRequired));
   const [notes, setNotes] = useState((c.fleet && c.fleet.notes) || "");
 
+  const [pickCar, setPickCar] = useState(false);
   const num = (v) => Math.max(0, Math.min(100, Number(v) || 0));
   const saveDiscounts = async () => {
     await shop.saveCustomer({ ...c, fleet: { ...(c.fleet || {}), discounts: { oil: num(oil), tires: num(tires), mechanical: num(mech) }, poRequired: po, notes: notes.trim() } });
@@ -223,9 +224,14 @@ function FleetDetail({ shop, cfg, nav, flash, onNew, cust: c, onBack, editing, s
           <div className="card">
             <div className="cardHead">
               <h3>Vehicles</h3>
-              <button className="btn tiny" onClick={() => setVehEdit({})}>
-                Add vehicle
-              </button>
+              <span className="rowActs">
+                <button className="btn tiny primary" onClick={() => setPickCar(true)}>
+                  Add a car we've seen
+                </button>
+                <button className="btn tiny" onClick={() => setVehEdit({})}>
+                  New car
+                </button>
+              </span>
             </div>
             {vehs.length === 0 ? (
               <p className="muted" style={{ margin: 0 }}>No vehicles on file yet.</p>
@@ -299,6 +305,7 @@ function FleetDetail({ shop, cfg, nav, flash, onNew, cust: c, onBack, editing, s
           }}
         />
       )}
+      {pickCar && <AddExistingCar shop={shop} cfg={cfg} fleet={c} flash={flash} onClose={() => setPickCar(false)} />}
       {vehEdit && (
         <VehicleForm
           cfg={cfg}
@@ -314,5 +321,121 @@ function FleetDetail({ shop, cfg, nav, flash, onNew, cust: c, onBack, editing, s
         />
       )}
     </>
+  );
+}
+
+/* Find a car already in the desk (by plate, VIN, car, or owner) and move it
+   onto this fleet account, optionally with its past tickets. */
+function AddExistingCar({ shop, cfg, fleet, flash, onClose }) {
+  const [q, setQ] = useState("");
+  const [pick, setPick] = useState(null);
+  const [moveHistory, setMoveHistory] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  /* visits per car, counted once (the desk can hold tens of thousands of tickets) */
+  const visits = useMemo(() => {
+    const m = {};
+    for (const o of Object.values(shop.orders || {})) if (o && o.vehicleId && o.status !== "deleted") m[o.vehicleId] = (m[o.vehicleId] || 0) + 1;
+    return m;
+  }, [shop.orders]);
+  const who = (o) => (!o ? "No owner" : o.ls && o.ls.placeholder ? "Walk-in" : customerName(o));
+
+  const matches = useMemo(() => {
+    const needle = q.trim();
+    if (needle.length < 2) return [];
+    const out = [];
+    for (const v of activeList(shop.vehicles)) {
+      if (v.customerId === fleet.id) continue;
+      const owner = shop.customers[v.customerId];
+      if (searchText(needle, v.plate, v.vin, vehicleName(v), v.unit, owner && customerName(owner), owner && owner.company, owner && owner.phone)) out.push(v);
+      if (out.length >= 40) break;
+    }
+    return out;
+  }, [q, shop.vehicles, shop.customers, fleet.id]);
+
+  const choose = (v) => {
+    const owner = shop.customers[v.customerId];
+    /* a walk-in placeholder or nameless owner: the history is the fleet's */
+    const nameless = !owner || (owner.ls && owner.ls.placeholder) || !(owner.first || owner.last || owner.company || owner.phone);
+    setMoveHistory(!!nameless);
+    setPick(v);
+  };
+
+  const owner = pick ? shop.customers[pick.customerId] : null;
+  const past = pick ? ordersOf(shop.orders, { vehicleId: pick.id }).filter((o) => o.customerId !== fleet.id) : [];
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const { vehicle, orders } = moveVehicleToFleet({ vehicle: pick, orders: past, fleet, fromCustomer: owner, cfg, moveHistory });
+      await shop.saveVehicle(vehicle);
+      if (orders.length) await shop.saveOrdersBulk(orders);
+      flash(`${vehicleName(pick)} added to ${fleetName(fleet)}${orders.length ? ` with ${orders.length} past ticket${orders.length === 1 ? "" : "s"}` : ""}`);
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={`Add a car to ${fleetName(fleet)}`} onClose={onClose} size="lg">
+      {!pick ? (
+        <>
+          <input className="search" autoFocus style={{ width: "100%" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Plate, VIN, car, owner name, or phone" />
+          {q.trim().length < 2 ? (
+            <p className="muted">Type at least two letters or numbers.</p>
+          ) : matches.length === 0 ? (
+            <p className="muted">No car matches. Use New car to add one.</p>
+          ) : (
+            <table className="dk" style={{ marginTop: 10 }}>
+              <tbody>
+                {matches.map((v) => {
+                  const o = shop.customers[v.customerId];
+                  const n = visits[v.id] || 0;
+                  return (
+                    <tr key={v.id} className="row" onClick={() => choose(v)}>
+                      <td>
+                        <strong>{vehicleName(v)}</strong>
+                        <span className="sub">{[v.plate, v.vin].filter(Boolean).join(" · ")}</span>
+                      </td>
+                      <td className="muted">{who(o)}</td>
+                      <td className="r num muted">{n ? `${n} visit${n === 1 ? "" : "s"}` : ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </>
+      ) : (
+        <>
+          <p style={{ marginTop: 0 }}>
+            <strong>{vehicleName(pick)}</strong>
+            {pick.plate ? ` · ${pick.plate}` : ""}
+            <br />
+            <span className="muted">Now on file under {owner ? (who(owner) === "Walk-in" ? "a walk-in" : who(owner)) : "no one"}. It will move to {fleetName(fleet)}.</span>
+          </p>
+          {past.length > 0 && (
+            <label style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "12px 0" }}>
+              <input type="checkbox" checked={moveHistory} onChange={(e) => setMoveHistory(e.target.checked)} />
+              <span>
+                Move its {past.length} past ticket{past.length === 1 ? "" : "s"} to {fleetName(fleet)} too
+                <span className="sub muted" style={{ display: "block" }}>
+                  They'll count in this account's history and report. Totals don't change: no fleet discount is added to past work, and each invoice keeps the tax it was charged. Leave this off if the car belonged to someone else before.
+                </span>
+              </span>
+            </label>
+          )}
+          <div className="rowBtns">
+            <button className="btn primary" disabled={busy} onClick={save}>
+              {busy ? "Adding…" : "Add to fleet"}
+            </button>
+            <button className="btn ghost" onClick={() => setPick(null)}>
+              Pick a different car
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }

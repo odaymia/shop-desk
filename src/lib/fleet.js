@@ -72,3 +72,22 @@ export function fleetStats(orders, customer, cfg, parts) {
   }
   return { visits: inv.length, lifetime, last, byCat, onAccount, saved };
 }
+
+/* Moving a car the shop already knows onto a fleet account. The car
+   changes owner; its past tickets move too only when asked (they then
+   count in the account's history and report). A moved invoice keeps the
+   tax it was charged: the fleet may be tax exempt, and a finished
+   invoice must not change its total. No fleet discount is applied to
+   past work. → { vehicle, orders } to save. */
+export function moveVehicleToFleet({ vehicle, orders, fleet, fromCustomer, cfg, moveHistory }) {
+  const moved = { ...vehicle, customerId: fleet.id };
+  if (!moveHistory) return { vehicle: moved, orders: [] };
+  const out = (orders || [])
+    .filter((o) => o && o.vehicleId === vehicle.id && o.customerId !== fleet.id && o.status !== "deleted")
+    .map((o) => {
+      const next = { ...o, customerId: fleet.id, movedFrom: o.customerId || "" };
+      if (o.status === "invoiced" && o.taxOverride == null) next.taxOverride = orderTotals(o, cfg, fromCustomer).tax;
+      return next;
+    });
+  return { vehicle: moved, orders: out };
+}
