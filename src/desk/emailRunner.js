@@ -7,6 +7,7 @@
 import { cloud } from "../storage/index.js";
 import { dueAutomations, automationsOf, AUTOMATION_INFO } from "../lib/emailAutomations.js";
 import { composeEmail } from "../lib/emailCompose.js";
+import { duePostcards } from "../lib/postcards.js";
 import defaultLogo from "../assets/genie-logo.png";
 
 export const emailOpts = () => ({ appBase: new URL("./", window.location.href).href, logoUrl: new URL(defaultLogo, window.location.href).href });
@@ -59,4 +60,23 @@ export async function dailyEmailTick(shop, cfg) {
 export async function drainTick() {
   if (!cloud.getState().linked) return null;
   return cloud.invoke("email", { action: "drain" }).catch(() => null);
+}
+
+/* The weekly postcard reminder: how many cards are waiting to be approved,
+   once a shop mails postcards (it has postcard settings or has mailed
+   before) and it's been about a week since the last batch. → { count } or null */
+export async function postcardsWaiting(shop, cfg) {
+  if (!cloud.getState().linked) return null;
+  let keys;
+  try {
+    keys = await cloud.listMailKeys();
+  } catch {
+    return null; // postcards aren't set up
+  }
+  const sends = await cloud.listMailSends(1);
+  if (!cfg.mail && !sends.length) return null;
+  const last = sends[0] ? Date.parse(sends[0].created_at) : 0;
+  if (last && Date.now() - last < 6 * 86400000) return null; // mailed this week already
+  const batch = duePostcards({ cfg, customers: shop.customers, vehicles: shop.vehicles, orders: shop.orders, mailed: new Set(keys) });
+  return batch.length ? { count: batch.length } : null;
 }

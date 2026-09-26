@@ -13,7 +13,7 @@ import { Staff } from "./Staff.jsx";
 import { Reports } from "./Reports.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
 import { EmailCenter } from "./EmailCenter.jsx";
-import { dailyEmailTick, drainTick } from "./emailRunner.js";
+import { dailyEmailTick, drainTick, postcardsWaiting } from "./emailRunner.js";
 import { PrintTicket } from "./PrintTicket.jsx";
 import { StartTicket } from "./StartTicket.jsx";
 import { SignatureStation } from "./Signing.jsx";
@@ -83,7 +83,51 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       clearInterval(every);
     };
   }, [shop.loaded, cfg]);
+
   const [page, setPage] = useState("orders");
+
+  /* weekly postcard reminder: a banner and a count on Marketing while a
+     batch is waiting; "Later" hides it until tomorrow */
+  const [cardsDue, setCardsDue] = useState(0);
+  const [cardsHidden, setCardsHidden] = useState(() => {
+    try {
+      return localStorage.getItem("bb:postcardNudgeHidden") === new Date().toISOString().slice(0, 10);
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    if (!shop.loaded || page === "email") return;
+    let live = true;
+    const check = () =>
+      postcardsWaiting(shopRef.current, cfg)
+        .then((r) => live && setCardsDue(r ? r.count : 0))
+        .catch(() => {});
+    const first = setTimeout(check, 8000);
+    const every = setInterval(check, 6 * 3600000);
+    return () => {
+      live = false;
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, [shop.loaded, cfg, page]);
+  const reviewCards = () => {
+    try {
+      localStorage.setItem("bb:emailTab", JSON.stringify("postcards"));
+    } catch {
+      /* private window */
+    }
+    setCardsDue(0);
+    nav.go("email");
+  };
+  const laterCards = () => {
+    try {
+      localStorage.setItem("bb:postcardNudgeHidden", new Date().toISOString().slice(0, 10));
+    } catch {
+      /* private window */
+    }
+    setCardsHidden(true);
+  };
   const [orderId, setOrderId] = useState(null);
   const [customerId, setCustomerId] = useState(null);
   const [printId, setPrintId] = useState(null);
@@ -184,6 +228,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {PAGES.map(([k, label]) => (
             <button key={k} className={`deskNavBtn ${page === k ? "on" : ""}`} onClick={() => nav.go(k)}>
               {label}
+              {k === "email" && cardsDue > 0 && (
+                <span title={`${cardsDue} postcards ready to mail`} style={{ marginLeft: 8, background: "var(--amber, #d9a400)", color: "#15171b", borderRadius: 99, padding: "1px 8px", fontSize: 12, fontWeight: 700 }}>
+                  {cardsDue}
+                </span>
+              )}
             </button>
           ))}
           <div className="deskNavFoot">
@@ -193,6 +242,20 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           </div>
         </nav>
         <div className="deskMain">
+          {cardsDue > 0 && !cardsHidden && page !== "email" && (
+            <div role="status" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "12px 16px 0", padding: "10px 14px", borderRadius: 10, background: "rgba(217,164,0,.14)", border: "1px solid rgba(217,164,0,.45)" }}>
+              <span>
+                📬 <b>{cardsDue} oil change postcard{cardsDue === 1 ? "" : "s"}</b> ready to mail this week.
+              </span>
+              <span style={{ flex: 1 }} />
+              <button className="btn primary" onClick={reviewCards}>
+                Review and mail
+              </button>
+              <button className="btn" onClick={laterCards}>
+                Later
+              </button>
+            </div>
+          )}
           {page === "orders" &&
             (orderId ? (
               <OrderEditor key={orderId} orderId={orderId} shop={shop} cfg={cfg} employees={employees} nav={nav} flash={flash} />
