@@ -37,7 +37,11 @@ const NOT_WORK = /disposal|hazard|environmental|shop suppl|recycl|core charge|co
 /* brake repair that mentions brake fluid ("Front Brake Pad, Rotor & Brake
    Fluid Service", "repaired brake fluid leak") is mechanical, not lube */
 const BRAKE_REPAIR = /brake pad|\bpads?\b|rotor|caliper|brake shoe|\bshoes\b|brake line|brake hose|\bleak/;
-const isWork = (l) => !!l && ["labor", "part", "sublet"].includes(l.kind) && !NOT_WORK.test(text(l));
+/* free courtesy checks that ride along on an oil change ("multi-point
+   inspection $0", "top off fluids", "check tire pressure") aren't work */
+const COURTESY = /inspect|multi.?point|courtesy|top.?off|\bcheck(ed)?\b|\bfill\b|tire pressure|air pressure/;
+const isWork = (l) =>
+  !!l && ["labor", "part", "sublet"].includes(l.kind) && !NOT_WORK.test(text(l)) && !(lineAmount(l) === 0 && COURTESY.test(text(l)));
 
 /* The department one line belongs to, or null for lines that aren't work
    (notes, fees, discounts). Anything that isn't lube or tires is mechanical. */
@@ -143,6 +147,12 @@ export function authorizationRequired(order, cfg, parts) {
   if ((cfg && cfg.pmSignature) === "required") return true;
   if (isMaintenanceOnly(order, parts)) return false;
   return !isQuickLube(order, parts, cfg);
+}
+/* The lines that make a ticket need authorization, for the warning. */
+export function authorizationReasons(order, cfg, parts) {
+  if (!authorizationRequired(order, cfg, parts)) return [];
+  if ((cfg && cfg.pmSignature) === "required") return [];
+  return ((order && order.lines) || []).filter((l) => isWork(l) && !isMaintenanceLine(l, parts) && lineDept(l, parts) !== "oil").map((l) => String(l.description || l.job || "a line").trim());
 }
 
 /* ---------- combining tickets ---------- */

@@ -107,3 +107,14 @@ test("oil change tickets never ask for authorization; brake jobs mentioning flui
   assert.equal(lineDept(L("", "REPAIRED BRAKE FLUID LEAK")), "mech");
   assert.equal(authorizationRequired({ dept: "oil", lines: [oil, padsFluid] }, {}), true);
 });
+
+test("free courtesy checks don't turn an oil change into a repair; the warning names what does", () => {
+  const mpi = { kind: "labor", description: "Multi-point inspection", hours: 1, rate: 0 };
+  const topoff = { kind: "labor", description: "Top off fluids", hours: 0, rate: 0 };
+  assert.equal(isQuickLube({ dept: "oil", lines: [oil, filter, mpi, topoff] }), true);
+  assert.equal(authorizationRequired({ dept: "oil", lines: [oil, filter, mpi, topoff] }, {}), false);
+  const batt = L("", "Replace battery", 150);
+  const w = complianceWarnings({ lines: [oil, batt] }, {}, 210);
+  assert.equal(w.length, 1);
+  assert.match(w[0], /Needed for: Replace battery\./);
+});

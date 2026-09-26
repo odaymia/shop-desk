@@ -3,7 +3,7 @@
    has grown past what the customer approved (a top BAR violation), the EPA ID
    a hazardous-waste disposal fee must carry, and a soft pre-post checklist. */
 
-import { authorizationRequired } from "./departments.js";
+import { authorizationRequired, authorizationReasons } from "./departments.js";
 
 const CENT = 0.005;
 
@@ -73,7 +73,15 @@ export function complianceWarnings(order, cfg, total, parts) {
   const w = [];
   /* maintenance-only work (an oil change at posted prices) needs no written
      estimate under B&P 9884.9(e); the shop can still require a signature */
-  if (!isAuthorized(order) && authorizationRequired(order, cfg, parts)) w.push("No customer authorization is on record (no signature or recorded phone/electronic approval).");
+  if (!isAuthorized(order) && authorizationRequired(order, cfg, parts)) {
+    const why = authorizationReasons(order, cfg, parts);
+    const shown = why.slice(0, 3).join(", ") + (why.length > 3 ? ` and ${why.length - 3} more` : "");
+    w.push(
+      `No customer authorization is on record (no signature or recorded phone/electronic approval).${
+        (cfg && cfg.pmSignature) === "required" ? " Your settings ask for one on every ticket." : why.length ? ` Needed for: ${shown}.` : ""
+      }`
+    );
+  }
   if (needsReauth(order, total)) {
     const authd = authorizedTotal(order);
     w.push(`The total (${fmtMoney(total)}) is above what the customer authorized (${fmtMoney(authd)}). Record the customer's approval for the additional work.`);
