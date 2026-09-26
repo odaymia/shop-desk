@@ -10,7 +10,7 @@ import qrcode from "qrcode-generator";
 import { isOilOrder, fmtDay, vehicleName, addMonths } from "./emailAutomations.js";
 import { siteHome } from "./emailCompose.js";
 import { offerSlug, couponText, hoursRows } from "./website.js";
-import { photoUrl, SERVICE_CONTENT } from "./serviceContent.js";
+import { SERVICE_CONTENT } from "./serviceContent.js";
 
 const DAY = 86400000;
 const str = (s) => String(s == null ? "" : s).trim();
@@ -64,7 +64,11 @@ export function mailOf(cfg) {
   });
   return { ...DEFAULT_MAIL, ...saved, steps };
 }
-export const photoOf = (m) => (/^https:\/\//.test(str(m.photo)) ? str(m.photo) : photoUrl(str(m.photo) || PHOTO_LIBRARY[0].id, 1400));
+/* The front photo at exactly the card's shape and print size, as a plain
+   JPEG: Lob's older renderer can't draw WebP/AVIF, which a format-by-browser
+   request might get. Uploads are cropped to the same shape when added. */
+export const cardPhotoUrl = (id) => `https://images.unsplash.com/photo-${id}?w=1875&h=1275&fit=crop&crop=entropy&fm=jpg&q=80`;
+export const photoOf = (m) => (/^https:\/\//.test(str(m.photo)) ? str(m.photo) : cardPhotoUrl(str(m.photo) || PHOTO_LIBRARY[0].id));
 
 /* ---------- which oil the car gets ---------- */
 
@@ -240,8 +244,9 @@ export function renderPostcard(cfg, coupons, opts = {}, stepIndex = 0, oil = "")
      tables, and -webkit- prefixes so the proof and the print match what
      the desk shows. The dark shade is a real element, not a pseudo one. */
   const front = `<!DOCTYPE html><html><head><meta charset="utf-8">${font}<style>${base}
-.f{position:relative;width:6.25in;height:4.25in;overflow:hidden;background:#121417 url('${esc(photo)}') no-repeat center center;background-size:cover}
-.shade{position:absolute;left:0;top:0;width:6.25in;height:4.25in;background:-webkit-linear-gradient(left,rgba(12,13,15,.92) 0%,rgba(12,13,15,.7) 50%,rgba(12,13,15,.35) 100%);background:linear-gradient(90deg,rgba(12,13,15,.92) 0%,rgba(12,13,15,.7) 50%,rgba(12,13,15,.35) 100%)}
+.f{position:relative;width:6.25in;height:4.25in;overflow:hidden;background:#121417}
+.ph{position:absolute;left:0;top:0;width:6.25in;height:4.25in;display:block}
+.shade{position:absolute;left:0;top:0;width:6.25in;height:4.25in;background:-webkit-linear-gradient(left,rgba(12,13,15,.88) 0%,rgba(12,13,15,.6) 50%,rgba(12,13,15,.25) 100%);background:linear-gradient(90deg,rgba(12,13,15,.88) 0%,rgba(12,13,15,.6) 50%,rgba(12,13,15,.25) 100%)}
 .shade2{position:absolute;left:0;bottom:0;width:6.25in;height:2.2in;background:-webkit-linear-gradient(bottom,rgba(12,13,15,.85) 0%,rgba(12,13,15,0) 100%);background:linear-gradient(0deg,rgba(12,13,15,.85) 0%,rgba(12,13,15,0) 100%)}
 .logo{position:absolute;left:.4in;top:.38in;background:#fff;border-radius:.08in;padding:.05in .1in}.logo img{height:.46in;display:block}
 .name{position:absolute;left:.4in;top:.4in;color:#fff;font-size:.3in;font-weight:800}
@@ -254,7 +259,7 @@ h1{font-size:.66in;line-height:.9;margin:0 0 .1in}
 .tag .ln{display:block;font-size:.15in;line-height:1.1;margin-top:.04in}
 .tag .cd{display:inline-block;margin-top:.08in;background:#fff;color:#15171b;font:700 .16in "Courier New",monospace;letter-spacing:.04in;padding:.03in .1in;border-radius:.05in}
 .bar{position:absolute;left:0;bottom:0;width:6.25in;height:.1in;background:${main}}
-</style></head><body><div class="f"><div class="shade"></div><div class="shade2"></div>
+</style></head><body><div class="f"><img class="ph" src="${esc(photo)}" alt=""><div class="shade"></div><div class="shade2"></div>
 ${logo ? `<div class="logo"><img src="${esc(logo)}" alt=""></div>` : `<div class="name d">${esc(cfg.shopName)}</div>`}
 ${off ? `<div class="tag"><div class="in"><b class="off d">${esc(off)}</b>${line ? `<span class="ln d">${esc(line)}</span>` : ""}${str(c.code) ? `<span class="cd">${esc(c.code)}</span>` : ""}</div></div>` : ""}
 <div class="txt"><h1 class="d">${esc(st.headline)}</h1>

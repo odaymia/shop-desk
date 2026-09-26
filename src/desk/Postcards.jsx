@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { cloud } from "../storage/index.js";
 import { Field, Text, Modal, fmtDate } from "./ui.jsx";
 import { duePostcards, renderPostcard, mailOf, DEFAULT_STEPS, STEP_LABELS, PHOTO_LIBRARY, photoOf, OIL_TYPES, couponIdsFor } from "../lib/postcards.js";
-import { photoUrl } from "../lib/serviceContent.js";
+import { cardPhotoUrl } from "../lib/postcards.js";
 import { couponText } from "../lib/website.js";
 import { emailOpts } from "./emailRunner.js";
 
@@ -25,17 +25,22 @@ async function errText(e) {
   return (e && e.message) || "Something went wrong";
 }
 
-/* Shrink an uploaded photo to print size (a 6x4 card at 300 dpi is 1875px wide) */
+/* Crop an uploaded photo to the card's shape (6.25 x 4.25 in, with bleed)
+   at print size, 1875 x 1275 px, keeping the middle */
 function shrinkPhoto(file) {
   return new Promise((res, rej) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const scale = Math.min(1, 1900 / img.width);
+      const W = 1875;
+      const H = 1275;
+      const scale = Math.max(W / img.width, H / img.height);
+      const sw = W / scale;
+      const sh = H / scale;
       const c = document.createElement("canvas");
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      c.width = W;
+      c.height = H;
+      c.getContext("2d").drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, W, H);
       URL.revokeObjectURL(url);
       c.toBlob((b) => (b ? res(b) : rej(new Error("Couldn't read that photo"))), "image/jpeg", 0.85);
     };
@@ -246,9 +251,9 @@ export function Postcards({ shop, cfg, saveCfg, flash }) {
                 type="button"
                 title={p.label}
                 onClick={() => setM({ ...m, photo: p.id })}
-                style={{ padding: 0, border: photoOf(m) === photoUrl(p.id, 1400) ? "3px solid var(--accent, #d9a400)" : "3px solid transparent", borderRadius: 8, background: "none", cursor: "pointer" }}
+                style={{ padding: 0, border: photoOf(m) === cardPhotoUrl(p.id) ? "3px solid var(--accent, #d9a400)" : "3px solid transparent", borderRadius: 8, background: "none", cursor: "pointer" }}
               >
-                <img src={photoUrl(p.id, 240)} alt={p.label} style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 5, display: "block" }} />
+                <img src={`https://images.unsplash.com/photo-${p.id}?w=240&h=163&fit=crop&fm=jpg&q=60`} alt={p.label} style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 5, display: "block" }} />
               </button>
             ))}
             {/^https:\/\//.test(m.photo || "") && (
