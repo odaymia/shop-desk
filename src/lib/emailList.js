@@ -14,7 +14,7 @@ export const validEmail = (e) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(str(e));
 
 /* One row per address.
    customers: { id: customer }   signups: [{ id, email, name, source, created_at, unsubscribed_at }] */
-export function buildEmailList({ customers, orders, signups }) {
+export function buildEmailList({ customers, orders, signups, suppressed }) {
   /* last visit and visit count per customer, in one pass over the orders */
   const visits = {};
   for (const o of Object.values(orders || {})) {
@@ -69,6 +69,9 @@ export function buildEmailList({ customers, orders, signups }) {
     }
     if (s.unsubscribed_at) r.unsubscribed = true;
   }
+
+  /* unsubscribed from an email's link, bounced, or marked as spam */
+  if (suppressed && suppressed.size) for (const [k, r] of by) if (suppressed.has(k)) r.unsubscribed = true;
 
   const rows = [...by.values()].sort((a, b) => Math.max(b.lastVisit, b.signedUpAt) - Math.max(a.lastVisit, a.signedUpAt) || a.email.localeCompare(b.email));
   return { rows, invalid };

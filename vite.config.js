@@ -18,6 +18,7 @@ export default defineConfig({
         sign: resolve(__dirname, "sign/index.html"),
         inspect: resolve(__dirname, "inspect/index.html"),
         site: resolve(__dirname, "site/index.html"),
+        unsubscribe: resolve(__dirname, "unsubscribe/index.html"),
       },
       /* the website's script keeps a fixed address (site/app.js) so a page on
          a shop's own domain can load it and pull its latest content */

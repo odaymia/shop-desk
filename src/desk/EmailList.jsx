@@ -20,6 +20,7 @@ function download(name, text) {
 
 export function EmailList({ shop, flash }) {
   const [signups, setSignups] = useState([]);
+  const [suppressed, setSuppressedList] = useState(new Set());
   const [signupErr, setSignupErr] = useState("");
   const [who, setWho] = useState("all");
   const [since, setSince] = useState("any");
@@ -33,11 +34,13 @@ export function EmailList({ shop, flash }) {
         setSignupErr("");
       })
       .catch((e) => setSignupErr(/site_signups|schema cache|does not exist/i.test(e.message || "") ? "Website signups need the latest supabase/website.sql run once in Supabase." : e.message));
+  const loadSuppressed = () => cloud.listSuppressions().then((l) => setSuppressedList(new Set(l.map((x) => x.email))));
   useEffect(() => {
     loadSignups();
+    loadSuppressed();
   }, []);
 
-  const { rows, invalid } = useMemo(() => buildEmailList({ customers: shop.customers, orders: shop.orders, signups }), [shop.customers, shop.orders, signups]);
+  const { rows, invalid } = useMemo(() => buildEmailList({ customers: shop.customers, orders: shop.orders, signups, suppressed }), [shop.customers, shop.orders, signups, suppressed]);
   const shown = useMemo(() => filterEmailList(rows, { who, since, q }), [rows, who, since, q]);
   const counts = useMemo(() => {
     const monthAgo = Date.now() - 30 * 86400000;
@@ -62,7 +65,9 @@ export function EmailList({ shop, flash }) {
         if (c) await shop.saveCustomer({ ...c, emailOptOut: value });
       }
       await cloud.setSignupUnsubscribed(r.signupIds, value);
+      await cloud.setSuppressed(r.email, value); // the sender checks this list too
       if (r.signupIds.length) loadSignups();
+      loadSuppressed();
       flash(value ? `${r.email} unsubscribed` : `${r.email} is back on the list`);
     } catch (e) {
       flash(e.message, "out");
@@ -103,8 +108,7 @@ export function EmailList({ shop, flash }) {
 
   return (
     <>
-      <header className="deskHead">
-        <h1>Email list</h1>
+      <div className="deskHead" style={{ borderTop: 0 }}>
         <div className="seg">
           {[
             ["all", `Everyone (${counts.subscribed.toLocaleString()})`],
@@ -132,7 +136,7 @@ export function EmailList({ shop, flash }) {
         >
           Download CSV
         </button>
-      </header>
+      </div>
       <div className="deskBody">
         <div className="rowBtns" style={{ alignItems: "center", marginBottom: 12, gap: 12 }}>
           <input style={{ minWidth: 260 }} placeholder="Search name, email, phone" value={q} onChange={(e) => setQ(e.target.value)} />

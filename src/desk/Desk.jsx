@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./desk.css";
 import { useShop } from "./useShop.js";
 import { Orders } from "./Orders.jsx";
@@ -12,7 +12,8 @@ import { Coupons } from "./Coupons.jsx";
 import { Staff } from "./Staff.jsx";
 import { Reports } from "./Reports.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
-import { EmailList } from "./EmailList.jsx";
+import { EmailCenter } from "./EmailCenter.jsx";
+import { dailyEmailTick, drainTick } from "./emailRunner.js";
 import { PrintTicket } from "./PrintTicket.jsx";
 import { StartTicket } from "./StartTicket.jsx";
 import { SignatureStation } from "./Signing.jsx";
@@ -31,7 +32,7 @@ const PAGES = [
   ["tires", "Tires"],
   ["jobs", "Canned jobs"],
   ["coupons", "Coupons"],
-  ["email", "Email list"],
+  ["email", "Email"],
   ["vendors", "Vendors"],
   ["staff", "Staff"],
   ["reports", "Reports"],
@@ -64,6 +65,24 @@ const lsDel = (k) => {
 
 export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const shop = useShop(cfg);
+
+  /* automatic emails: check once a day who's due, and every 15 minutes nudge
+     the sender to send what's waiting (see emailRunner.js) */
+  const shopRef = useRef(shop);
+  shopRef.current = shop;
+  useEffect(() => {
+    if (!shop.loaded) return;
+    const tick = () => {
+      dailyEmailTick(shopRef.current, cfg).catch((e) => console.error("email automations", e));
+      if (cfg.email && cfg.email.enabled !== false && cfg.email.fromEmail) drainTick();
+    };
+    const first = setTimeout(tick, 20000);
+    const every = setInterval(tick, 15 * 60000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, [shop.loaded, cfg]);
   const [page, setPage] = useState("orders");
   const [orderId, setOrderId] = useState(null);
   const [customerId, setCustomerId] = useState(null);
@@ -188,7 +207,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
           {page === "jobs" && <Jobs shop={shop} cfg={cfg} flash={flash} />}
           {page === "coupons" && <Coupons shop={shop} cfg={cfg} flash={flash} />}
-          {page === "email" && <EmailList shop={shop} flash={flash} />}
+          {page === "email" && <EmailCenter shop={shop} cfg={cfg} saveCfg={saveCfg} flash={flash} />}
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}

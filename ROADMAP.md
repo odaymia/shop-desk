@@ -61,7 +61,8 @@ What a shop uses Manager SE for every day, in a browser:
 - [x] Customer portal at /portal/: magic-link sign-in, their cars, what's due, service history, price menu, oil change quote for their engine
 - [x] Shop website (Bolt Badger add-on) at /site/?s=<address>: built from the desk's own data — services, oil change prices, pick-your-car oil quote from the shop's specs, chosen specials, live open/closed hours, map, FAQ, appointment requests into the desk, SEO markup; downloadable as one HTML file for the shop's own domain
 - [x] Email list: customer emails + website signups in one list, filters by last visit, copy/CSV export, unsubscribes remembered
-- [ ] Send email from the desk (Resend/SES via Edge Function) with an unsubscribe link, instead of exporting to Mailchimp
+- [x] Email from the desk (Resend via the email Edge Function): campaigns with audiences, tests and scheduling; automations (thank-you + review, oil reminder, win-back, welcome); one-click unsubscribe; daily limits
+- [ ] Email: bounce/complaint webhook from Resend into suppressions, open/click stats, scheduled send without the desk open (pg_cron → drain)
 - [ ] Website: custom domains per shop (genieautocenter.com) on a host that supports them, photo gallery, Google reviews feed, appointment requests on the Tickets page and by text, spam protection (captcha / rate limit Edge Function)
 
 - Service reminders by text and email, driven by mileage and time since last visit

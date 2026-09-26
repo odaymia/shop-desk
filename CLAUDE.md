@@ -134,6 +134,29 @@ prices and hours never drift from the counter. Rules:
   The desk doesn't send mail; the CSV goes to Mailchimp or similar, which
   carries the unsubscribe link CAN-SPAM requires.
 
+## Email (campaigns and automations)
+
+The desk's Email page writes and sends email through Resend, via the
+`email` Edge Function (`supabase/functions/email`, tables in
+`supabase/email.sql`). One Resend account serves every shop; each shop
+sends from its own verified domain (or a shared default sender).
+
+- `src/lib/emailRender.js` draws the email (tables, inline styles; no
+  scripts or data: images). Per-person values are placeholders
+  (`{first_name}`, `{vehicle}`, `{due_date}`, `{unsubscribe_url}`) that the
+  function fills at send time, so one copy serves the whole list.
+- `src/lib/emailAutomations.js` decides who's due (thank-you, oil reminder,
+  win-back, welcome). Each rule looks only at a short recent window, so
+  turning one on never emails years of old customers; every email has a
+  `dedupe` key the outbox refuses to repeat. The desk runs it once a day
+  (`src/desk/emailRunner.js`) and nudges the function every 15 minutes.
+- The function is the only thing that sends. It checks suppressions
+  (unsubscribes, bounces) and the shop's daily limit on every batch, signs
+  unsubscribe links (HMAC, EMAIL_SECRET), and supports one-click
+  unsubscribe headers. The unsubscribe page is `unsubscribe/`.
+- Every email carries the shop's address and an unsubscribe link. Never
+  remove either.
+
 ## Known gaps
 
 - No card processing; payments are recorded by hand.
