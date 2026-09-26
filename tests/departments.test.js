@@ -95,3 +95,15 @@ test("quick lube: oil-only tickets, no estimate, lube menu only", () => {
   assert.equal(startStatus("tires", {}), "estimate");
   assert.equal(startStatus(null, {}), "estimate");
 });
+
+test("oil change tickets never ask for authorization; brake jobs mentioning fluid are mechanical", () => {
+  const bf = L("", "Brake fluid service", 90);
+  assert.equal(lineDept(bf), "oil");
+  assert.equal(authorizationRequired({ dept: "oil", lines: [oil, filter, bf] }, {}), false);
+  assert.equal(authorizationRequired({ dept: "oil", lines: [oil, filter, bf] }, { pmSignature: "required" }), true);
+  assert.equal(authorizationRequired({ dept: "oil", lines: [oil, filter, bf] }, { quickLube: false }), true);
+  const padsFluid = L("Front Brake Pad, Rotor & Brake Fluid Service", "Front Brake Pad, Rotor & Brake Fluid Service", 300);
+  assert.equal(lineDept(padsFluid), "mech");
+  assert.equal(lineDept(L("", "REPAIRED BRAKE FLUID LEAK")), "mech");
+  assert.equal(authorizationRequired({ dept: "oil", lines: [oil, padsFluid] }, {}), true);
+});

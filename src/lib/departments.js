@@ -34,12 +34,16 @@ const text = (l) => `${l.job || ""} ${l.description || ""}`.toLowerCase();
 const OIL_TEXT = /fuel (inj|sys)|injector|induction|\b[23] ?(pt|part)\b|two.?part|three.?part|pwr steer|power steer|oil (additive|treatment|stabilizer)|fuel (additive|treatment)|max.?life/;
 const TIRE_TEXT = /tpms|valve stem|flat (repair|fix)|tire (patch|plug|repair)|lug nut|wheel lock/;
 const NOT_WORK = /disposal|hazard|environmental|shop suppl|recycl|core charge|core deposit/;
+/* brake repair that mentions brake fluid ("Front Brake Pad, Rotor & Brake
+   Fluid Service", "repaired brake fluid leak") is mechanical, not lube */
+const BRAKE_REPAIR = /brake pad|\bpads?\b|rotor|caliper|brake shoe|\bshoes\b|brake line|brake hose|\bleak/;
 const isWork = (l) => !!l && ["labor", "part", "sublet"].includes(l.kind) && !NOT_WORK.test(text(l));
 
 /* The department one line belongs to, or null for lines that aren't work
    (notes, fees, discounts). Anything that isn't lube or tires is mechanical. */
 export function lineDept(line, parts) {
   if (!isWork(line)) return null;
+  if (BRAKE_REPAIR.test(text(line))) return "mech";
   if (TIRE_TEXT.test(text(line))) return "tires";
   if (OIL_TEXT.test(text(line))) return "oil";
   const c = lineCode(line, parts);
@@ -117,6 +121,7 @@ const PM_TIRE = /rotat|tire pressure|air pressure|\bpressure\b/i;
 
 export function isMaintenanceLine(line, parts) {
   if (!isWork(line)) return true; // notes, fees, discounts don't change it
+  if (BRAKE_REPAIR.test(text(line))) return false;
   if (OIL_TEXT.test(text(line))) return true;
   const c = lineCode(line, parts);
   if (c && PM_CODES.has(c)) return true;
@@ -129,11 +134,15 @@ export function isMaintenanceOnly(order, parts) {
   return lines.length > 0 && lines.every((l) => isMaintenanceLine(l, parts));
 }
 /* Does this ticket need the customer's signed or recorded authorization?
-   Everything does, except maintenance-only work when the shop has chosen
-   not to require it (cfg.pmSignature === "optional", the default). */
+   Everything does, except maintenance-only work and oil change (quick
+   lube) tickets, unless the shop has chosen to require it
+   (cfg.pmSignature === "required"). An oil change ticket can carry a
+   brake fluid service, which isn't on the statute's list; the shop has
+   decided its posted menu covers it. */
 export function authorizationRequired(order, cfg, parts) {
   if ((cfg && cfg.pmSignature) === "required") return true;
-  return !isMaintenanceOnly(order, parts);
+  if (isMaintenanceOnly(order, parts)) return false;
+  return !isQuickLube(order, parts, cfg);
 }
 
 /* ---------- combining tickets ---------- */
