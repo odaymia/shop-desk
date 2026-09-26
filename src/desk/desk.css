@@ -279,6 +279,7 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .sheet .shTotals { margin-left:auto; width:280px; margin-top:8px; }
 .sheet .shTotals div { display:flex; justify-content:space-between; padding:3px 6px; }
 .sheet .shTotals div.grand { border-top:2px solid #111; font-weight:700; font-size:14px; margin-top:4px; padding-top:6px; }
+.sheet .shTotals div.tender { padding:0 6px 0 18px; font-size:0.92em; color:#444; }
 .sheet .shNote { margin-top:16px; font-size:11px; color:#333; }
 .sheet .shSign { margin-top:34px; display:flex; gap:30px; }
 .sheet .shSign div { flex:1; border-top:1px solid #111; padding-top:4px; font-size:10px; color:#555; }

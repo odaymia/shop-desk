@@ -258,3 +258,12 @@ test("paymentDesc reads the card brand, cash change, or check number", () => {
   assert.equal(paymentDesc({ method: "check", ref: "204" }), "Check #204");
   assert.equal(paymentDesc({ method: "other", ref: "store credit" }), "Other store credit");
 });
+
+import { cashTenderLines } from "../src/lib/invoice.js";
+
+test("cash receipts show what was handed over and the change", () => {
+  assert.deepEqual(cashTenderLines({ method: "cash", amount: 42.5, cashGiven: 60, change: 17.5 }), [["Cash given", 60], ["Change", 17.5]]);
+  assert.deepEqual(cashTenderLines({ method: "cash", amount: 20, cashGiven: 20, change: 0 }), [["Cash given", 20], ["Change", 0]]);
+  assert.deepEqual(cashTenderLines({ method: "cash", amount: 20 }), []);
+  assert.deepEqual(cashTenderLines({ method: "card", amount: 20, cashGiven: 50 }), []);
+});

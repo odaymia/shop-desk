@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/cloudConfig.js";
 import { fmtMoney } from "../lib/invoice.js";
@@ -493,7 +493,11 @@ function Receipt({ h, v, shop, onBack }) {
         <div><span>Sales tax{t.taxRate ? ` (${t.taxRate}%)` : ""}</span><span>{fmtMoney(t.tax)}</span></div>
         <div className="grand"><span>Total</span><span>{fmtMoney(t.total)}</span></div>
         {(h.payments || []).map((p, i) => (
-          <div key={i}><span>Paid {p.method} {fmtDate(p.at)}</span><span>-{fmtMoney(p.amount)}</span></div>
+          <Fragment key={i}>
+            <div><span>Paid {p.method} {fmtDate(p.at)}</span><span>-{fmtMoney(p.amount)}</span></div>
+            {p.cashGiven > 0 && <div className="tender"><span>Cash given</span><span>{fmtMoney(p.cashGiven)}</span></div>}
+            {p.cashGiven > 0 && <div className="tender"><span>Change</span><span>{fmtMoney(p.change || 0)}</span></div>}
+          </Fragment>
         ))}
         {h.owed && <div className="grand"><span>Balance</span><span>{fmtMoney(t.balance)}</span></div>}
       </div>

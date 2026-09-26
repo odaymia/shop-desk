@@ -51,6 +51,16 @@ export function paymentDesc(p) {
   return `${cap(p.method)}${p.ref ? ` ${p.ref}` : ""}`;
 }
 
+/* A cash payment's tender lines for the receipt: what was handed over and
+   the change given back. Empty when the cash given wasn't recorded. */
+export function cashTenderLines(p) {
+  if (!p || p.method !== "cash" || !(num(p.cashGiven) > 0)) return [];
+  return [
+    ["Cash given", round2(p.cashGiven)],
+    ["Change", round2(num(p.change))],
+  ];
+}
+
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 

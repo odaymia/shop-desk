@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel, owesBalance, paymentDesc } from "../lib/invoice.js";
+import { Fragment, useEffect } from "react";
+import { fmtMoney, laborQtyText, lineAmount, orderTotals, statusLabel, conditionLabel, owesBalance, paymentDesc, cashTenderLines } from "../lib/invoice.js";
 import { customerName, vehicleName } from "./useShop.js";
 import { fmtDate, fmtDateTime, fmtTime, fmtPhone } from "./ui.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -177,14 +177,25 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               <span>Total</span>
               <span>{fmtMoney(t.total)}</span>
             </div>
-            {(o.payments || []).map((p) => (
-              <div key={p.id}>
-                <span>
-                  Paid {paymentDesc(p)} {fmtDate(p.at)}
-                </span>
-                <span>-{fmtMoney(p.amount)}</span>
-              </div>
-            ))}
+            {(o.payments || []).map((p) => {
+              const tender = cashTenderLines(p);
+              return (
+                <Fragment key={p.id}>
+                  <div>
+                    <span>
+                      Paid {tender.length ? "Cash" : paymentDesc(p)} {fmtDate(p.at)}
+                    </span>
+                    <span>-{fmtMoney(p.amount)}</span>
+                  </div>
+                  {tender.map(([label, v]) => (
+                    <div key={label} className="tender">
+                      <span>{label}</span>
+                      <span>{fmtMoney(v)}</span>
+                    </div>
+                  ))}
+                </Fragment>
+              );
+            })}
             {owesBalance(o, t) && (
               <div className="grand">
                 <span>Balance due</span>
