@@ -1,24 +1,69 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Modal, Field, fmtPhone, fmtDate } from "./ui.jsx";
-import { VehicleForm } from "./forms.jsx";
-import { customerName, vehicleName, activeList, ordersOf } from "./useShop.js";
+import { VehicleForm, CustomerForm } from "./forms.jsx";
+import { customerName, vehicleName, activeList, ordersOf, vehiclesOf } from "./useShop.js";
 
 /* A new ticket: plate → the car → the estimate. No customer questions up
    front; people want a price before they give a name. The customer is
    added from the ticket later. A car on file shows its details to confirm;
    a new plate opens the vehicle form (with the plate lookup when a key is
-   set). Walk-ins can skip all of it. */
+   set). Walk-ins can skip all of it.
+
+   Or by name: find the customer by name, company, or phone, then pick one
+   of their cars (or add one). */
 
 const US_STATES = "AL AK AZ AR CA CO CT DC DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 const norm = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const digits = (s) => String(s || "").replace(/\D/g, "");
+const MODE_KEY = "sd:startBy";
+const savedMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === "name" ? "name" : "plate";
+  } catch {
+    return "plate";
+  }
+};
 
 export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket", startsAs = "estimate" }) {
   const [plate, setPlate] = useState("");
   const [state, setState] = useState("CA");
-  const [step, setStep] = useState("plate"); // plate | confirm | vehicle | edit
+  const [step, setStep] = useState("plate"); // plate | confirm | vehicle | edit | newCustomer | carFor
   const [chosen, setChosen] = useState(null); // vehicle on file being confirmed
+  const [mode, setModeState] = useState(savedMode); // plate | name
+  const [q, setQ] = useState(""); // name, company, or phone
+  const [owner, setOwner] = useState(null); // customer a new car is being added for
   const inputRef = useRef(null);
-  useEffect(() => inputRef.current && inputRef.current.focus(), []);
+  useEffect(() => inputRef.current && inputRef.current.focus(), [mode]);
+  const setMode = (m) => {
+    setModeState(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      /* the choice just isn't remembered */
+    }
+  };
+
+  /* customers by name, company, or phone (any format), with their cars */
+  const people = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (mode !== "name" || needle.length < 2) return [];
+    const words = needle.split(/\s+/);
+    const qd = digits(needle);
+    const phoneish = qd.length >= 3 && qd.length >= needle.replace(/[\s()+.-]/g, "").length;
+    const out = [];
+    for (const c of activeList(shop.customers)) {
+      if (c.ls && c.ls.placeholder) continue;
+      const hit = phoneish
+        ? [c.phone, c.phone2].some((ph) => digits(ph).includes(qd))
+        : words.every((w) => `${c.first || ""} ${c.last || ""} ${c.company || ""} ${c.email || ""}`.toLowerCase().includes(w));
+      if (hit) out.push(c);
+      if (out.length >= 30) break;
+    }
+    return out
+      .map((c) => ({ c, cars: vehiclesOf(shop.vehicles, c.id) }))
+      .sort((a, b) => b.cars.length - a.cars.length || customerName(a.c).localeCompare(customerName(b.c)))
+      .slice(0, 8);
+  }, [mode, q, shop.customers, shop.vehicles]);
 
   const matches = useMemo(() => {
     const p = norm(plate);
@@ -52,6 +97,35 @@ export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket",
         onClose={() => setStep("plate")}
         onSave={async (v) => {
           const saved = await shop.saveVehicle(v);
+          start(saved);
+        }}
+      />
+    );
+
+  if (step === "newCustomer")
+    return (
+      <CustomerForm
+        cfg={cfg}
+        initial={/\d{3}/.test(q) ? { phone: digits(q) } : { first: q.trim().split(/\s+/)[0] || "", last: q.trim().split(/\s+/).slice(1).join(" ") }}
+        onClose={() => setStep("plate")}
+        onSave={async (c) => {
+          const saved = await shop.saveCustomer(c);
+          setOwner(saved);
+          setStep("carFor");
+        }}
+      />
+    );
+
+  if (step === "carFor" && owner)
+    return (
+      <VehicleForm
+        cfg={cfg}
+        shop={shop}
+        customerId={owner.id}
+        initial={{ plateState: state }}
+        onClose={() => setStep("plate")}
+        onSave={async (v) => {
+          const saved = await shop.saveVehicle({ ...v, customerId: owner.id });
           start(saved);
         }}
       />
@@ -113,6 +187,59 @@ export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket",
 
   return (
     <Modal title={title} onClose={onClose} size="wide">
+      <div className="seg" style={{ marginBottom: 14 }}>
+        <button className={mode === "plate" ? "on" : ""} onClick={() => setMode("plate")}>
+          By plate
+        </button>
+        <button className={mode === "name" ? "on" : ""} onClick={() => setMode("name")}>
+          By name or phone
+        </button>
+      </div>
+      {mode === "name" ? (
+        <>
+          <Field label="Customer name, company, or phone">
+            <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Maria Alvarez or 619 555" style={{ fontSize: 22, fontWeight: 600 }} />
+          </Field>
+          {q.trim().length >= 2 && people.length === 0 && <p className="muted">No customer matches.</p>}
+          {people.length > 0 && (
+            <ul className="pickList personPick" style={{ marginTop: 0 }}>
+              {people.map(({ c, cars }) => (
+                <li key={c.id} style={{ cursor: "default", display: "block" }}>
+                  <div className="main">
+                    <strong>{customerName(c)}</strong>
+                    <span>{[c.company && c.first ? c.company : "", c.phone ? fmtPhone(c.phone) : "", cars.length ? `${cars.length} car${cars.length === 1 ? "" : "s"}` : "no car on file"].filter(Boolean).join(" · ")}</span>
+                  </div>
+                  <div className="carChips">
+                    {cars.map((v) => (
+                      <button key={v.id} type="button" className="btn tiny" onClick={() => (setChosen(v), setStep("confirm"))}>
+                        {vehicleName(v)}
+                        {v.plate ? ` · ${v.plate}` : ""}
+                      </button>
+                    ))}
+                    <button type="button" className="btn tiny ghost" onClick={() => (setOwner(c), setStep("carFor"))}>
+                      {cars.length ? "+ Another car" : "+ Add a car"}
+                    </button>
+                    {cars.length === 0 && (
+                      <button type="button" className="btn tiny ghost" onClick={() => onStart({ customerId: c.id })}>
+                        Start without a car
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="rowBtns" style={{ marginTop: 14 }}>
+            <button className="btn primary" onClick={() => setStep("newCustomer")}>
+              New customer
+            </button>
+            <button className="btn ghost" onClick={() => onStart({})}>
+              Skip, walk-in
+            </button>
+          </div>
+        </>
+      ) : (
+      <>
       <p className="muted" style={{ marginTop: 0 }}>
         Start with the plate.
       </p>
@@ -174,6 +301,8 @@ export function StartTicket({ shop, cfg, onStart, onClose, title = "New ticket",
         {cfg.plateApiKey ? "is looked up and the car is built from it" : "opens a blank car to fill in"}. The customer's name
         and number go on the ticket whenever they're ready, from the Customer button at the top.
       </p>
+      </>
+      )}
     </Modal>
   );
 }
