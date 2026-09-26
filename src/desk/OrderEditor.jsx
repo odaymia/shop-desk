@@ -58,6 +58,7 @@ import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
 import { composeConcern } from "../lib/symptoms.js";
 import { OrderSign } from "./Signing.jsx";
+import { TireQuote } from "./TireQuote.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
 
@@ -103,6 +104,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   useEffect(() => {
     if (autoPay) setPick("pay");
   }, [autoPay]);
+  /* a new ticket started in Tires opens straight into the tire quote */
+  useEffect(() => {
+    if (order && order.dept === "tires" && order.status === STATUS.estimate && !(order.lines || []).length && cfg.tireQuote !== false) setPick("tireQuote");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [jobCat, setJobCat] = useState(""); // the menu button that opened the job picker
   const [partCat, setPartCat] = useState(""); // inventory category a menu button opened the part picker to
   const [signing, setSigning] = useState(false);
@@ -402,6 +408,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
      by the concern's suggested-work chips. */
   const openServiceMenu = (m) => {
     if (m.oil) return setPick("oil");
+    /* the Tires button opens the tire quote (size → tire → add-ons) */
+    if (/^tires?$/i.test(String(m.name || "").trim()) && cfg.tireQuote !== false) return setPick("tireQuote");
     const pc = menuPartCat(m);
     if (pc) {
       setPartCat(pc);
@@ -949,6 +957,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
                 >
                   All jobs
                 </button>
+                {!quick && cfg.tireQuote !== false && (
+                  <button className="btn tiny primary" onClick={() => setPick("tireQuote")} title="Build a tire estimate: size, tire, how many, add-ons">
+                    🛞 Tire quote
+                  </button>
+                )}
               </div>
             )}
             {!locked && (
@@ -1453,6 +1466,27 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               return next;
             })
           }
+        />
+      )}
+      {pick === "tireQuote" && (
+        <TireQuote
+          shop={shop}
+          cfg={cfg}
+          order={o}
+          customer={customer}
+          vehicle={vehicle}
+          flash={flash}
+          onClose={() => setPick(null)}
+          onAdd={async (lines, { size, sign }) => {
+            addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.topTechId || o.techId || null } : l)));
+            if (size && vehicle && vehicle.tireSize !== size) shop.saveVehicle({ ...vehicle, tireSize: size });
+            setPick(null);
+            flash("Tires added to the estimate");
+            if (sign) {
+              await flushNow();
+              setSigning(true);
+            }
+          }}
         />
       )}
       {pick === "oil" && (

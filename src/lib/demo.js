@@ -56,10 +56,10 @@ function sampleData() {
   ].map((c) => ({ company: "", street: "", zip: "", phone2: "", notes: "", taxExempt: false, active: true, ...c }));
 
   const vehicles = [
-    { id: "dv1", customerId: "dc1", year: 2019, make: "Toyota", model: "Camry", engine: "2.5L 4-cyl", plate: "COA1234", vin: "4T1B11HK1KU000001", mileage: 61200 },
-    { id: "dv2", customerId: "dc2", year: 2021, make: "Honda", model: "Accord", engine: "1.5L Turbo", plate: "COB2345", vin: "1HGCV1F10MA000002", mileage: 38400 },
+    { id: "dv1", customerId: "dc1", year: 2019, make: "Toyota", model: "Camry", engine: "2.5L 4-cyl", plate: "COA1234", vin: "4T1B11HK1KU000001", mileage: 61200, tireSize: "215/55R17" },
+    { id: "dv2", customerId: "dc2", year: 2021, make: "Honda", model: "Accord", engine: "1.5L Turbo", plate: "COB2345", vin: "1HGCV1F10MA000002", mileage: 38400, tireSize: "225/50R17" },
     { id: "dv3", customerId: "dc3", year: 2017, make: "Subaru", model: "Outback", engine: "2.5L 4-cyl", plate: "COC3456", vin: "4S4BSANC1H3000003", mileage: 88900 },
-    { id: "dv4", customerId: "dc4", year: 2015, make: "Ford", model: "F-150", engine: "5.0L V8", plate: "COD4567", vin: "1FTFW1EF0FK000004", mileage: 121500 },
+    { id: "dv4", customerId: "dc4", year: 2015, make: "Ford", model: "F-150", engine: "5.0L V8", plate: "COD4567", vin: "1FTFW1EF0FK000004", mileage: 121500, tireSize: "275/65R18" },
     { id: "dv5", customerId: "dc5", year: 2020, make: "Volkswagen", model: "Golf", engine: "1.4L Turbo (European)", plate: "COE5678", vin: "3VW217AU0LM000005", mileage: 44100 },
     { id: "dv6", customerId: "dc6", year: 2018, make: "Ram", model: "2500", engine: "6.7L Diesel", plate: "COF6789", vin: "3C6UR5DL0JG000006", mileage: 96800 },
     { id: "dv7", customerId: "dc6", year: 2018, make: "Ram", model: "1500", engine: "5.7L V8", plate: "COF6790", vin: "1C6RR7FT0JS000007", mileage: 73100 },
@@ -77,6 +77,16 @@ function sampleData() {
     { id: "dp_pads_r", number: "SCD1114", description: "Rear brake pads", category: "Brakes", cost: 21, price: 49.99, onHand: 4, reorderAt: 4 },
     { id: "dp_rotor_f", number: "BR900312RGS", description: "Front brake rotor", category: "Brakes", cost: 28, price: 74.99, onHand: 3, reorderAt: 4 },
     { id: "dp_wiper", number: "WB-22", description: "Wiper blade 22\"", category: "Wipers", cost: 6, price: 14.99, onHand: 18, reorderAt: 10 },
+    /* a small tire rack, so the tire quote has something to show */
+    { id: "dt1", tire: true, brand: "Ironman", model: "iMove Gen 3 AS", size: "215/55R17", loadSpeed: "94V", number: "IM-98221", description: "Ironman, iMove Gen 3 AS", category: "Tires", cost: 62, price: 98, onHand: 4, reorderAt: 4 },
+    { id: "dt2", tire: true, brand: "Michelin", model: "Defender2", size: "215/55R17", loadSpeed: "94H", number: "MI-03376", description: "Michelin, Defender2", category: "Tires", cost: 138, price: 189, onHand: 2, reorderAt: 0 },
+    { id: "dt3", tire: true, brand: "Ironman", model: "iMove Gen 3 AS", size: "225/50R17", loadSpeed: "98V", number: "IM-98254", description: "Ironman, iMove Gen 3 AS", category: "Tires", cost: 64, price: 102, onHand: 6, reorderAt: 4 },
+    { id: "dt4", tire: true, brand: "Hankook", model: "Kinergy PT", size: "225/50R17", loadSpeed: "94V", number: "HK-1025041", description: "Hankook, Kinergy PT", category: "Tires", cost: 96, price: 139, onHand: 0, reorderAt: 0 },
+    { id: "dt5", tire: true, brand: "Ironman", model: "All Country AT", size: "275/65R18", loadSpeed: "116T", number: "IM-91341", description: "Ironman, All Country AT", category: "Tires", cost: 108, price: 159, onHand: 2, reorderAt: 2 },
+    { id: "dt6", tire: true, brand: "Cooper", model: "Discoverer AT3 4S", size: "275/65R18", loadSpeed: "116T", number: "CP-90000029", description: "Cooper, Discoverer AT3 4S", category: "Tires", cost: 162, price: 219, onHand: 4, reorderAt: 2 },
+    { id: "dt7", tire: true, brand: "Cooper", model: "Discoverer AT3 LT", size: "275/70R18", loadSpeed: "125/122S", number: "CP-90000031", description: "Cooper, Discoverer AT3 LT", category: "Tires", cost: 196, price: 259, onHand: 4, reorderAt: 2 },
+    { id: "dt8", tire: true, brand: "BFGoodrich", model: "All-Terrain T/A KO2", size: "275/70R18", loadSpeed: "125/122S", number: "BF-49520", description: "BFGoodrich, All-Terrain T/A KO2", category: "Tires", cost: 262, price: 329, onHand: 0, reorderAt: 0 },
+    { id: "dt9", tire: true, brand: "Michelin", model: "Defender LTX M/S", size: "275/55R20", loadSpeed: "113T", number: "MI-19498", description: "Michelin, Defender LTX M/S", category: "Tires", cost: 221, price: 289, onHand: 2, reorderAt: 0 },
   ].map((p) => ({ vendorId: "", location: "", taxable: true, active: true, packType: "", packSize: "", oilType: "", surcharge: "", surchargeLabel: "", ...p }));
 
   const now = Date.now();

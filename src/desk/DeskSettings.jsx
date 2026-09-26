@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DEPTS } from "../lib/departments.js";
+import { tireAddOns } from "../lib/tireQuote.js";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -547,6 +548,46 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Quick lube tickets open ready to work, show only oil change, filter and fluid services, and print a short receipt with the next oil change
             due. Add brakes, tires, or repair work and the ticket turns into a full one on its own.
           </p>
+
+          <h3 className="subhead" style={{ marginTop: 28 }}>Tire quote add-ons</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            What the tire quote offers after the tires. Ticked ones start checked. "Per tire" multiplies by the number of tires; "once" is one charge per
+            quote. Labor and fees aren't taxed; parts are (California rules, per your pricing settings).
+          </p>
+          <div className="miniLines">
+            {tireAddOns(d).map((a, i, list) => {
+              const put = (patch) => set("tireAddOns")(list.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+              return (
+                <div key={a.id || i} className="miniLine" style={{ gridTemplateColumns: "34px 1.6fr 90px 100px 90px 30px" }}>
+                  <input type="checkbox" checked={!!a.on} onChange={(e) => put({ on: e.target.checked })} title="Checked by default" />
+                  <input value={a.label || ""} onChange={(e) => put({ label: e.target.value })} placeholder="Lug nut locks" />
+                  <input value={a.price ?? ""} onChange={(e) => put({ price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="Price" />
+                  <select value={a.per || "tire"} onChange={(e) => put({ per: e.target.value })}>
+                    <option value="tire">Per tire</option>
+                    <option value="ticket">Once</option>
+                  </select>
+                  <select value={a.kind || "fee"} onChange={(e) => put({ kind: e.target.value })}>
+                    <option value="labor">Labor</option>
+                    <option value="part">Part</option>
+                    <option value="fee">Fee</option>
+                  </select>
+                  <button type="button" className="lineX" title="Remove" onClick={() => set("tireAddOns")(list.filter((_, j) => j !== i))}>
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="rowBtns" style={{ marginTop: 8 }}>
+            <button type="button" className="btn tiny" onClick={() => set("tireAddOns")([...tireAddOns(d), { id: "a" + Math.random().toString(36).slice(2, 7), label: "", price: "", per: "tire", kind: "fee", on: false }])}>
+              + Add-on
+            </button>
+            {Array.isArray(d.tireAddOns) && (
+              <button type="button" className="btn tiny ghost" onClick={() => set("tireAddOns")(undefined)}>
+                Back to the standard list
+              </button>
+            )}
+          </div>
 
           <h3 className="subhead" style={{ marginTop: 28 }}>Signatures on maintenance-only tickets</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>

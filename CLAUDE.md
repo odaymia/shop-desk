@@ -106,6 +106,11 @@ Records are never deleted. Customers, vehicles, parts, vendors, jobs get
   ticket (no estimate), shows only the lube menu and tools, and prints a
   short receipt with the next oil change due. Adding non-lube work turns it
   back into a full ticket. `cfg.quickLube === false` turns this off.
+- Tire quote (`src/lib/tireQuote.js`, `src/desk/TireQuote.jsx`): size (from
+  `vehicle.tireSize`, else the last tire the car was sold) → inventory tires
+  in that size → count → add-ons (`cfg.tireAddOns`, defaults in
+  `DEFAULT_TIRE_ADDONS`) → one grouped job on the estimate, then the
+  customer signs. New Tires-department tickets open straight into it.
 
 ## UI
 

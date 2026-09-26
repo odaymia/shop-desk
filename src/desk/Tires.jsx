@@ -245,7 +245,7 @@ function TireForm({ tire, vendors, onClose, onSave }) {
 /* Live tire lookup from the distributor (US AutoForce). Enter a size, see
    what's in stock with your cost and retail, and add one to your inventory
    so it can go on a ticket. */
-function DistributorTires({ shop, cfg, flash, initialSize, onClose }) {
+export function DistributorTires({ shop, cfg, flash, initialSize, onClose }) {
   const [size, setSize] = useState(initialSize || "");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);

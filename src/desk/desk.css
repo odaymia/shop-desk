@@ -780,3 +780,42 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .sheet .shNext { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:10px; padding:8px 10px; border:2px solid #111; border-radius:6px; font-size:13px; }
 .personPick li .carChips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .navCount { margin-left:auto; background:var(--signal, #8e2f2f); color:#fff; border-radius:99px; padding:1px 8px; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+/* tire quote: step bar, tire cards, add-ons, estimate */
+.tqSteps { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+.tqStep { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:99px; border:1px solid var(--line); background:#fff; color:var(--muted); font-size:14px; }
+.tqStep span { display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--panel2, #eef0f3); font-size:12px; font-weight:700; }
+.tqStep em { font-style:normal; font-weight:600; color:var(--ink); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tqStep.on { border-color:var(--signal); color:var(--ink); font-weight:600; }
+.tqStep.on span { background:var(--signal); color:#fff; }
+.tqStep.done span { background:#dcfce7; color:#166534; }
+.tqStep:disabled { opacity:.45; cursor:default; }
+.tqBody { min-height:220px; }
+.tqKnown { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; text-align:left; padding:14px 16px; border-radius:12px; border:2px solid var(--signal); background:#fff; cursor:pointer; }
+.tqKnown strong { font-size:26px; font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+.tqKnown span { color:var(--muted); font-size:13px; }
+.tqSize { flex:1; font-size:22px !important; font-weight:600; letter-spacing:.04em; }
+.tqTires { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:10px; }
+.tqTire { display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+.tqTire:hover, .tqTire.on { border-color:var(--signal); box-shadow:0 0 0 2px rgba(142,47,47,.12); }
+.tqBrand { font-weight:700; font-size:15px; }
+.tqPrice { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+.tqPrice small { font-size:12px; font-weight:500; color:var(--muted); }
+.tqStock { font-size:12px; font-weight:600; padding:1px 8px; border-radius:99px; }
+.tqStock.ok { background:#dcfce7; color:#166534; }
+.tqStock.low { background:#fef3c7; color:#92400e; }
+.tqStock.out { background:#f3f4f6; color:#4b5563; }
+.tqTyped { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.tqAddOns { display:flex; flex-direction:column; gap:6px; }
+.tqAddOn { display:grid; grid-template-columns:24px 1fr auto 90px; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; cursor:pointer; }
+.tqAddOn.on { border-color:var(--signal); background:#fff8f6; }
+.tqAddLabel { display:flex; flex-direction:column; }
+.tqAddLabel .muted { font-size:12px; }
+.tqAddPrice { display:flex; align-items:center; gap:4px; font-variant-numeric:tabular-nums; }
+.tqAddPrice input { width:72px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; font:inherit; text-align:right; }
+.tqAddPrice small { color:var(--muted); font-size:11px; width:48px; }
+.tqAddTotal { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+.tqTotals { margin:12px 0 0 auto; max-width:300px; display:flex; flex-direction:column; gap:4px; font-variant-numeric:tabular-nums; }
+.tqTotals div { display:flex; justify-content:space-between; }
+.tqTotals .grand { border-top:1px solid var(--line); padding-top:8px; margin-top:4px; font-size:20px; font-weight:800; }
+@media (max-width: 600px) { .tqAddOn { grid-template-columns:24px 1fr; } .tqAddPrice, .tqAddTotal { grid-column:2; text-align:left; } }

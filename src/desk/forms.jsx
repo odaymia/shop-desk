@@ -7,6 +7,7 @@ import { loadValvolineSpecs, vvMakeList, vvModelList, vvEngineList } from "../li
 import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
 import { realNameError } from "../lib/names.js";
 import { AddressField } from "./AddressField.jsx";
+import { normalizeTireSize } from "../lib/tires.js";
 
 /* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
 function mergeOpts(a, b) {
@@ -354,6 +355,9 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
         </Field>
         <Field label="Mileage">
           <Num value={d.mileage} onChange={set("mileage")} />
+        </Field>
+        <Field label="Tire size">
+          <Text value={d.tireSize || ""} onChange={(v) => set("tireSize")(v.toUpperCase())} onBlur={() => d.tireSize && set("tireSize")(normalizeTireSize(d.tireSize))} placeholder="225/65R17" />
         </Field>
       </div>
       <Field label="Notes (oil spec, quirks, keys)">

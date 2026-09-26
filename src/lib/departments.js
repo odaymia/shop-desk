@@ -41,7 +41,10 @@ const BRAKE_REPAIR = /brake pad|\bpads?\b|rotor|caliper|brake shoe|\bshoes\b|bra
    inspection $0", "top off fluids", "check tire pressure") aren't work */
 const COURTESY = /inspect|multi.?point|courtesy|top.?off|\bcheck(ed)?\b|\bfill\b|tire pressure|air pressure/;
 const isWork = (l) =>
-  !!l && ["labor", "part", "sublet"].includes(l.kind) && !NOT_WORK.test(text(l)) && !(lineAmount(l) === 0 && COURTESY.test(text(l)));
+  !!l &&
+  ["labor", "part", "sublet"].includes(l.kind) &&
+  !(l.kind !== "labor" && NOT_WORK.test(String(l.description || "").toLowerCase())) &&
+  !(lineAmount(l) === 0 && COURTESY.test(text(l)));
 
 /* The department one line belongs to, or null for lines that aren't work
    (notes, fees, discounts). Anything that isn't lube or tires is mechanical. */

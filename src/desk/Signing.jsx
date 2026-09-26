@@ -133,10 +133,18 @@ function LineRows({ order }) {
                   </tr>
                 );
               })}
+              {/* a job with several lines (a tire quote) gets its name once, as a heading */}
+              {g.job && !packaged.length && rest.length > 1 && (
+                <tr>
+                  <td colSpan={2} className="signJob">
+                    {g.job}
+                  </td>
+                </tr>
+              )}
               {rest.map((l) => (
                 <tr key={l.id}>
-                  <td>
-                    {g.job && !packaged.length ? <span className="signJob">{g.job}: </span> : null}
+                  <td style={g.job && !packaged.length && rest.length > 1 ? { paddingLeft: 14 } : undefined}>
+                    {g.job && !packaged.length && rest.length === 1 ? <span className="signJob">{g.job}: </span> : null}
                     {l.description}
                     {l.kind === "part" ? <span className="muted"> ({conditionLabel(l.condition)})</span> : null}
                     {l.kind === "labor" ? <span className="muted"> · {laborQtyText(l)}</span> : l.qty > 1 ? <span className="muted"> · {l.qty}</span> : null}
