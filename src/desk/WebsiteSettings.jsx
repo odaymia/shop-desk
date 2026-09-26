@@ -122,51 +122,19 @@ export function WebsiteSettings({ d, set, shop, flash }) {
         <a className="btn" href={siteUrl(slug)} target="_blank" rel="noreferrer">
           Open the website ↗
         </a>
-        <button
-          className="btn"
-          disabled={!shop}
-          title="A single file you can put on your own domain (e.g. with your web host). Appointment requests still come here."
-          onClick={() => download(`${slug || "website"}.html`, renderSite(shop.buildSite({ ...d, website: { ...w, slug } }), { api: cloud.siteApi(), portalUrl: d.portalEnabled ? portalUrl() : "" }))}
-        >
-          Download as a file
-        </button>
       </div>
 
       <h3 className="subhead" style={{ marginTop: 28 }}>
         Your own domain
       </h3>
       <p className="legalNote" style={{ marginTop: 0 }}>
-        Put the site on your own address (like www.yourshop.com). Download the page below and host it there; it shows your
-        site with everything already on the page for Google, and each time someone opens it, it pulls in your latest
-        prices, hours, and specials from here. Publish at least once first.
+        Want the site on your own address, like www.yourshop.com? Bolt Badger connects it for you as part of the website
+        add-on: send us your domain and we'll walk you through the one DNS change. Your site stays up to date on its own
+        once it's connected.
       </p>
-      <Field label="Your domain">
+      <Field label="Your domain (once it's connected, emails and links use it)">
         <Text value={w.domain || ""} onChange={(v) => setW({ domain: v.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") })} placeholder="www.yourshop.com" />
       </Field>
-      <div className="rowBtns" style={{ alignItems: "center" }}>
-        <button
-          className="btn"
-          disabled={!shop || !w.domain}
-          onClick={() =>
-            download(
-              "index.html",
-              renderSite(shop.buildSite({ ...d, website: { ...w, slug } }), {
-                api: cloud.siteApi(),
-                portalUrl: d.portalEnabled ? portalUrl() : "",
-                live: { src: new URL("site/app.js", window.location.href).toString(), slug, canonical: `https://${w.domain}/` },
-              })
-            )
-          }
-        >
-          Download the page for {w.domain || "your domain"}
-        </button>
-      </div>
-      <p className="legalNote" style={{ marginTop: 6 }}>
-        Free hosting that works: a GitHub Pages site with this index.html and a file named CNAME containing{" "}
-        <b>{w.domain || "your domain"}</b>. Then at your domain company (GoDaddy → DNS), point <b>www</b> with a CNAME record to the GitHub
-        Pages address, and the bare domain with A records to 185.199.108.153, 185.199.109.153, 185.199.110.153 and 185.199.111.153.
-        Don't touch the MX records; those carry your email.
-      </p>
 
       {requests.length > 0 && (
         <>

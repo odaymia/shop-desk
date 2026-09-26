@@ -32,7 +32,18 @@ async function load() {
   const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
   if (!res.ok) return say("This page couldn't load. Please try again in a minute.");
   const [row] = await res.json();
-  if (!row) return say("We couldn't find that shop's website.");
+  if (!row) {
+    /* the shop's website add-on is off: a copy of the page kept anywhere
+       (its own domain, a saved file) stops showing the shop, instead of
+       living on with old prices and a form that goes nowhere */
+    if (onOwnDomain) {
+      document.open();
+      document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Website not active</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f5f0;color:#15171b;font:17px/1.6 system-ui,-apple-system,sans-serif;text-align:center;padding:24px}h1{font-size:24px;margin:0 0 8px}p{color:#5b616c;margin:0}</style></head><body><div><h1>This website isn\'t active right now</h1><p>Please check back soon.</p></div></body></html>');
+      document.close();
+      return;
+    }
+    return say("We couldn't find that shop's website.");
+  }
   /* on the shop's domain, the page is already drawn; redraw only when the
      shop has published something newer than this copy */
   if (onOwnDomain && window.SITE && window.SITE.updatedAt === row.data.updatedAt) return;
