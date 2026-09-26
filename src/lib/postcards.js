@@ -190,6 +190,23 @@ export function duePostcards({ cfg, customers, vehicles, orders, mailed, now = D
 
 /* ---------- the card ---------- */
 
+/* The dark shade over the front photo, so the white headline reads. Lob's
+   renderer turns see-through CSS gradients into solid black, so the fade is
+   built from thin strips of plain see-through color instead: darker on the
+   left where the headline sits, and darker toward the bottom. */
+const SHADE = (() => {
+  let h = "";
+  const cols = 10;
+  for (let i = 0; i < cols; i++) {
+    const a = (0.62 - i * 0.05).toFixed(3); // left .62 → right .17
+    h += `<div class="sv" style="left:${((6.25 / cols) * i).toFixed(3)}in;width:${(6.25 / cols + 0.01).toFixed(3)}in;background:rgba(12,13,15,${a})"></div>`;
+  }
+  /* the bottom: overlapping bands, each a little shorter, so it darkens toward the bottom edge */
+  const rows = 8;
+  for (let i = 0; i < rows; i++) h += `<div class="sh" style="bottom:0;height:${(0.28 * (rows - i)).toFixed(2)}in;background:rgba(12,13,15,.07)"></div>`;
+  return h;
+})();
+
 /* The QR code as one compact path, dark squares merged into runs along
    each row: a fraction of the size of the library's own SVG, which
    matters because Lob takes at most 10,000 characters per side. */
@@ -246,8 +263,7 @@ export function renderPostcard(cfg, coupons, opts = {}, stepIndex = 0, oil = "")
   const front = `<!DOCTYPE html><html><head><meta charset="utf-8">${font}<style>${base}
 .f{position:relative;width:6.25in;height:4.25in;overflow:hidden;background:#121417}
 .ph{position:absolute;left:0;top:0;width:6.25in;height:4.25in;display:block}
-.shade{position:absolute;left:0;top:0;width:6.25in;height:4.25in;background:-webkit-linear-gradient(left,rgba(12,13,15,.88) 0%,rgba(12,13,15,.6) 50%,rgba(12,13,15,.25) 100%);background:linear-gradient(90deg,rgba(12,13,15,.88) 0%,rgba(12,13,15,.6) 50%,rgba(12,13,15,.25) 100%)}
-.shade2{position:absolute;left:0;bottom:0;width:6.25in;height:2.2in;background:-webkit-linear-gradient(bottom,rgba(12,13,15,.85) 0%,rgba(12,13,15,0) 100%);background:linear-gradient(0deg,rgba(12,13,15,.85) 0%,rgba(12,13,15,0) 100%)}
+.sv{position:absolute;top:0;height:4.25in}.sh{position:absolute;left:0;width:6.25in}
 .logo{position:absolute;left:.4in;top:.38in;background:#fff;border-radius:.08in;padding:.05in .1in}.logo img{height:.46in;display:block}
 .name{position:absolute;left:.4in;top:.4in;color:#fff;font-size:.3in;font-weight:800}
 .txt{position:absolute;left:.4in;bottom:.46in;width:3.2in;color:#fff}
@@ -259,7 +275,7 @@ h1{font-size:.66in;line-height:.9;margin:0 0 .1in}
 .tag .ln{display:block;font-size:.15in;line-height:1.1;margin-top:.04in}
 .tag .cd{display:inline-block;margin-top:.08in;background:#fff;color:#15171b;font:700 .16in "Courier New",monospace;letter-spacing:.04in;padding:.03in .1in;border-radius:.05in}
 .bar{position:absolute;left:0;bottom:0;width:6.25in;height:.1in;background:${main}}
-</style></head><body><div class="f"><img class="ph" src="${esc(photo)}" alt=""><div class="shade"></div><div class="shade2"></div>
+</style></head><body><div class="f"><img class="ph" src="${esc(photo)}" alt="">${SHADE}
 ${logo ? `<div class="logo"><img src="${esc(logo)}" alt=""></div>` : `<div class="name d">${esc(cfg.shopName)}</div>`}
 ${off ? `<div class="tag"><div class="in"><b class="off d">${esc(off)}</b>${line ? `<span class="ln d">${esc(line)}</span>` : ""}${str(c.code) ? `<span class="cd">${esc(c.code)}</span>` : ""}</div></div>` : ""}
 <div class="txt"><h1 class="d">${esc(st.headline)}</h1>

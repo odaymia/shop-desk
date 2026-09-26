@@ -171,7 +171,9 @@ owner approves each week's batch; nothing mails on its own.
   The back's lower right is Lob's address and postage area: keep it empty.
   Lob renders with an older WebKit: no flexbox, grid, `inset`, or
   pseudo-element overlays; use absolute positioning, tables and -webkit-
-  prefixes, or the proof won't match the desk's preview.
+  prefixes, or the proof won't match the desk's preview. It draws
+  see-through gradients as solid black (the shade is stepped strips of
+  plain rgba instead), and can't draw WebP/AVIF (photos are fm=jpg).
 - Each reminder is reserved in `mail_keys` before Lob is called, and
   released if Lob refuses the card, so none is mailed twice. Lob calls
   carry an Idempotency-Key.
