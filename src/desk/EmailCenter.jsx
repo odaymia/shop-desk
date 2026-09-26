@@ -8,16 +8,18 @@ import { fillPlaceholders } from "../lib/emailRender.js";
 import { automationsOf, AUTOMATION_INFO, DEFAULT_AUTOMATIONS } from "../lib/emailAutomations.js";
 import { couponText } from "../lib/website.js";
 import { runAutomations, emailOpts } from "./emailRunner.js";
+import { Postcards } from "./Postcards.jsx";
 
-/* Email: write and send campaigns, set up the automatic emails, the list,
-   and the sender settings. Sending itself happens in the "email" Edge
+/* Marketing: write and send email campaigns, set up the automatic emails,
+   mail oil change postcards, the email list, and the sender settings. Sending itself happens in the "email" Edge
    Function (supabase/functions/email), through Resend. */
 
 const TABS = [
   ["campaigns", "Campaigns"],
   ["automations", "Automations"],
-  ["list", "List"],
-  ["settings", "Settings"],
+  ["postcards", "Postcards"],
+  ["list", "Email list"],
+  ["settings", "Email settings"],
 ];
 const lsGet = (k, d) => {
   try {
@@ -45,7 +47,7 @@ export function EmailCenter({ shop, cfg, saveCfg, flash }) {
   return (
     <>
       <header className="deskHead">
-        <h1>Email</h1>
+        <h1>Marketing</h1>
         <div className="seg">
           {TABS.map(([k, l]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
@@ -56,6 +58,7 @@ export function EmailCenter({ shop, cfg, saveCfg, flash }) {
       </header>
       {tab === "campaigns" && <Campaigns shop={shop} cfg={cfg} flash={flash} />}
       {tab === "automations" && <Automations shop={shop} cfg={cfg} saveCfg={saveCfg} flash={flash} />}
+      {tab === "postcards" && <Postcards shop={shop} cfg={cfg} saveCfg={saveCfg} flash={flash} />}
       {tab === "list" && <EmailList shop={shop} flash={flash} />}
       {tab === "settings" && <EmailSettings cfg={cfg} saveCfg={saveCfg} flash={flash} />}
     </>

@@ -157,6 +157,23 @@ sends from its own verified domain (or a shared default sender).
 - Every email carries the shop's address and an unsubscribe link. Never
   remove either.
 
+## Postcards (Marketing → Postcards)
+
+Oil change reminder cards printed and mailed by Lob via the `mail` Edge
+Function (`supabase/functions/mail`, tables in `supabase/mail.sql`). The
+owner approves each week's batch; nothing mails on its own.
+
+- `src/lib/postcards.js`: who's due (sticker date from a week ago to
+  `aheadDays` out, one card per customer), mailable addresses (never the
+  shop's own address, which some records carry as a placeholder), and the
+  4x6 design. Lob takes at most 10,000 characters of HTML a side, so the
+  QR code is drawn as one compact path; keep both sides under the limit.
+  The back's lower right is Lob's address and postage area: keep it empty.
+- Each reminder is reserved in `mail_keys` before Lob is called, and
+  released if Lob refuses the card, so none is mailed twice. Lob calls
+  carry an Idempotency-Key.
+- `customer.mailOptOut` stops postcards for that customer.
+
 ## Known gaps
 
 - No card processing; payments are recorded by hand.

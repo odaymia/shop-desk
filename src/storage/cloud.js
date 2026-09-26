@@ -624,6 +624,24 @@ async function setSuppressed(email, on) {
   if (error && !/email_suppressions|schema cache|does not exist/i.test(error.message)) throw error;
 }
 
+/* ---------- postcards (supabase/mail.sql; mailing is the "mail" function) ---------- */
+async function listMailKeys() {
+  if (!state.linked) return [];
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("mail_keys").select("key").eq("shop_id", state.shopId).range(from, from + 999);
+    if (error) throw /mail_keys|schema cache|does not exist/i.test(error.message) ? new Error("Postcards aren't set up yet: run supabase/mail.sql in Supabase.") : error;
+    out.push(...(data || []).map((r) => r.key));
+    if (!data || data.length < 1000) return out;
+  }
+}
+async function listMailSends(limit = 100) {
+  if (!state.linked) return [];
+  const { data, error } = await supabase.from("mail_sends").select("id, batch_id, name, address, status, expected_delivery, error, created_at").eq("shop_id", state.shopId).order("created_at", { ascending: false }).limit(limit);
+  if (error) return [];
+  return data || [];
+}
+
 /* Customer requests from the portal. Read live; handled by staff. */
 async function listPortalRequests() {
   if (!state.linked) return [];
@@ -694,6 +712,8 @@ export const cloud = {
   listEmailMessages,
   listSuppressions,
   setSuppressed,
+  listMailKeys,
+  listMailSends,
   /* Call a Supabase Edge Function as the signed-in shop user. Used for
      distributor lookups (tire search/order) that must run server-side so
      the wholesale credentials never reach the browser. */

@@ -32,7 +32,7 @@ const PAGES = [
   ["tires", "Tires"],
   ["jobs", "Canned jobs"],
   ["coupons", "Coupons"],
-  ["email", "Email"],
+  ["email", "Marketing"],
   ["vendors", "Vendors"],
   ["staff", "Staff"],
   ["reports", "Reports"],

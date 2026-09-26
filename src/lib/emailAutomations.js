@@ -69,10 +69,10 @@ export const automationsOf = (cfg) => {
 
 /* "oil change" lines, the same test the customer portal's reminders use */
 const OIL = /\boil\b(?!.*(?:cooler|pan|pressure|leak))/i;
-const isOilOrder = (o, pkgNames) => (o.lines || []).some((l) => l.kind !== "note" && (OIL.test(`${l.job || ""}: ${l.description || ""}`) || pkgNames.has(str(l.job).toLowerCase())));
-const fmtDay = (t) => new Date(t).toLocaleDateString("en-US", { month: "long", day: "numeric" });
-const vehicleName = (v) => (v ? [v.year, v.make, v.model].filter(Boolean).join(" ") : "") || "car";
-const addMonths = (t, m) => {
+export const isOilOrder = (o, pkgNames) => (o.lines || []).some((l) => l.kind !== "note" && (OIL.test(`${l.job || ""}: ${l.description || ""}`) || pkgNames.has(str(l.job).toLowerCase())));
+export const fmtDay = (t) => new Date(t).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+export const vehicleName = (v) => (v ? [v.year, v.make, v.model].filter(Boolean).join(" ") : "") || "car";
+export const addMonths = (t, m) => {
   const d = new Date(t);
   d.setMonth(d.getMonth() + Number(m || 0));
   return d.getTime();
