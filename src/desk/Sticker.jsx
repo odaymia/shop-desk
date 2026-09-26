@@ -73,7 +73,19 @@ export function Sticker({ order, cfg, vehicle, employees, requireCrew, onAssign,
   const print = () => {
     if (!crewOk) return;
     if (onSave) onSave({ months: d.months, miles: d.miles, mileage: d.mileage || null });
+    /* close the sticker window once the print dialog is done; the label
+       has to stay on the page until then or it prints blank */
+    let closed = false;
+    const done = () => {
+      window.removeEventListener("afterprint", done);
+      if (closed) return;
+      closed = true;
+      onClose();
+    };
+    window.addEventListener("afterprint", done);
     window.print();
+    /* a browser with no afterprint event: print() has returned, so it's done */
+    if (!("onafterprint" in window)) done();
   };
 
   const crewSelect = (value, onPick) => (
