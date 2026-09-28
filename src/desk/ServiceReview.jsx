@@ -24,6 +24,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const baseIntervals = activeIntervals(cfg.serviceIntervals || DEFAULT_SERVICE_INTERVALS);
   const [merged, setMerged] = useState(() => ({ intervals: mergeMotorIntervals(baseIntervals, [], "store").intervals, source: "store" }));
   const [motorState, setMotorState] = useState(mode === "store" ? "store" : "loading"); // loading | motor | motor-sample | store
+  const [motorWhy, setMotorWhy] = useState(""); // why the manufacturer schedule isn't showing
 
   // pull the vehicle's real factory schedule from MOTOR (unless the owner chose store-only)
   useEffect(() => {
@@ -37,9 +38,10 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
       try {
         const v = await motorVehicleFor(vehicle);
         if (!live) return;
-        if (!v.vehicle) return setMotorState("store");
+        if (!v.vehicle) return setMotorWhy(v.error || "MOTOR didn't find this car."), setMotorState("store");
         const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId), motorFluids(v.vehicle.baseVehicleId)]);
         if (!live) return;
+        if (m.error) throw new Error(m.error);
         const isSample = v.sample || m.sample || f.sample;
         // only hide services from REAL per-vehicle data — never from the sample fallback
         const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
@@ -48,9 +50,19 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         if (mm.matched > 0 || applicable.length !== baseIntervals.length) {
           setMerged(mm);
           setMotorState(v.sample || m.sample ? "motor-sample" : "motor");
-        } else setMotorState("store");
-      } catch {
-        if (live) setMotorState("store");
+        } else {
+          setMotorWhy(
+            (m.services || []).length
+              ? `MOTOR sent ${m.services.length} schedule items for this car, but none matched these services.`
+              : "MOTOR sent no maintenance schedule for this car."
+          );
+          setMotorState("store");
+        }
+      } catch (e) {
+        if (live) {
+          setMotorWhy(`Couldn't read MOTOR's schedule: ${e.message || "lookup failed"}`);
+          setMotorState("store");
+        }
       }
     })();
     return () => { live = false; };
@@ -89,6 +101,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                 : motorState === "motor-sample"
                   ? `${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations (sample) · checked against this car's history`
                   : `${storeLabel} recommendations · checked against this car's history`}
+            {motorState === "store" && motorWhy ? <div style={{ color: "var(--warn)", marginTop: 2 }}>{motorWhy}</div> : null}
           </div>
         </div>
         <label className="fld" style={{ width: 150 }}>

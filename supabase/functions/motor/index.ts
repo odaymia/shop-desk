@@ -110,8 +110,18 @@ function normFluids(data: Record<string, unknown>) {
 // interval. `en` narrows the schedule to the car's engine.
 async function motorMaintenance(V: string, en: string) {
   const q = en ? `?EN=${encodeURIComponent(en)}` : "";
-  const sum = await motorGet(`${V}/Content/Summaries/Of/MaintenanceSchedules${q}`);
-  const apps = ((sum.Body as Record<string, unknown>)?.Applications as Record<string, unknown>[]) || [];
+  const appsOf = (d: Record<string, unknown> | null) => ((d?.Body as Record<string, unknown>)?.Applications as Record<string, unknown>[]) || [];
+  /* ask for this engine's schedule; if MOTOR rejects or empties that, take
+     the whole vehicle's and keep the entries mapped to this engine (or to
+     no engine in particular) */
+  let apps = en ? appsOf(await motorGet(`${V}/Content/Summaries/Of/MaintenanceSchedules${q}`).catch(() => null)) : [];
+  if (!apps.length) {
+    const all = appsOf(await motorGet(`${V}/Content/Summaries/Of/MaintenanceSchedules`));
+    const enOf = (a: Record<string, unknown>) =>
+      ((a.AttributeMappings as Record<string, unknown>[]) || []).filter((m) => m.Type === "EN").map((m) => String(m.ID));
+    apps = en ? all.filter((a) => !enOf(a).length || enOf(a).includes(en)) : all;
+    if (!apps.length) apps = all;
+  }
   const seen = new Set<string>();
   const uniq: Record<string, unknown>[] = [];
   for (const a of apps) {
@@ -122,7 +132,11 @@ async function motorMaintenance(V: string, en: string) {
   }
   const capped = uniq.slice(0, 60);
   const details = await Promise.all(
-    capped.map((a) => motorGet(`${V}/Content/Details/Of/MaintenanceSchedules/${a.ApplicationID}${q}`).catch(() => null)),
+    capped.map((a) =>
+      motorGet(`${V}/Content/Details/Of/MaintenanceSchedules/${a.ApplicationID}${q}`)
+        .catch(() => (q ? motorGet(`${V}/Content/Details/Of/MaintenanceSchedules/${a.ApplicationID}`) : null))
+        .catch(() => null),
+    ),
   );
   // every object under the detail that carries an interval, with the
   // service type / severe flag / notes found on it or its parents
