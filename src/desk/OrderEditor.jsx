@@ -43,7 +43,7 @@ import {
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
 import { findSpec, matchOil, matchFilter, blankSpec } from "../lib/specs.js";
-import { motorVehicle, motorFilters } from "../lib/motor.js";
+import { motorVehicleFor, motorFilters } from "../lib/motor.js";
 import { pickEngine, specFromMotorFilters, mergeMotorFilters } from "../lib/motorFilters.js";
 import { loadValvolineSpecs, findValvolineSpec } from "../lib/valvolineSpecs.js";
 import { valvolineFor } from "../lib/valvoline.js";
@@ -61,6 +61,7 @@ import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, s
 import { composeConcern } from "../lib/symptoms.js";
 import { OrderSign } from "./Signing.jsx";
 import { TireQuote } from "./TireQuote.jsx";
+import { MotorLink } from "./MotorLink.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
 
@@ -553,12 +554,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
      so the oil change picker can recommend the right filter */
   const fillFromMotor = async () => {
     if (!vehicle) return;
-    if (String(vehicle.vin || "").trim().length !== 17) return flash("Add the car's 17-character VIN first. MOTOR looks it up by VIN.", "out");
     setMotorBusy(true);
     try {
-      const r = await motorVehicle(vehicle.vin);
+      const r = await motorVehicleFor(vehicle);
       const mv = r && r.vehicle;
-      if (!mv || !mv.baseVehicleId) throw new Error((r && r.error) || "MOTOR didn't find that VIN.");
+      if (!mv || !mv.baseVehicleId) throw new Error((r && r.error) || "MOTOR didn't find this car.");
       const f = await motorFilters(mv.baseVehicleId);
       if (f && f.error) throw new Error(f.error);
       if ((r.sample || f.sample) && !DEMO) throw new Error("MOTOR isn't connected yet. Deploy the motor function with your keys, then try again.");
@@ -950,6 +950,21 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
                       <div className="whoSub">
                         {[vehicle.engine, vehicle.color, vehicle.plate, vehicle.vin].filter(Boolean).join(" · ")}
                         {vehicle.notes ? <div style={{ color: "var(--signal)" }}>{vehicle.notes}</div> : null}
+                      </div>
+                      <div className="motorLinkRow">
+                        {vehicle.motor && vehicle.motor.baseVehicleId ? (
+                          <span className={`motorChip ${vehicle.motor.sample ? "sample" : ""}`} title={`MOTOR base vehicle ${vehicle.motor.baseVehicleId}${vehicle.motor.engineId ? `, engine ${vehicle.motor.engineId}` : ""}`}>
+                            ✓ MOTOR: {[vehicle.motor.year, vehicle.motor.make, vehicle.motor.model, vehicle.motor.engine].filter(Boolean).join(" ")}
+                            {vehicle.motor.sample ? " (sample)" : ""}
+                          </span>
+                        ) : (
+                          <span className="muted" style={{ fontSize: 12 }}>Not linked to MOTOR</span>
+                        )}
+                        {!locked && (
+                          <button className="btn tiny ghost" onClick={() => setPick("motorLink")}>
+                            {vehicle.motor && vehicle.motor.baseVehicleId ? "Change" : "Link to MOTOR"}
+                          </button>
+                        )}
                       </div>
                     </>
                   ) : (
@@ -1503,6 +1518,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               return next;
             })
           }
+        />
+      )}
+      {pick === "motorLink" && vehicle && (
+        <MotorLink
+          vehicle={vehicle}
+          flash={flash}
+          onClose={() => setPick(null)}
+          onSave={async (link) => {
+            await shop.saveVehicle({ ...vehicle, motor: link });
+            setPick(null);
+            flash(`Linked to MOTOR: ${[link.year, link.make, link.model].filter(Boolean).join(" ")}`);
+          }}
         />
       )}
       {pick === "tireQuote" && (

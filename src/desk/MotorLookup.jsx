@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./ui.jsx";
-import { motorVehicle, motorLabor } from "../lib/motor.js";
+import { motorVehicleFor, motorLabor } from "../lib/motor.js";
 
 /* MOTOR labor guide. Decodes the ticket's VIN to a MOTOR vehicle, then lets the
    writer search the labor operations and drop one onto the estimate with the
@@ -17,17 +17,11 @@ export function MotorLookup({ vehicle, cfg, onClose, onAddLabor }) {
   useEffect(() => {
     let live = true;
     (async () => {
-      const vin = String((vehicle && vehicle.vin) || "").trim();
-      if (vin.length !== 17) {
-        setErr("This vehicle needs a 17-character VIN on file for a MOTOR lookup.");
-        setLoading(false);
-        return;
-      }
-      const r = await motorVehicle(vin);
+      const r = await motorVehicleFor(vehicle);
       if (!live) return;
       setSample(!!r.sample);
       if (!r.vehicle) {
-        setErr("MOTOR couldn't identify this VIN.");
+        setErr(r.error || "MOTOR couldn't identify this car.");
         setLoading(false);
         return;
       }

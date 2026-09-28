@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal } from "./ui.jsx";
 import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parsePressure, formatPressure, applyEquipment } from "../lib/checklist.js";
-import { motorVehicle, motorFluids, motorMaintenance } from "../lib/motor.js";
+import { motorVehicleFor, motorFluids, motorMaintenance } from "../lib/motor.js";
 
 /* The service checklist, driven from the keyboard: Enter takes the
    answer and moves on, Space (or the arrows) picks a different one,
@@ -18,12 +18,11 @@ export function ChecklistModal({ cfg, order, vehicle, prior, parts, onSave, onCa
   // real MOTOR data, never the sample fallback.
   useEffect(() => {
     if (!fresh) return;
-    const vin = String((vehicle && vehicle.vin) || "").trim();
-    if (vin.length !== 17) return;
+    if (!vehicle || (String(vehicle.vin || "").trim().length !== 17 && !(vehicle.motor && vehicle.motor.baseVehicleId))) return;
     let live = true;
     (async () => {
       try {
-        const v = await motorVehicle(vin);
+        const v = await motorVehicleFor(vehicle);
         if (!live || !v.vehicle || v.sample) return;
         const [f, m] = await Promise.all([motorFluids(v.vehicle.baseVehicleId), motorMaintenance(v.vehicle.baseVehicleId)]);
         if (!live || f.sample || m.sample) return;

@@ -847,3 +847,6 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .pickList li.rec:hover { background:#dcfce7; }
 .recBadge { display:inline-block; margin-right:8px; padding:1px 8px; border-radius:99px; background:#16a34a; color:#fff; font-size:11px; font-weight:700; letter-spacing:.02em; vertical-align:2px; }
 .pickList li .main .recBadge { display:inline-block; color:#fff; font-size:11px; overflow:visible; }
+.motorLinkRow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.motorChip { font-size:12px; font-weight:600; padding:2px 9px; border-radius:99px; background:#e0f2fe; color:#075985; }
+.motorChip.sample { background:#f3f4f6; color:#4b5563; }

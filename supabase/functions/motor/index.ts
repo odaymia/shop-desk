@@ -199,6 +199,62 @@ async function motorFilters(V: string) {
   };
 }
 
+/* ---- Year / Make / Model / Engine: link a car without a VIN ----
+   MOTOR's YMME routes. Their JSON wraps lists a little differently per
+   route, so the list is found by shape (the first array in Body) and
+   each row reads its ID and name from whichever *ID / *Name fields it
+   has. When nothing parses, the raw body comes back so it can be fixed. */
+function firstArray(v: unknown, depth = 0): Rec[] {
+  if (Array.isArray(v)) return v as Rec[];
+  if (!v || typeof v !== "object" || depth > 3) return [];
+  for (const k of Object.keys(v as Rec)) {
+    const a = firstArray((v as Rec)[k], depth + 1);
+    if (a.length) return a;
+  }
+  return [];
+}
+function rowOf(r: Rec, idKey: RegExp, nameKey: RegExp) {
+  if (typeof r !== "object" || r === null) return { id: String(r), name: String(r) };
+  const keys = Object.keys(r);
+  const id = keys.find((k) => idKey.test(k)) || keys.find((k) => /ID$/i.test(k));
+  const name = keys.find((k) => nameKey.test(k)) || keys.find((k) => /(Name|Description)$/i.test(k));
+  return { id: String(id ? r[id] : ""), name: String(name ? r[name] : id ? r[id] : ""), raw: r };
+}
+async function ymme(body: Rec) {
+  const Y = "/v1/Information/YMME/Years";
+  const year = encodeURIComponent(String(body.year || ""));
+  const makeId = encodeURIComponent(String(body.makeId || ""));
+  const modelId = encodeURIComponent(String(body.modelId || ""));
+  const level = String(body.level || "");
+  if (level === "years") {
+    const d = await motorGet(Y);
+    const rows = firstArray(d.Body).map((r) => (typeof r === "object" ? rowOf(r, /^Year$|YearID/i, /^Year$/i).id : String(r)));
+    return { years: rows.filter(Boolean).sort((a, b) => Number(b) - Number(a)) };
+  }
+  if (level === "makes") {
+    const d = await motorGet(`${Y}/${year}/Makes`);
+    const rows = firstArray(d.Body).map((r) => rowOf(r, /MakeID/i, /MakeName/i));
+    return rows.length ? { makes: rows.map(({ id, name }) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)) } : { makes: [], raw: d.Body };
+  }
+  if (level === "models") {
+    const d = await motorGet(`${Y}/${year}/Makes/${makeId}/Models`);
+    const rows = firstArray(d.Body).map((r) => rowOf(r, /ModelID/i, /ModelName/i));
+    return rows.length ? { models: rows.map(({ id, name }) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)) } : { models: [], raw: d.Body };
+  }
+  if (level === "vehicle") {
+    const [bv, en] = await Promise.all([
+      motorGet(`${Y}/${year}/Makes/${makeId}/Models/${modelId}/BaseVehicle`),
+      motorGet(`${Y}/${year}/Makes/${makeId}/Models/${modelId}/Engines`).catch(() => null),
+    ]);
+    const b = (bv.Body as Rec) || {};
+    const bRow = Array.isArray(b) ? (b as Rec[])[0] || {} : firstArray(b)[0] || b;
+    const baseVehicleId = String((bRow as Rec).BaseVehicleID || (b as Rec).BaseVehicleID || "");
+    const engines = en ? firstArray(en.Body).map((r) => rowOf(r, /EngineID/i, /Description|EngineName/i)).map(({ id, name }) => ({ id, name })) : [];
+    return baseVehicleId ? { baseVehicleId, engines } : { baseVehicleId: "", engines, raw: bv.Body };
+  }
+  throw new Error("Unknown level");
+}
+
 /* ---- sample data (used until MOTOR keys are set) ---- */
 const SAMPLE_FILTERS = {
   engines: [{ id: "3476", description: "3.5L V6 (J35Z2) GAS FI", liters: "3.5", cylinders: "6", code: "J35Z2" }],
@@ -281,6 +337,13 @@ Deno.serve(async (req) => {
       if (action === "parts") return json({ parts: [], sample: true });
       if (action === "maintenance") return json({ services: SAMPLE_MAINTENANCE, sample: true });
       if (action === "filters") return json({ ...SAMPLE_FILTERS, sample: true });
+      if (action === "ymme") {
+        const lv = String(body.level || "");
+        if (lv === "years") return json({ years: ["2012", "2011", "2010"], sample: true });
+        if (lv === "makes") return json({ makes: [{ id: "74", name: "Toyota" }], sample: true });
+        if (lv === "models") return json({ models: [{ id: "940", name: "Camry" }], sample: true });
+        return json({ baseVehicleId: "20957", engines: [{ id: "0", name: "2.5L L4 (sample)" }], sample: true });
+      }
       if (action === "content") return json({ items: (SAMPLE_CONTENT[String(body.type || "")] || []).map((name) => ({ name, id: 0 })), sample: true });
       if (action === "content-detail") return json({ detail: { Note: "Sample — connect MOTOR to see the full detail for this item." }, sample: true });
       return json({ error: "Unknown action" }, 400);
@@ -291,6 +354,7 @@ Deno.serve(async (req) => {
       if (vin.length !== 17) return json({ error: "Enter a 17-character VIN" }, 400);
       return json(normVehicle(await motorGet(`/v1/Information/Vehicles/Search/ByVIN?VIN=${encodeURIComponent(vin)}`)));
     }
+    if (action === "ymme") return json(await ymme(body));
     if (!baseVehicleId) return json({ error: "Look up the vehicle first" }, 400);
     const V = `/v1/Information/Vehicles/Attributes/BaseVehicleID/${encodeURIComponent(baseVehicleId)}`;
     if (action === "labor") return json({ labor: normLabor(await motorGet(`${V}/Content/Summaries/Of/EstimatedWorkTimes`), q) });

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./ui.jsx";
-import { motorVehicle, motorContent, motorContentDetail } from "../lib/motor.js";
+import { motorVehicleFor, motorContent, motorContentDetail } from "../lib/motor.js";
 
 /* MOTOR reference — browse everything MOTOR has for the vehicle: fluids & specs,
    parts, labor times, factory maintenance, service procedures, TSBs, trouble
@@ -52,18 +52,12 @@ export function MotorReference({ vehicle, onClose }) {
   // decode the VIN once
   useEffect(() => {
     let live = true;
-    const vin = String((vehicle && vehicle.vin) || "").trim();
-    if (vin.length !== 17) {
-      setErr("This vehicle needs a 17-character VIN for a MOTOR lookup.");
-      setLoading(false);
-      return;
-    }
     (async () => {
-      const r = await motorVehicle(vin);
+      const r = await motorVehicleFor(vehicle);
       if (!live) return;
       setSample(!!r.sample);
       if (!r.vehicle) {
-        setErr("MOTOR couldn't identify this VIN.");
+        setErr(r.error || "MOTOR couldn't identify this car.");
         setLoading(false);
         return;
       }

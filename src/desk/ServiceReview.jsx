@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Modal, fmtDate } from "./ui.jsx";
 import { ordersOf } from "./useShop.js";
 import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
-import { motorVehicle, motorMaintenance, motorFluids } from "../lib/motor.js";
+import { motorVehicleFor, motorMaintenance, motorFluids } from "../lib/motor.js";
 
 const STATUS = {
   due: { label: "Due now", cls: "due" },
@@ -29,14 +29,13 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   useEffect(() => {
     if (mode === "store") return;
     let live = true;
-    const vin = String(vehicle.vin || "").trim();
-    if (vin.length !== 17) {
+    if (String(vehicle.vin || "").trim().length !== 17 && !(vehicle.motor && vehicle.motor.baseVehicleId)) {
       setMotorState("store");
       return;
     }
     (async () => {
       try {
-        const v = await motorVehicle(vin);
+        const v = await motorVehicleFor(vehicle);
         if (!live) return;
         if (!v.vehicle) return setMotorState("store");
         const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId), motorFluids(v.vehicle.baseVehicleId)]);

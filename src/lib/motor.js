@@ -67,6 +67,12 @@ async function call(body) {
     if (body.action === "parts") return { parts: [], sample: true };
     if (body.action === "maintenance") return { services: SAMPLE_MAINTENANCE, sample: true };
     if (body.action === "filters") return { ...SAMPLE_FILTERS, sample: true };
+    if (body.action === "ymme") {
+      if (body.level === "years") return { years: ["2012", "2011", "2010"], sample: true };
+      if (body.level === "makes") return { makes: [{ id: "74", name: "Toyota" }], sample: true };
+      if (body.level === "models") return { models: [{ id: "940", name: "Camry" }], sample: true };
+      return { baseVehicleId: "20957", engines: [{ id: "0", name: "2.5L L4 (sample)" }], sample: true };
+    }
     if (body.action === "content") return { items: (SAMPLE_CONTENT[body.type] || []).map((name) => ({ name, id: 0 })), sample: true };
     if (body.action === "content-detail") return { detail: { Note: "Sample — connect MOTOR to see the full detail for this item." }, sample: true };
     return { sample: true };
@@ -104,3 +110,23 @@ export const motorContentDetail = (baseVehicleId, type, id) => call({ action: "c
    catalog, per engine. Returns { engines, parts: [{ type: oil|air|cabin|
    fuel|wiper, engineId, position, label, numbers }], sample }. */
 export const motorFilters = (baseVehicleId) => call({ action: "filters", baseVehicleId });
+
+/* Year → Make → Model → Engine, for linking a car to MOTOR without a VIN.
+   level "years" → { years }, "makes" (year) → { makes: [{ id, name }] },
+   "models" (year, makeId) → { models }, "vehicle" (year, makeId, modelId)
+   → { baseVehicleId, engines: [{ id, name }] }. */
+export const motorYmme = (level, args = {}) => call({ action: "ymme", level, ...args });
+
+/* The MOTOR vehicle for a car on file: the link saved on the car (from
+   the Year/Make/Model picker or an earlier VIN decode) wins; otherwise
+   decode its VIN. → { vehicle: { baseVehicleId, engineId, ... } | null,
+   sample, error }. */
+export async function motorVehicleFor(car) {
+  const link = car && car.motor;
+  if (link && link.baseVehicleId) return { vehicle: { ...link }, sample: !!link.sample };
+  const vin = String((car && car.vin) || "").trim();
+  if (vin.length !== 17) return { vehicle: null, error: "Link this car to MOTOR (the MOTOR button on the vehicle) or add its 17-character VIN." };
+  const r = await motorVehicle(vin);
+  if (r && !r.vehicle) return { ...r, error: r.error || "MOTOR didn't find that VIN. Link the car by year, make and model instead." };
+  return r;
+}
