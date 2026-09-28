@@ -190,6 +190,25 @@ export function oilsForPackage(oils, pkg) {
   });
 }
 
+/* The packages an oil shows in right now: its own list when it has one,
+   otherwise the ones its oil type matches (auto). */
+export function oilPackagesOf(oil, pkgs) {
+  const active = (pkgs || []).filter((k) => k && k.active !== false);
+  const own = Array.isArray(oil && oil.packages) && oil.packages.length > 0;
+  return { auto: !own, ids: active.filter((k) => oilsForPackage([oil], k).length > 0).map((k) => k.id) };
+}
+/* Tick or untick one package for an oil. The first change on an auto oil
+   starts its own list from what it was already matching, so nothing it
+   showed in silently drops out. → the new `packages` array. Setting
+   `packages` to [] puts the oil back on auto. */
+export function toggleOilPackage(oil, pkgId, pkgs) {
+  const cur = oilPackagesOf(oil, pkgs).ids;
+  const next = cur.includes(pkgId) ? cur.filter((x) => x !== pkgId) : [...cur, pkgId];
+  /* an empty list means "auto", which would bring the packages back; an
+     oil unticked from everything keeps an explicit "none" instead */
+  return next.length ? next : ["none"];
+}
+
 /* Engine (crankcase) oils that belong on an oil change: category says
    oil, or the description reads like a motor-oil grade — but never a
    filter, and never gear/differential/transmission/other fluids, which

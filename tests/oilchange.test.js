@@ -205,3 +205,23 @@ test("a full synthetic package also lists a European synthetic; conventional sti
   assert.deepEqual(oilsForPackage(oils, synPkg).map((o) => o.id), ["s", "e"]);
   assert.deepEqual(oilsForPackage(oils, convPkg).map((o) => o.id), ["c"]);
 });
+
+import { oilPackagesOf, toggleOilPackage } from "../src/lib/oilchange.js";
+
+test("matching oils to packages from one grid", () => {
+  const pkgs = [
+    { id: "conv", name: "Conventional Oil Change", oilType: "conventional" },
+    { id: "syn", name: "Full Synthetic Oil Change", oilType: "synthetic" },
+    { id: "old", name: "Retired", oilType: "synthetic", active: false },
+  ];
+  const syn = { id: "o1", description: "Valvoline Full Synthetic 5W-30", category: "Oil", oilType: "synthetic" };
+  assert.deepEqual(oilPackagesOf(syn, pkgs), { auto: true, ids: ["syn"] });
+  // first tick starts its own list from what it already matched
+  const withConv = toggleOilPackage(syn, "conv", pkgs);
+  assert.deepEqual(withConv, ["syn", "conv"]);
+  assert.deepEqual(oilPackagesOf({ ...syn, packages: withConv }, pkgs), { auto: false, ids: ["conv", "syn"] });
+  // unticking everything keeps it out of every package (not back to auto)
+  const none = toggleOilPackage({ ...syn, packages: ["syn"] }, "syn", pkgs);
+  assert.deepEqual(none, ["none"]);
+  assert.deepEqual(oilPackagesOf({ ...syn, packages: none }, pkgs).ids, []);
+});

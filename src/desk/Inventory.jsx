@@ -4,6 +4,7 @@ import { activeList, searchText } from "./useShop.js";
 import { OIL_TYPE_OPTIONS } from "../lib/oilchange.js";
 import { itemCategory, packQuartsOf } from "../lib/inventoryReports.js";
 import { InventoryCount } from "./InventoryCount.jsx";
+import { OilPackageGrid } from "./OilPackageGrid.jsx";
 
 const blank = () => ({
   number: "",
@@ -37,6 +38,7 @@ export function Inventory({ shop, cfg, flash }) {
   const [only, setOnly] = useState("all"); // all | low
   const [cat, setCat] = useState("all");
   const [edit, setEdit] = useState(null);
+  const [oilGrid, setOilGrid] = useState(false); // the oils × packages grid
   const [quick, setQuick] = useState(false);
   const [receive, setReceive] = useState(false);
   const [imp, setImp] = useState(false);
@@ -80,6 +82,11 @@ export function Inventory({ shop, cfg, flash }) {
         <span className="muted">
           Stock at cost: <Money v={value} />
         </span>
+        {(cfg?.oilPackages || []).some((k) => k.active !== false) && (
+          <button className="btn" onClick={() => setOilGrid(true)} title="Tick which oil change packages each oil can be sold in, all on one screen">
+            Oils &amp; packages
+          </button>
+        )}
         <button className="btn" onClick={() => setCounting(true)}>
           Take inventory
         </button>
@@ -96,6 +103,7 @@ export function Inventory({ shop, cfg, flash }) {
           Add part
         </button>
       </header>
+      {oilGrid && <OilPackageGrid shop={shop} cfg={cfg} flash={flash} onClose={() => setOilGrid(false)} />}
       {quick && <QuickAdd shop={shop} flash={flash} onClose={() => setQuick(false)} />}
       {receive && <ReceiveOrder shop={shop} flash={flash} onClose={() => setReceive(false)} />}
       {imp && <ImportParts shop={shop} flash={flash} onClose={() => setImp(false)} />}
