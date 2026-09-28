@@ -44,7 +44,7 @@ import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
 import { findSpec, matchOil, matchFilter, blankSpec } from "../lib/specs.js";
 import { motorVehicleFor, motorFilters } from "../lib/motor.js";
-import { pickEngine, specFromMotorFilters, mergeMotorFilters } from "../lib/motorFilters.js";
+import { pickEngine, specFromMotorFilters, mergeMotorFilters, specNumbersFor, isNotServiceable } from "../lib/motorFilters.js";
 import { loadValvolineSpecs, findValvolineSpec } from "../lib/valvolineSpecs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
@@ -1445,6 +1445,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
         <PartPicker
           shop={shop}
           category={partCat}
+          suggested={partCat ? matchFilter(shop.parts, specNumbersFor(shopSpec, partCat)) : []}
           onClose={() => setPick(null)}
           onPick={(p) => {
             addLine("part", {
@@ -2384,6 +2385,15 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd, onMotor,
         ]
           .filter(([, l]) => (l || []).length)
           .map(([label, l]) => {
+            if (l.every((f) => isNotServiceable(f.number)))
+              return (
+                <div key={label}>
+                  <span>{label}</span>
+                  <strong>Not serviceable</strong>
+                  <em>No replaceable part listed (built in)</em>
+                </div>
+              );
+            l = l.filter((f) => !isNotServiceable(f.number));
             const have = matchFilter(shop.parts, l);
             return (
               <div key={label}>

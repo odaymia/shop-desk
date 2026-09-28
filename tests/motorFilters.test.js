@@ -53,3 +53,38 @@ test("merging keeps what the shop typed, and the oil filter lights up in invento
   // running it twice doesn't double up
   assert.equal(mergeMotorFilters(merged, specFromMotorFilters(result, "3476")).oilFilters.length, 2);
 });
+
+import { specNumbersFor, isNotServiceable } from "../src/lib/motorFilters.js";
+
+test("the part picker's recommended part comes from the spec by category", () => {
+  const spec = {
+    oilFilters: [{ number: "VO-40" }],
+    airFilters: [{ number: "VA-163" }],
+    cabinFilters: [{ number: "VCA-1031" }],
+    fuelFilters: [{ number: "NS" }],
+    wipers: [{ side: "Driver", number: "836454" }],
+  };
+  assert.deepEqual(specNumbersFor(spec, "Engine Air Filters").map((f) => f.number), ["VA-163"]);
+  assert.deepEqual(specNumbersFor(spec, "Cabin Air Filters").map((f) => f.number), ["VCA-1031"]);
+  assert.deepEqual(specNumbersFor(spec, "Wipers").map((f) => f.number), ["836454"]);
+  assert.deepEqual(specNumbersFor(spec, "Fuel Filters"), []); // "NS" = nothing to sell
+  assert.deepEqual(specNumbersFor(null, "Engine Air Filters"), []);
+  assert.equal(isNotServiceable("N/S"), true);
+});
+
+test("MOTOR's NS fuel filter is marked not serviceable, not saved as a part", () => {
+  const s = specFromMotorFilters({ parts: [{ type: "fuel", engineId: "1", numbers: ["NS"] }, { type: "oil", engineId: "1", numbers: ["VO-40"] }] }, "1");
+  assert.deepEqual(s.fuelFilters, []);
+  assert.equal(s.notServiceable.fuel, true);
+});
+
+test("engine from a VIN-decode style engine text, gas over hybrid", () => {
+  const cam = [
+    { id: "h", description: "2.4L L4 (B) 2AZ-FXE FULL HYBRID EV-GAS (FHEV) FI", liters: "2.4", cylinders: "4" },
+    { id: "a", description: "2.5L L4 (2AR-FE) GAS FI", liters: "2.5", cylinders: "4" },
+    { id: "b", description: "2.4L L4 (2AZ-FE) GAS FI", liters: "2.4", cylinders: "4" },
+  ];
+  assert.equal(pickEngine(cam, { engineText: "2.5 16V (USA), ASV40" }), "a");
+  assert.equal(pickEngine(cam, { engineText: "2.4L" }), "b");
+  assert.equal(pickEngine(cam, { engineText: "2.4L Hybrid" }), "h");
+});

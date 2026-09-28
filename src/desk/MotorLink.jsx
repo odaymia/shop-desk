@@ -83,8 +83,13 @@ export function MotorLink({ vehicle, onSave, onClose, flash }) {
       if (r.error) throw new Error(r.error);
       if (!r.baseVehicleId && r.raw) setRaw(r.raw);
       setFound(r);
-      const liters = (String(vehicle.engine || "").match(/(\d+\.\d)\s*L/i) || [])[1];
-      const e = (r.engines || []).length === 1 ? r.engines[0] : (r.engines || []).find((x) => liters && String(x.name).includes(`${liters}L`));
+      /* the car's engine size ("2.5L", or "2.5 16V" from a VIN decode);
+         skip hybrids unless the car says hybrid */
+      const eng = String(vehicle.engine || "");
+      const liters = (eng.match(/\b(\d\.\d)\s*L?\b/i) || [])[1];
+      const hybrid = /hybrid|hev/i.test(eng);
+      const fits = (r.engines || []).filter((x) => liters && String(x.name).includes(`${liters}L`) && /hybrid|hev/i.test(x.name) === hybrid);
+      const e = (r.engines || []).length === 1 ? r.engines[0] : fits[0];
       if (e) setEngineId(e.id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -9,18 +9,22 @@ import { uid } from "../lib/ids.js";
 /* Pick a part from inventory, or type one in. When `category` is set the
    list opens filtered to that inventory category (e.g. Engine Air Filters),
    with a toggle to fall back to everything. */
-export function PartPicker({ shop, onPick, onTyped, onClose, category }) {
+export function PartPicker({ shop, onPick, onTyped, onClose, category, suggested = [] }) {
   const [q, setQ] = useState("");
   const [all, setAll] = useState(!category);
   const cat = String(category || "").trim();
+  const recKey = suggested.map((p) => p.id).join(",");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const recIds = useMemo(() => new Set(suggested.map((p) => p.id)), [recKey]);
   const rows = useMemo(
     () =>
       activeList(shop.parts)
         .filter((p) => all || itemCategory(p) === cat)
         .filter((p) => searchText(q, p.number, p.description, p.size, p.category))
-        .sort((a, b) => (a.number || "").localeCompare(b.number || ""))
+        /* the car's spec part (from MOTOR or the shop) goes first */
+        .sort((a, b) => (recIds.has(b.id) ? 1 : 0) - (recIds.has(a.id) ? 1 : 0) || (a.number || "").localeCompare(b.number || ""))
         .slice(0, 80),
-    [shop.parts, q, all, cat]
+    [shop.parts, q, all, cat, recIds]
   );
   return (
     <Modal title={cat && !all ? cat : "Add a part"} onClose={onClose} size="wide">
@@ -56,9 +60,10 @@ export function PartPicker({ shop, onPick, onTyped, onClose, category }) {
         {rows.map((p) => {
           const low = toNum(p.onHand) <= 0;
           return (
-            <li key={p.id} className={low ? "low" : ""} onClick={() => onPick(p)}>
+            <li key={p.id} className={[low ? "low" : "", recIds.has(p.id) ? "rec" : ""].join(" ")} onClick={() => onPick(p)}>
               <div className="main">
                 <strong>
+                  {recIds.has(p.id) ? <span className="recBadge">✓ Recommended</span> : null}
                   {p.tire ? `${p.size} · ${tireName(p)}` : `${p.number} ${p.description ? `— ${p.description}` : ""}`}
                 </strong>
                 <span>{[p.category, p.location, (shop.vendors[p.vendorId] || {}).name].filter(Boolean).join(" · ")}</span>
