@@ -38,13 +38,13 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         const v = await motorVehicleFor(vehicle);
         if (!live) return;
         if (!v.vehicle) return setMotorState("store");
-        const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId), motorFluids(v.vehicle.baseVehicleId)]);
+        const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId), motorFluids(v.vehicle.baseVehicleId)]);
         if (!live) return;
         const isSample = v.sample || m.sample || f.sample;
         // only hide services from REAL per-vehicle data — never from the sample fallback
         const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
         const applicable = isSample ? baseIntervals : filterApplicable(baseIntervals, motorNames);
-        const mm = mergeMotorIntervals(applicable, m.services, mode);
+        const mm = mergeMotorIntervals(applicable, m.services, mode, cfg.serviceSeverity === "severe" ? "severe" : "normal");
         if (mm.matched > 0 || applicable.length !== baseIntervals.length) {
           setMerged(mm);
           setMotorState(v.sample || m.sample ? "motor-sample" : "motor");
@@ -85,7 +85,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
             {motorState === "loading"
               ? "Loading the manufacturer schedule…"
               : motorState === "motor"
-                ? `✓ ${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations · checked against this car's history`
+                ? `✓ ${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations (${cfg.serviceSeverity === "severe" ? "severe service" : "normal driving"}) · checked against this car's history`
                 : motorState === "motor-sample"
                   ? `${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations (sample) · checked against this car's history`
                   : `${storeLabel} recommendations · checked against this car's history`}
@@ -148,6 +148,12 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                             {storeLabel} {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Manufacturer {miles(r.motorMiles)}</span>
                           </span>
                         ) : null}
+                        {r.motorInspectMiles > 0 || r.motorInspectMonths > 0 ? (
+                          <span className="sub">
+                            Maker says inspect every {r.motorInspectMiles ? miles(r.motorInspectMiles) : `${r.motorInspectMonths} mo`}
+                          </span>
+                        ) : null}
+                        {r.noFactory ? <span className="sub">No factory interval for this car · using your {storeLabel.toLowerCase()} interval</span> : null}
                       </>
                     )}
                   </td>

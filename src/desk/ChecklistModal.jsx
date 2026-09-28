@@ -24,7 +24,7 @@ export function ChecklistModal({ cfg, order, vehicle, prior, parts, onSave, onCa
       try {
         const v = await motorVehicleFor(vehicle);
         if (!live || !v.vehicle || v.sample) return;
-        const [f, m] = await Promise.all([motorFluids(v.vehicle.baseVehicleId), motorMaintenance(v.vehicle.baseVehicleId)]);
+        const [f, m] = await Promise.all([motorFluids(v.vehicle.baseVehicleId), motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId)]);
         if (!live || f.sample || m.sample) return;
         const names = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
         setItems((cur) => applyEquipment(cur, cfgItems, names));

@@ -120,3 +120,31 @@ test("default interval table is well-formed", () => {
   assert.ok(DEFAULT_SERVICE_INTERVALS.length >= 10);
   assert.ok(DEFAULT_SERVICE_INTERVALS.every((s) => s.id && s.name && s.match && s.miles > 0));
 });
+
+import { mergeMotorIntervals as mergeMI } from "../src/lib/serviceReview.js";
+
+test("factory schedule: replace beats inspect, severe-only drops out of normal, lifetime fluids say so", () => {
+  const intervals = [
+    { id: "af", name: "Engine air filter", miles: 15000, months: 12, motorKeys: ["air filter"] },
+    { id: "cool", name: "Coolant flush", miles: 30000, months: 24, motorKeys: ["coolant"] },
+    { id: "atf", name: "Transmission fluid service", miles: 30000, months: 24, motorKeys: ["transmission fluid", "transaxle fluid"] },
+  ];
+  /* shaped like the 2010 Camry 2.5L sandbox answer */
+  const motor = [
+    { name: "Engine Air Filter Element Inspect", serviceType: "Inspect", miles: 0, months: 0, severeMiles: 5000, severeMonths: 6 },
+    { name: "Engine Air Filter Element Inspect", serviceType: "Inspect", miles: 15000, months: 18 },
+    { name: "Engine Air Filter Element Replace", serviceType: "Replace", miles: 30000, months: 36, severeMiles: 15000, severeMonths: 18 },
+    { name: "Engine Coolant Inspect", serviceType: "Inspect", miles: 15000, months: 18 },
+    { name: "Engine Coolant Replace", serviceType: "Replace", miles: 100000, months: 120 },
+  ];
+  const r = mergeMI(intervals, motor, "motor", "normal").intervals;
+  const af = r.find((x) => x.id === "af");
+  assert.equal(af.miles, 30000);
+  assert.equal(af.motorInspectMiles, 15000);
+  assert.equal(r.find((x) => x.id === "cool").miles, 100000);
+  const atf = r.find((x) => x.id === "atf");
+  assert.equal(atf.noFactory, true);
+  assert.equal(atf.miles, 30000); // the store interval stands in
+  // severe schedule
+  assert.equal(mergeMI(intervals, motor, "motor", "severe").intervals.find((x) => x.id === "af").miles, 15000);
+});

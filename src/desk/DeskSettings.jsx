@@ -842,6 +842,14 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
                   </select>
                 </div>
                 <div className="fld">
+                  <span>Manufacturer schedule</span>
+                  <select value={d.serviceSeverity === "severe" ? "severe" : "normal"} onChange={(e) => set("serviceSeverity")(e.target.value)}>
+                    <option value="normal">Normal driving</option>
+                    <option value="severe">Severe service (towing, dusty roads, short trips, heavy stop-and-go)</option>
+                  </select>
+                  <span className="muted" style={{ fontSize: 12 }}>Makers give a shorter schedule for severe conditions. Most cars run the normal one.</span>
+                </div>
+                <div className="fld">
                   <span>What to call your recommendations</span>
                   <Text value={d.serviceStoreLabel ?? "Store"} onChange={set("serviceStoreLabel")} placeholder="Store" />
                   <span className="muted" style={{ fontSize: 12 }}>e.g. "Store", "Valvoline", "{cfg.shopName || "Genie"}" — shows on the review next to your intervals.</span>

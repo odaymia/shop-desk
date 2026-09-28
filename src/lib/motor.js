@@ -95,7 +95,7 @@ export const motorParts = (baseVehicleId, q) => call({ action: "parts", baseVehi
 
 /* The vehicle's factory maintenance schedule. Returns
    { services: [{ name, miles, months }], sample } — the real OEM intervals. */
-export const motorMaintenance = (baseVehicleId) => call({ action: "maintenance", baseVehicleId });
+export const motorMaintenance = (baseVehicleId, engineId) => call({ action: "maintenance", baseVehicleId, engineId: engineId || "" });
 
 /* Browse any MOTOR content domain for a vehicle (Fluids, Specifications, Parts,
    ServiceProcedures, TechnicalServiceBulletins, DiagnosticTroubleCodes,

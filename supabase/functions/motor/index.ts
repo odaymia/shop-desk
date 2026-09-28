@@ -99,10 +99,18 @@ function normFluids(data: Record<string, unknown>) {
     detail: ((a.Links as Record<string, unknown>[]) || [])[0]?.Href || "",
   }));
 }
-// The vehicle's factory maintenance schedule: unique service names, each with
-// its real interval (smallest positive miles/months across its schedule items).
-async function motorMaintenance(V: string) {
-  const sum = await motorGet(`${V}/Content/Summaries/Of/MaintenanceSchedules`);
+// The vehicle's factory maintenance schedule: one entry per service name,
+// with the NORMAL-driving interval and the SEVERE-service interval kept
+// apart. MOTOR marks each schedule item (seen in the sandbox, 2026-09-28):
+//   ServiceType "Inspect" | "Replace" | …, SevereServiceDescription "Yes"
+//   for severe-only items (dusty roads, towing…), FrequencyCode "E" = every,
+//   IntervalMile / IntervalMonth, and Notes[].Text ("Replace if necessary.").
+// Taking the smallest interval across all of them is what made an air
+// filter "inspect every 5,000 mi on dusty roads" look like the replacement
+// interval. `en` narrows the schedule to the car's engine.
+async function motorMaintenance(V: string, en: string) {
+  const q = en ? `?EN=${encodeURIComponent(en)}` : "";
+  const sum = await motorGet(`${V}/Content/Summaries/Of/MaintenanceSchedules${q}`);
   const apps = ((sum.Body as Record<string, unknown>)?.Applications as Record<string, unknown>[]) || [];
   const seen = new Set<string>();
   const uniq: Record<string, unknown>[] = [];
@@ -114,18 +122,60 @@ async function motorMaintenance(V: string) {
   }
   const capped = uniq.slice(0, 60);
   const details = await Promise.all(
-    capped.map((a) => motorGet(`${V}/Content/Details/Of/MaintenanceSchedules/${a.ApplicationID}`).catch(() => null)),
+    capped.map((a) => motorGet(`${V}/Content/Details/Of/MaintenanceSchedules/${a.ApplicationID}${q}`).catch(() => null)),
   );
+  // every object under the detail that carries an interval, with the
+  // service type / severe flag / notes found on it or its parents
+  const collect = (v: unknown, ctx: Record<string, unknown>, out: Record<string, unknown>[], depth = 0) => {
+    if (depth > 8 || v == null || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach((x) => collect(x, ctx, out, depth + 1));
+    const o = v as Record<string, unknown>;
+    const here = { ...ctx };
+    if (o.ServiceType != null) here.serviceType = String(o.ServiceType);
+    if (o.SevereServiceDescription != null) here.severe = /^(yes|true|y)$/i.test(String(o.SevereServiceDescription));
+    if (o.FrequencyCode != null) here.freq = String(o.FrequencyCode);
+    if (o.IntervalMile != null || o.IntervalMonth != null) {
+      const notes: string[] = [];
+      const grab = (x: unknown, d = 0) => {
+        if (d > 5 || x == null) return;
+        if (Array.isArray(x)) return x.forEach((y) => grab(y, d + 1));
+        if (typeof x === "object") for (const [k, y] of Object.entries(x as Record<string, unknown>)) (k === "Text" && typeof y === "string" ? notes.push(y.trim()) : grab(y, d + 1));
+      };
+      grab(o.Notes);
+      out.push({ ...here, miles: Number(o.IntervalMile) || 0, months: Number(o.IntervalMonth) || 0, notes });
+    }
+    for (const [k, x] of Object.entries(o)) if (k !== "Notes" && x && typeof x === "object") collect(x, here, out, depth + 1);
+  };
+  const minOf = (xs: Record<string, unknown>[]) => {
+    const mi = xs.map((x) => Number(x.miles) || 0).filter((x) => x > 0);
+    const mo = xs.map((x) => Number(x.months) || 0).filter((x) => x > 0);
+    return { miles: mi.length ? Math.min(...mi) : 0, months: mo.length ? Math.min(...mo) : 0 };
+  };
   const services: Record<string, unknown>[] = [];
   for (let i = 0; i < capped.length; i++) {
     const d = details[i];
     if (!d) continue;
-    const items = (((d.Body as Record<string, unknown>)?.MaintenanceSchedules as Record<string, unknown>[]) || []).flatMap(
-      (m) => (m.Items as Record<string, unknown>[]) || [],
-    );
-    const mi = items.map((it) => Number(it.IntervalMile) || 0).filter((x) => x > 0);
-    const mo = items.map((it) => Number(it.IntervalMonth) || 0).filter((x) => x > 0);
-    services.push({ name: capped[i].DisplayName, miles: mi.length ? Math.min(...mi) : 0, months: mo.length ? Math.min(...mo) : 0 });
+    const items: Record<string, unknown>[] = [];
+    collect(d.Body, {}, items);
+    if (!items.length) continue;
+    const name = String(capped[i].DisplayName || "");
+    // "every" items first; a one-time "at" item only when there's nothing else
+    const every = items.filter((x) => !x.freq || /^e/i.test(String(x.freq)));
+    const pool = every.length ? every : items;
+    const normal = minOf(pool.filter((x) => !x.severe));
+    const severe = minOf(pool.filter((x) => x.severe));
+    const type = String((items.find((x) => x.serviceType) || {}).serviceType || (/inspect/i.test(name) ? "Inspect" : ""));
+    const notes = [...new Set(items.flatMap((x) => (x.notes as string[]) || []))].slice(0, 4);
+    services.push({
+      name,
+      serviceType: type,
+      // back-compat: miles/months are the normal-driving interval
+      miles: normal.miles,
+      months: normal.months,
+      severeMiles: severe.miles,
+      severeMonths: severe.months,
+      notes,
+    });
   }
   return services;
 }
@@ -388,7 +438,7 @@ Deno.serve(async (req) => {
     if (action === "labor") return json({ labor: normLabor(await motorGet(`${V}/Content/Summaries/Of/EstimatedWorkTimes`), q) });
     if (action === "fluids") return json({ fluids: normFluids(await motorGet(`${V}/Content/Summaries/Of/Fluids`)) });
     if (action === "parts") return json({ parts: normParts(await motorGet(`${V}/Content/Summaries/Of/Parts`), q) });
-    if (action === "maintenance") return json({ services: await motorMaintenance(V) });
+    if (action === "maintenance") return json({ services: await motorMaintenance(V, String(body.engineId || "")) });
     if (action === "filters") return json(await motorFilters(V));
     if (action === "content") {
       const type = String(body.type || "");

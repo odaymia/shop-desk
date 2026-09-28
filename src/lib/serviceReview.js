@@ -58,20 +58,36 @@ export const activeIntervals = (intervals) => (intervals || []).filter((s) => s 
        screen can show store vs manufacturer side by side.
    Each row carries storeMiles/Months, motorMiles/Months, the effective
    miles/months (used for due/done), and a source tag. Pure. */
-export function mergeMotorIntervals(intervals, motorServices, mode = "both") {
-  const svcs = (motorServices || []).filter((m) => m && m.name && (num(m.miles) > 0 || num(m.months) > 0));
-  const rank = (name) => (/replace|service|flush|exchange|change|drain/i.test(name) ? 2 : /inspect/i.test(name) ? 0 : 1);
+export function mergeMotorIntervals(intervals, motorServices, mode = "both", severity = "normal") {
+  const severe = severity === "severe";
+  /* each MOTOR service at the chosen schedule: the normal-driving interval,
+     or (severe) the severe-service one where MOTOR lists it. A severe-only
+     item (inspect the air filter every 5,000 mi on dusty roads) has no
+     normal interval and drops out of a normal schedule. */
+  const svcs = (motorServices || [])
+    .map((m) => {
+      const miles = severe ? num(m.severeMiles) || num(m.miles) : num(m.miles);
+      const months = severe ? num(m.severeMonths) || num(m.months) : num(m.months);
+      return m && m.name ? { ...m, miles, months } : null;
+    })
+    .filter((m) => m && (m.miles > 0 || m.months > 0));
+  const isInspect = (m) => /inspect/i.test(m.serviceType || "") || (!m.serviceType && /inspect/i.test(m.name));
+  const rank = (m) => (isInspect(m) ? 0 : /replace|service|flush|exchange|change|drain/i.test(`${m.serviceType || ""} ${m.name}`) ? 2 : 1);
+  const haveMotor = (motorServices || []).length > 0 && mode !== "store";
   let matched = 0;
   const merged = (intervals || []).map((svc) => {
     const storeMiles = num(svc.miles);
     const storeMonths = num(svc.months);
     const keys = (svc.motorKeys || []).map((k) => k.toLowerCase());
     const cands = mode === "store" ? [] : svcs.filter((m) => keys.some((k) => m.name.toLowerCase().includes(k)));
-    cands.sort((a, b) => rank(b.name) - rank(a.name) || num(a.miles) - num(b.miles));
-    const m = cands[0] || null;
-    const motorMiles = m ? num(m.miles) : 0;
-    const motorMonths = m ? num(m.months) : 0;
-    const useMotor = mode !== "store" && m && (motorMiles > 0 || motorMonths > 0);
+    cands.sort((a, b) => rank(b) - rank(a) || a.miles - b.miles);
+    /* the replace/service interval decides "due"; an inspect-only match
+       becomes a note ("inspect every 15,000 mi"), not the due date */
+    const m = cands.find((c) => !isInspect(c)) || null;
+    const insp = cands.find(isInspect) || null;
+    const motorMiles = m ? m.miles : 0;
+    const motorMonths = m ? m.months : 0;
+    const useMotor = !!m && mode !== "store";
     if (useMotor) matched += 1;
     return {
       ...svc,
@@ -80,12 +96,17 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both") {
       motorMiles,
       motorMonths,
       motorName: m ? m.name : "",
+      motorInspectMiles: insp ? insp.miles : 0,
+      motorInspectMonths: insp ? insp.months : 0,
+      /* MOTOR answered for this car but lists no replacement for this
+         service (a lifetime fluid, say): the store interval stands in */
+      noFactory: haveMotor && !m && keys.length > 0,
       miles: useMotor ? motorMiles || storeMiles : storeMiles,
       months: useMotor ? motorMonths || storeMonths : storeMonths,
       source: useMotor ? "MOTOR" : "store",
     };
   });
-  return { intervals: merged, source: matched && mode !== "store" ? "MOTOR" : "store", matched, mode };
+  return { intervals: merged, source: matched && mode !== "store" ? "MOTOR" : "store", matched, mode, severity: severe ? "severe" : "normal" };
 }
 
 /* Tidy an edited interval table for saving (Settings). */
