@@ -250,12 +250,20 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [motorModel && motorModel.id]);
   const az = (list) => [...list].sort((a, b) => String(a).localeCompare(String(b)));
+  /* makes and models: MOTOR's plus the shop's and Valvoline's, A–Z, so a
+     make MOTOR doesn't carry (the sandbox has only a handful) still shows */
   const makeOptions = useMemo(
-    () => (mm.on ? az(mm.makes.map((m) => m.name)) : az(mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []))),
+    () => az(mergeOpts(mm.on ? mm.makes.map((m) => m.name) : [], mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []))),
     [mm.on, mm.makes, ymme, d.year, vv]
   );
   const modelOptions = useMemo(
-    () => (motorMake && mm.models.length ? az(mm.models.map((m) => m.name)) : az(mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : []))),
+    () =>
+      az(
+        mergeOpts(
+          motorMake ? mm.models.map((m) => m.name) : [],
+          mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : [])
+        )
+      ),
     [motorMake, mm.models, ymme, d.year, d.make, vv]
   );
   /* MOTOR's engines only, when it knows the car; otherwise Valvoline's
