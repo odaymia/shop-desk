@@ -51,8 +51,8 @@ const SAMPLE_FILTERS = {
     { type: "oil", engineId: "3476", position: "", label: "", numbers: ["VO-106"] },
     { type: "air", engineId: "3476", position: "", label: "", numbers: ["CA10467"] },
     { type: "cabin", engineId: "3476", position: "", label: "", numbers: ["CF10285"] },
-    { type: "wiper", engineId: "3476", position: "Front Left", label: "Beam Blade", numbers: ["VB-26"] },
-    { type: "wiper", engineId: "3476", position: "Front Right", label: "Beam Blade", numbers: ["VB-19"] },
+    { type: "wiper", engineId: "3476", position: "Front Left", label: "Beam Blade", numbers: ["VB-26"], items: [{ number: "VB-26", notes: ["22 in.", "Arm Connector: Hook 9x3"] }] },
+    { type: "wiper", engineId: "3476", position: "Front Right", label: "Beam Blade", numbers: ["VB-19"], items: [{ number: "VB-19", notes: ["19 in.", "Arm Connector: Hook 9x3"] }] },
   ],
 };
 

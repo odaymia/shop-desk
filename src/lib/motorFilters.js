@@ -7,6 +7,44 @@
 
 const num = (s) => String(s || "").trim();
 
+/* A wiper's size and fit from MOTOR's notes: "24 in." → size 24,
+   "Arm Connector: Hook 9x3" → connector, "Original (OEM): Hybrid" → the
+   blade style the car came with. */
+export function wiperNotes(notes) {
+  const out = {};
+  for (const t of notes || []) {
+    const s = String(t || "").trim();
+    const size = s.match(/^(\d{1,2}(?:\.\d)?)\s*(?:in\.?|inch(?:es)?|")$/i) || s.match(/\b(\d{1,2}(?:\.\d)?)\s*(?:in\.?|inch(?:es)?|")(?=\s|$)/i);
+    if (size && !out.size) out.size = size[1];
+    const conn = s.match(/arm connector:\s*(.+)/i);
+    if (conn) out.connector = conn[1].trim();
+    const oem = s.match(/original \(oem\):\s*(.+)/i);
+    if (oem) out.oemStyle = oem[1].trim();
+  }
+  return out;
+}
+
+/* The wiper sizes a car takes, one per side: { Driver: "24", Passenger: "19" }. */
+export function wiperSizes(spec) {
+  const out = {};
+  for (const w of (spec && spec.wipers) || []) if (w.size && !out[w.side || "Blade"]) out[w.side || "Blade"] = w.size;
+  return out;
+}
+
+/* Wiper blades in inventory that are one of these sizes, whatever the
+   brand: the size read from the part number ("WB-24", "VB24") or the
+   description ("Wiper blade 24\"", "24 in"). */
+export function wipersBySize(parts, sizes) {
+  const want = new Set((sizes || []).map((x) => String(Number(x))));
+  if (!want.size) return [];
+  const sizeOf = (p) => {
+    const t = `${p.description || ""} ${p.number || ""}`;
+    const m = t.match(/\b(\d{2})(?:\.\d)?\s*(?:in\b|inch|")/i) || String(p.number || "").match(/(\d{2})(?!\d)/);
+    return m ? String(Number(m[1])) : "";
+  };
+  return Object.values(parts || {}).filter((p) => p && p.active !== false && /wiper/i.test(`${p.category || ""} ${p.description || ""}`) && want.has(sizeOf(p)));
+}
+
 /* Which MOTOR engine this car has: the id the VIN decode gave, else the
    one whose displacement and cylinder count match the car's engine text
    ("3.5L V6"), else the only one there is. Null when it can't tell. */
@@ -48,11 +86,15 @@ export function specFromMotorFilters(result, engineId) {
     return out;
   };
   const wipers = [];
-  for (const p of parts.filter((x) => x.type === "wiper"))
-    for (const n of p.numbers || []) {
-      const side = /left/i.test(p.position) ? "Driver" : /right/i.test(p.position) ? "Passenger" : /rear/i.test(p.position) ? "Rear" : p.position || "";
-      if (!wipers.some((w) => w.number === num(n) && w.side === side)) wipers.push({ side, kind: p.label || "", number: num(n) });
+  for (const p of parts.filter((x) => x.type === "wiper")) {
+    const side = /left/i.test(p.position) ? "Driver" : /right/i.test(p.position) ? "Passenger" : /rear/i.test(p.position) ? "Rear" : p.position || "";
+    const items = p.items && p.items.length ? p.items : (p.numbers || []).map((n) => ({ number: n, notes: [] }));
+    for (const it of items) {
+      const n = num(it.number);
+      if (!n || wipers.some((w) => w.number === n && w.side === side)) continue;
+      wipers.push({ side, kind: p.label || "", number: n, ...wiperNotes(it.notes) });
     }
+  }
   /* types MOTOR lists only as "NS": no part to sell */
   const notServiceable = {};
   for (const t of ["oil", "air", "cabin", "fuel"]) {
@@ -75,7 +117,8 @@ export function mergeMotorFilters(spec, found) {
     airFilters: add(spec.airFilters, found.airFilters),
     cabinFilters: add(spec.cabinFilters, found.cabinFilters),
     fuelFilters: add(spec.fuelFilters, found.fuelFilters),
-    wipers: (spec.wipers && spec.wipers.length ? spec.wipers : found.wipers) || [],
+    /* a fresh MOTOR answer replaces the wiper list (it carries sizes) */
+    wipers: (found.wipers && found.wipers.length ? found.wipers : spec.wipers) || [],
     notServiceable: { ...(spec.notServiceable || {}), ...(found.notServiceable || {}) },
     motorFiltersAt: Date.now(),
   };

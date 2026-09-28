@@ -88,3 +88,34 @@ test("engine from a VIN-decode style engine text, gas over hybrid", () => {
   assert.equal(pickEngine(cam, { engineText: "2.4L" }), "b");
   assert.equal(pickEngine(cam, { engineText: "2.4L Hybrid" }), "h");
 });
+
+import { wiperNotes, wiperSizes, wipersBySize } from "../src/lib/motorFilters.js";
+
+test("wiper size, arm and style come from MOTOR's notes (2010 Camry 2.5L)", () => {
+  assert.deepEqual(wiperNotes(["Original (OEM): Hybrid", "Arm Connector: Hook 9x3", "24 in."]), { oemStyle: "Hybrid", connector: "Hook 9x3", size: "24" });
+  const s = specFromMotorFilters(
+    {
+      parts: [
+        { type: "wiper", engineId: "10182", position: "Front Left", label: "Standard Blade", numbers: ["836454"], items: [{ number: "836454", notes: ["Original (OEM): Hybrid", "Arm Connector: Hook 9x3", "24 in."] }] },
+        { type: "wiper", engineId: "10182", position: "Front Right", label: "Standard Blade", numbers: ["836451"], items: [{ number: "836451", notes: ["19 in."] }] },
+        { type: "wiper", engineId: "10182", position: "Front Left", label: "Beam Blade", numbers: ["836538"], items: [{ number: "836538", notes: ["24 in."] }] },
+      ],
+    },
+    "10182"
+  );
+  assert.deepEqual(wiperSizes(s), { Driver: "24", Passenger: "19" });
+  assert.equal(s.wipers[0].connector, "Hook 9x3");
+  // a new lookup replaces wipers saved before sizes were read
+  assert.equal(mergeMotorFilters({ wipers: [{ side: "Driver", number: "836454" }] }, s).wipers[0].size, "24");
+});
+
+test("any brand of blade in stock matches by size", () => {
+  const parts = {
+    a: { id: "a", number: "WB-24", description: "Wiper blade", category: "Wipers" },
+    b: { id: "b", number: "RX-19B", description: "Rain-X Latitude 19\"", category: "Wipers" },
+    c: { id: "c", number: "WB-22", description: "Wiper blade 22\"", category: "Wipers" },
+    d: { id: "d", number: "CA10467", description: "Engine air filter 24", category: "Filters" },
+  };
+  assert.deepEqual(wipersBySize(parts, ["24", "19"]).map((p) => p.id).sort(), ["a", "b"]);
+  assert.deepEqual(wipersBySize(parts, []), []);
+});

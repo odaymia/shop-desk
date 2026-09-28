@@ -181,7 +181,18 @@ async function motorFilters(V: string) {
   wanted.forEach((a, i) => {
     const d = details[i];
     const papp = d ? arr(((d.Body as Rec) || {}).Parts)[0] || {} : {};
-    const numbers = arr(papp.Items).map((it) => String(it.PartNumber || "").trim()).filter(Boolean);
+    /* each part number with its notes: wipers carry the size ("24 in."),
+       the arm connector ("Arm Connector: Hook 9x3") and the original
+       blade style ("Original (OEM): Hybrid") there */
+    const items = arr(papp.Items)
+      .map((it) => {
+        const part = (it.Part as Rec) || it;
+        const noteBox = (part.Notes as Rec) || {};
+        const notes = arr(noteBox.Note || part.Notes).map((n) => String(n.Text || "").trim()).filter(Boolean);
+        return { number: String(part.PartNumber || "").trim(), notes };
+      })
+      .filter((x) => x.number);
+    const numbers = items.map((x) => x.number);
     if (!numbers.length) return;
     const name = String(((a.PCDBPart as Rec) || {}).PartTerminologyName || a.DisplayName || "");
     parts.push({
@@ -191,6 +202,7 @@ async function motorFilters(V: string) {
       position: ((a.Position as Rec) || {}).Name || "",
       label: a.ManufacturerLabel || "",
       numbers,
+      items,
     });
   });
   return {
@@ -262,8 +274,8 @@ const SAMPLE_FILTERS = {
     { type: "oil", name: "Engine Oil Filter", engineId: "3476", position: "", label: "", numbers: ["VO-106"] },
     { type: "air", name: "Engine Air Filter", engineId: "3476", position: "", label: "", numbers: ["CA10467"] },
     { type: "cabin", name: "Cabin Air Filter", engineId: "3476", position: "", label: "", numbers: ["CF10285"] },
-    { type: "wiper", name: "Wiper Blade", engineId: "3476", position: "Front Left", label: "Beam Blade", numbers: ["VB-26"] },
-    { type: "wiper", name: "Wiper Blade", engineId: "3476", position: "Front Right", label: "Beam Blade", numbers: ["VB-19"] },
+    { type: "wiper", name: "Wiper Blade", engineId: "3476", position: "Front Left", label: "Beam Blade", numbers: ["VB-26"], items: [{ number: "VB-26", notes: ["26 in.", "Arm Connector: Hook 9x3"] }] },
+    { type: "wiper", name: "Wiper Blade", engineId: "3476", position: "Front Right", label: "Beam Blade", numbers: ["VB-19"], items: [{ number: "VB-19", notes: ["19 in.", "Arm Connector: Hook 9x3"] }] },
   ],
 };
 const SAMPLE_LABOR = [

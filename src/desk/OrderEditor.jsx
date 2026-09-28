@@ -44,7 +44,7 @@ import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
 import { findSpec, matchOil, matchFilter, blankSpec } from "../lib/specs.js";
 import { motorVehicleFor, motorFilters } from "../lib/motor.js";
-import { pickEngine, specFromMotorFilters, mergeMotorFilters, specNumbersFor, isNotServiceable } from "../lib/motorFilters.js";
+import { pickEngine, specFromMotorFilters, mergeMotorFilters, specNumbersFor, isNotServiceable, wiperSizes, wipersBySize } from "../lib/motorFilters.js";
 import { loadValvolineSpecs, findValvolineSpec } from "../lib/valvolineSpecs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
@@ -1445,7 +1445,16 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
         <PartPicker
           shop={shop}
           category={partCat}
-          suggested={partCat ? matchFilter(shop.parts, specNumbersFor(shopSpec, partCat)) : []}
+          suggested={
+            partCat
+              ? [
+                  ...new Set([
+                    ...matchFilter(shop.parts, specNumbersFor(shopSpec, partCat)),
+                    ...(/wiper/i.test(partCat) ? wipersBySize(shop.parts, Object.values(wiperSizes(shopSpec))) : []),
+                  ]),
+                ]
+              : []
+          }
           onClose={() => setPick(null)}
           onPick={(p) => {
             addLine("part", {
@@ -2406,11 +2415,23 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd, onMotor,
         {(sp.wipers || []).length > 0 && (
           <div>
             <span>Wiper blades</span>
-            {sp.wipers.map((w, i) => (
-              <em key={i}>
-                {[w.side, w.number, w.kind].filter(Boolean).join(" · ")}
-              </em>
-            ))}
+            {Object.keys(wiperSizes(sp)).length ? (
+              <strong>
+                {Object.entries(wiperSizes(sp))
+                  .map(([side, size]) => `${side} ${size}"`)
+                  .join(" · ")}
+              </strong>
+            ) : null}
+            {(() => {
+              const w = sp.wipers.find((x) => x.connector || x.oemStyle);
+              return w ? <em>{[w.oemStyle ? `Came with: ${w.oemStyle} blades` : "", w.connector ? `Arm: ${w.connector}` : ""].filter(Boolean).join(" · ")}</em> : null;
+            })()}
+            {wipersBySize(shop.parts, Object.values(wiperSizes(sp))).length ? (
+              <em className="ok">Stocked: {wipersBySize(shop.parts, Object.values(wiperSizes(sp))).map((p) => p.number || p.description).join(", ")}</em>
+            ) : null}
+            <em className="muted" style={{ fontSize: 11 }}>
+              {sp.wipers.map((w) => [w.side, w.size ? `${w.size}"` : "", w.kind, `#${w.number}`].filter(Boolean).join(" ")).join(" · ")}
+            </em>
           </div>
         )}
       </div>
