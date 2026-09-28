@@ -68,6 +68,7 @@ function sampleData() {
   const parts = [
     { id: "dp_oil_conv", number: "VAL-CN-5W30", description: "Valvoline Conventional 5W-30", category: "Oil", oilType: "conventional", packType: "case", packSize: 6, cost: 3.2, price: 6.99, onHand: 44, reorderAt: 24 },
     { id: "dp_oil_syn", number: "VAL-FS-5W30", description: "Valvoline Full Synthetic 5W-30", category: "Oil", oilType: "synthetic", packType: "box", packSize: 5, cost: 4.6, price: 9.99, onHand: 28, reorderAt: 20 },
+    { id: "dp_oil_syn020", number: "VAL-FS-0W20", description: "Valvoline Full Synthetic 0W-20", category: "Oil", oilType: "synthetic", packType: "box", packSize: 5, cost: 4.8, price: 9.99, onHand: 30, reorderAt: 20 },
     { id: "dp_oil_euro", number: "VAL-EU-5W40", description: "Valvoline European Full Synthetic 5W-40", category: "Oil", oilType: "euro", packType: "case", packSize: 6, cost: 6.1, price: 12.99, onHand: 12, reorderAt: 12 },
     { id: "dp_of1", number: "VO106", description: "Engine oil filter", category: "Filters", cost: 2.1, price: 6.99, onHand: 26, reorderAt: 15 },
     { id: "dp_of_can", number: "CH10060", description: "Canister oil filter", category: "Filters", cost: 6.2, price: 13.99, onHand: 6, reorderAt: 6, surcharge: 15, surchargeLabel: "Canister filter charge" },

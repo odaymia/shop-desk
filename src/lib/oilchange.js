@@ -1,6 +1,7 @@
 /* Oil change packages: a menu price that includes so many quarts, the
    filter, and a fluid check, with a per-quart charge past that. Pure. */
 import { round2 } from "./invoice.js";
+import { normalizeViscosity } from "./specs.js";
 
 export const DEFAULT_OIL_PACKAGES = [
   { id: "conv", name: "Valvoline Conventional Oil Change", price: 54.99, quarts: 5, extraQuart: 4.99, details: "Includes up to 5 quarts of Valvoline conventional oil, oil filter, fluid inspection and top-off." },
@@ -188,6 +189,37 @@ export function oilsForPackage(oils, pkg) {
     if (!ok) return true; // a generic package with no type takes any oil
     return ok.includes(oilTypeOf(p));
   });
+}
+
+/* Which oil change packages fit this car, for the package step: a package
+   is recommended when it carries an oil in the car's grade that's in
+   inventory, and its oil type suits the car. A 0W grade calls for
+   synthetic (so not conventional or blend), a European approval in the
+   spec calls for a European or synthetic package, and a diesel engine for
+   a diesel package. → { ids: Set, grade, inGrade: { pkgId: [oils] } }.
+   No grade on file → nothing is recommended. */
+export function recommendedPackages(pkgs, oils, spec) {
+  const grade = normalizeViscosity((spec && spec.oilViscosity) || "");
+  const out = { ids: new Set(), grade, inGrade: {} };
+  if (!grade) return out;
+  const re = new RegExp(`\\b${grade.replace("-", "-?")}\\b`, "i");
+  const graded = (oils || []).filter((p) => re.test(String(p.description || "")));
+  const euro = /\b(VW|MB|BMW|PORSCHE|ACEA|LL-0)/i.test(String((spec && spec.oilSpec) || ""));
+  const diesel = /diesel/i.test(String((spec && spec.engine) || ""));
+  const synthOnly = /^0W/i.test(grade);
+  for (const k of pkgs || []) {
+    if (!k || k.active === false) continue;
+    const t = packageOilType(k);
+    if (diesel ? t !== "diesel" : t === "diesel") continue;
+    if (euro && t && !["euro", "synthetic"].includes(t)) continue;
+    if (synthOnly && (t === "conventional" || t === "blend")) continue;
+    const fit = oilsForPackage(graded, k);
+    if (fit.length) {
+      out.ids.add(k.id);
+      out.inGrade[k.id] = fit;
+    }
+  }
+  return out;
 }
 
 /* The packages an oil shows in right now: its own list when it has one,

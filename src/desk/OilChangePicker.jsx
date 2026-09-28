@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal, Money, toNum, Field } from "./ui.jsx";
-import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType } from "../lib/oilchange.js";
+import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType, recommendedPackages } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
 import { OilSpecLookup } from "./OilSpecLookup.jsx";
 import { uid } from "../lib/ids.js";
@@ -51,12 +51,12 @@ function PickList({ items, suggested, onPick, kind }) {
           <li className="emptyNote">{q ? "No match in inventory." : `Nothing in inventory yet that looks like ${kind}. Add it under Inventory, or choose later.`}</li>
         )}
         {list.map((p) => (
-          <li key={p.id} className={toNum(p.onHand) <= 0 ? "low" : ""} onClick={() => onPick(p)}>
+          <li key={p.id} className={[toNum(p.onHand) <= 0 ? "low" : "", suggested.includes(p) ? "rec" : ""].join(" ")} onClick={() => onPick(p)}>
             <div className="main">
               <strong>
+                {suggested.includes(p) ? <span className="recBadge">✓ Recommended</span> : null}
                 {p.number ? `${p.number} — ` : ""}
                 {p.description}
-                {suggested.includes(p) ? " · matches the spec" : ""}
               </strong>
               <span>{[p.category, p.location].filter(Boolean).join(" · ")}</span>
             </div>
@@ -103,21 +103,37 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
       />
     );
 
-  if (step === "package")
+  if (step === "package") {
+    /* packages that fit the car's recommended oil go first, in green */
+    const rec = recommendedPackages(packages, oils, { ...(spec || {}), oilViscosity: grade });
+    const ordered = [...packages.filter((p) => rec.ids.has(p.id)), ...packages.filter((p) => !rec.ids.has(p.id))];
     return (
       <Modal title="Oil change" onClose={onClose} size="wide">
         {packages.length === 0 && <p className="muted">No oil change packages yet. Add them under Settings → Oil change menu.</p>}
+        {packages.length > 0 && (
+          <p className="muted" style={{ marginTop: 0 }}>
+            {rec.grade
+              ? rec.ids.size
+                ? `This car takes ${rec.grade}${spec && spec.oilCapacityQt ? `, ${spec.oilCapacityQt} qt` : ""}. The packages in green have ${rec.grade} on the shelf.`
+                : `This car takes ${rec.grade}. No package has ${rec.grade} in inventory right now.`
+              : "No oil grade on file for this car. Look it up on the next step, or check the cap."}
+          </p>
+        )}
         <ul className="pickList">
-          {packages.map((p) => (
+          {ordered.map((p) => (
             <li
               key={p.id}
+              className={rec.ids.has(p.id) ? "rec" : ""}
               onClick={() => {
                 setPkg(p);
                 setStep("quarts");
               }}
             >
               <div className="main">
-                <strong>{p.name}</strong>
+                <strong>
+                  {rec.ids.has(p.id) ? <span className="recBadge">✓ Recommended</span> : null}
+                  {p.name}
+                </strong>
                 <span>
                   Up to {p.quarts} qt, then <Money v={p.extraQuart} /> per quart{p.details ? ` · ${p.details}` : ""}
                 </span>
@@ -133,6 +149,7 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
         </ul>
       </Modal>
     );
+  }
 
   if (step === "quarts")
     return (

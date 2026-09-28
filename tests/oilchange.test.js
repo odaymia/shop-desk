@@ -225,3 +225,31 @@ test("matching oils to packages from one grid", () => {
   assert.deepEqual(none, ["none"]);
   assert.deepEqual(oilPackagesOf({ ...syn, packages: none }, pkgs).ids, []);
 });
+
+import { recommendedPackages } from "../src/lib/oilchange.js";
+
+test("packages that fit the car's recommended oil", () => {
+  const pkgs = [
+    { id: "conv", name: "Conventional Oil Change" },
+    { id: "blend", name: "Synthetic Blend Oil Change" },
+    { id: "maxlife", name: "MaxLife High Mileage Oil Change" },
+    { id: "syn", name: "Full Synthetic Oil Change" },
+    { id: "euro", name: "European Synthetic Oil Change" },
+    { id: "dsl", name: "Diesel Oil Change" },
+  ];
+  const oils = [
+    { id: "c530", description: "Valvoline Conventional 5W-30", oilType: "conventional" },
+    { id: "s530", description: "Valvoline Full Synthetic 5W30", oilType: "synthetic" },
+    { id: "s020", description: "Valvoline Full Synthetic 0W-20", oilType: "synthetic" },
+    { id: "b020", description: "Valvoline Synthetic Blend 0W-20", oilType: "blend" },
+    { id: "e540", description: "Valvoline European 5W-40", oilType: "euro" },
+    { id: "d1540", description: "Premium Blue 15W-40", oilType: "diesel" },
+  ];
+  const ids = (spec) => [...recommendedPackages(pkgs, oils, spec).ids];
+  assert.deepEqual(ids({ oilViscosity: "5W-30" }), ["conv", "maxlife", "syn"]);
+  assert.deepEqual(ids({ oilViscosity: "0w20" }), ["maxlife", "syn"]); // 0W: synthetic only, no blend or conventional
+  assert.deepEqual(ids({ oilViscosity: "5W-40", oilSpec: "VW 502 00" }), ["syn", "euro"]); // the synthetic package sells the European oil too
+  assert.deepEqual(ids({ oilViscosity: "15W-40", engine: "6.7L Diesel" }), ["dsl"]);
+  assert.deepEqual(ids({ oilViscosity: "" }), []);
+  assert.deepEqual(ids({ oilViscosity: "0W-16" }), []); // nothing in stock in that grade
+});
