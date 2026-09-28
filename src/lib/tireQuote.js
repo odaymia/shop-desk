@@ -8,17 +8,29 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* What a shop can put on a tire sale besides the tires. `per` is "tire"
    (multiplies by the count) or "ticket" (once). `on` = ticked by default.
-   Shops change prices and add their own under Settings → Departments &
+   `mode` "percent" prices it as a percent of the tire's price (`price` is
+   then the percent: road hazard at 15% of a $100 tire is $15 a tire).
+   `details` prints under the line on the estimate, the signing screen, and
+   the invoice. Shops change all of it under Settings → Departments &
    signatures → Tire quote add-ons. */
 export const DEFAULT_TIRE_ADDONS = [
-  { id: "mount", label: "Mount, balance & disposal", kind: "labor", per: "tire", price: 25, on: true },
-  { id: "catire", label: "CA tire fee", kind: "fee", per: "tire", price: 1.75, on: true, note: "State fee on every new tire sold in California" },
-  { id: "stems", label: "New valve stems", kind: "part", per: "tire", price: 4, on: false },
-  { id: "hazard", label: "Road hazard warranty", kind: "fee", per: "tire", price: 15, on: false, note: "Covers flats and road damage" },
-  { id: "tpms", label: "TPMS sensor", kind: "part", per: "tire", price: 55, on: false },
-  { id: "tpmskit", label: "TPMS service kit", kind: "part", per: "tire", price: 8, on: false, note: "New seals and nuts for the existing sensors" },
-  { id: "align", label: "4-wheel alignment", kind: "labor", per: "ticket", price: 99.99, on: false },
-  { id: "nitrogen", label: "Nitrogen fill", kind: "fee", per: "tire", price: 5, on: false },
+  { id: "mount", label: "Mount, balance & disposal", kind: "labor", per: "tire", price: 25, on: true, details: "" },
+  { id: "catire", label: "CA tire fee", kind: "fee", per: "tire", price: 1.75, on: true, details: "California tire fee, charged on every new tire sold." },
+  { id: "stems", label: "New valve stems", kind: "part", per: "tire", price: 4, on: false, details: "" },
+  {
+    id: "hazard",
+    label: "Road hazard warranty",
+    kind: "fee",
+    per: "tire",
+    mode: "percent",
+    price: 15,
+    on: false,
+    details: "Covers repair or replacement of a covered tire damaged by a road hazard (nails, glass, potholes) under normal driving. Keep this invoice as proof of purchase. See the warranty terms for coverage and limits.",
+  },
+  { id: "tpms", label: "TPMS sensor", kind: "part", per: "tire", price: 55, on: false, details: "" },
+  { id: "tpmskit", label: "TPMS service kit", kind: "part", per: "tire", price: 8, on: false, details: "New seals and nuts for the existing tire pressure sensors." },
+  { id: "align", label: "4-wheel alignment", kind: "labor", per: "ticket", price: 99.99, on: false, details: "" },
+  { id: "nitrogen", label: "Nitrogen fill", kind: "fee", per: "tire", price: 5, on: false, details: "" },
 ];
 /* the shop's own list once it has saved one (even an empty one) */
 export const tireAddOns = (cfg) => (cfg && Array.isArray(cfg.tireAddOns) ? cfg.tireAddOns : DEFAULT_TIRE_ADDONS);
@@ -92,14 +104,33 @@ export function tireQuoteLines({ tire, size, count, picked, cfg, id }) {
     });
   }
   for (const a of picked || []) {
-    const qty = a.per === "ticket" ? 1 : n;
-    const price = round2(num(a.price));
-    const base = { id: id(), job, description: a.label, taxable: a.taxable === true || a.taxable === false ? a.taxable : null };
-    if (a.kind === "labor") lines.push({ ...base, kind: "labor", details: "", hours: qty, rate: price, unit: a.per === "ticket" ? "service" : "tire", techId: null });
+    const { qty, price } = addOnCharge(a, tire, n);
+    const details = String(a.details || a.note || "").trim();
+    const base = { id: id(), job, description: a.label, details, taxable: a.taxable === true || a.taxable === false ? a.taxable : null };
+    if (a.kind === "labor") lines.push({ ...base, kind: "labor", hours: qty, rate: price, unit: a.per === "ticket" ? "service" : "tire", techId: null });
     else if (a.kind === "part") lines.push({ ...base, kind: "part", partId: a.partId || null, number: a.number || "", qty, price, cost: round2(num(a.cost)), condition: "new" });
     else lines.push({ ...base, kind: "fee", qty, price });
   }
   return { job, lines };
+}
+
+/* An add-on's charge for this quote: { qty, price } where price is each.
+   A percent add-on is that percent of the tire's price, per tire (or of
+   all the tires together when it's charged once). */
+export function addOnCharge(a, tire, count) {
+  const n = Math.max(1, Math.round(num(count)) || 1);
+  const qty = a.per === "ticket" ? 1 : n;
+  if (a.mode === "percent") {
+    const tirePrice = num(tire && tire.price);
+    const each = a.per === "ticket" ? tirePrice * n : tirePrice;
+    return { qty, price: round2((each * num(a.price)) / 100) };
+  }
+  return { qty, price: round2(num(a.price)) };
+}
+/* How an add-on's price reads: "$25.00 per tire", "15% of the tire". */
+export function addOnPriceText(a) {
+  if (a.mode === "percent") return `${num(a.price)}% of the tire${a.per === "ticket" ? "s" : ""}`;
+  return `$${num(a.price).toFixed(2)} ${a.per === "ticket" ? "once" : "per tire"}`;
 }
 
 /* Quick math for the screen before anything is on the ticket. */

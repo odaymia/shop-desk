@@ -148,6 +148,7 @@ function LineRows({ order }) {
                     {l.description}
                     {l.kind === "part" ? <span className="muted"> ({conditionLabel(l.condition)})</span> : null}
                     {l.kind === "labor" ? <span className="muted"> · {laborQtyText(l)}</span> : l.qty > 1 ? <span className="muted"> · {l.qty}</span> : null}
+                    {l.details ? <div className="muted" style={{ fontSize: 12, marginTop: 2, whiteSpace: "pre-wrap" }}>{l.details}</div> : null}
                   </td>
                   <td className="r">{l.kind === "discount" ? `-${fmtMoney(lineAmount(l))}` : fmtMoney(lineAmount(l))}</td>
                 </tr>

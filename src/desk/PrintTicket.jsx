@@ -345,7 +345,7 @@ function LineRow({ l, shop, cfg, compact }) {
         {l.kind === "part" ? <span style={{ color: "#555" }}> ({conditionLabel(l.condition)})</span> : null}
         {vendor ? <span style={{ color: "#777" }}> · Sublet to {vendor.name}{vendor.city ? `, ${vendor.city}` : ""}</span> : null}
         {epaId ? <span style={{ color: "#777" }}> · EPA ID {epaId}</span> : null}
-        {l.kind === "labor" && l.details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{l.details}</div> : null}
+        {l.kind !== "note" && l.details ? <div style={{ color: "#444", fontSize: 11, marginTop: 2, whiteSpace: "pre-wrap" }}>{l.details}</div> : null}
       </td>
       <td className="r">{l.kind === "labor" ? laborQtyText(l) : l.kind === "note" ? "" : l.qty}</td>
       <td className="r">{l.kind === "labor" ? fmtMoney(l.rate) : l.kind === "note" ? "" : fmtMoney(l.price)}</td>

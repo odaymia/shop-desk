@@ -1786,6 +1786,11 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
                     className="details"
                   />
                 </div>
+              ) : l.details ? (
+                <div className="laborCell">
+                  <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="Description" readOnly={locked} />
+                  <input value={l.details} onChange={(e) => set({ details: e.target.value })} placeholder="Details (print under the line)" readOnly={locked} className="details" />
+                </div>
               ) : (
                 <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="Description" readOnly={locked} />
               )}

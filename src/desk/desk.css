@@ -819,3 +819,9 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .tqTotals div { display:flex; justify-content:space-between; }
 .tqTotals .grand { border-top:1px solid var(--line); padding-top:8px; margin-top:4px; font-size:20px; font-weight:800; }
 @media (max-width: 600px) { .tqAddOn { grid-template-columns:24px 1fr; } .tqAddPrice, .tqAddTotal { grid-column:2; text-align:left; } }
+.tqAddInfo { font-size:12px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.tqReview .tqAddInfo { -webkit-line-clamp:unset; display:block; }
+.tqSetList { display:flex; flex-direction:column; gap:10px; }
+.tqSetItem { border:1px solid var(--line); border-radius:10px; padding:8px; background:#fff; }
+.tqSetItem .miniLine { margin:0; }
+.tqSetDetails { margin-top:6px; min-height:0; font-size:13px; }

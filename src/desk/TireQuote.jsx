@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Modal, Money, toNum } from "./ui.jsx";
 import { vehicleName, ordersOf } from "./useShop.js";
 import { normalizeTireSize, isTireSize, tireName } from "../lib/tires.js";
-import { sizeForVehicle, tiresForSize, stockedSizes, tireAddOns, tireQuoteLines, quoteSubtotal } from "../lib/tireQuote.js";
+import { sizeForVehicle, tiresForSize, stockedSizes, tireAddOns, tireQuoteLines, quoteSubtotal, addOnCharge } from "../lib/tireQuote.js";
 import { orderTotals, fmtMoney } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 import { DistributorTires } from "./Tires.jsx";
@@ -198,20 +198,27 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
           <div className="tqAddOns">
             {addOnList.map((a) => {
               const st = picked[a.id] || { on: false, price: "" };
-              const qty = a.per === "ticket" ? 1 : count;
+              const pct = a.mode === "percent";
+              const ch = addOnCharge({ ...a, price: toNum(st.price) }, tire, count);
+              const info = a.details || a.note;
               return (
                 <label key={a.id} className={`tqAddOn ${st.on ? "on" : ""}`}>
                   <input type="checkbox" checked={st.on} onChange={(e) => setPicked((m) => ({ ...m, [a.id]: { ...st, on: e.target.checked } }))} />
                   <span className="tqAddLabel">
                     <strong>{a.label}</strong>
-                    {a.note ? <span className="muted">{a.note}</span> : null}
+                    {pct ? (
+                      <span className="muted">
+                        {fmtMoney(ch.price)} {a.per === "ticket" ? "for the set" : "a tire"} ({toNum(st.price)}% of {a.per === "ticket" ? "the tires" : fmtMoney(tire.price)})
+                      </span>
+                    ) : null}
+                    {info ? <span className="muted tqAddInfo">{info}</span> : null}
                   </span>
                   <span className="tqAddPrice" onClick={(e) => e.preventDefault()}>
-                    $
+                    {pct ? "" : "$"}
                     <input value={st.price} onChange={(e) => setPicked((m) => ({ ...m, [a.id]: { ...st, price: e.target.value } }))} inputMode="decimal" />
-                    <small>{a.per === "ticket" ? "once" : "per tire"}</small>
+                    <small>{pct ? `% ${a.per === "ticket" ? "once" : "per tire"}` : a.per === "ticket" ? "once" : "per tire"}</small>
                   </span>
-                  <span className="tqAddTotal">{st.on ? fmtMoney(qty * toNum(st.price)) : ""}</span>
+                  <span className="tqAddTotal">{st.on ? fmtMoney(ch.qty * ch.price) : ""}</span>
                 </label>
               );
             })}
@@ -233,7 +240,10 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
                 const each = l.kind === "labor" ? l.rate : l.price;
                 return (
                   <tr key={l.id}>
-                    <td>{l.description}</td>
+                    <td>
+                      {l.description}
+                      {l.details ? <div className="muted tqAddInfo">{l.details}</div> : null}
+                    </td>
                     <td className="r num">{qty}</td>
                     <td className="r num">
                       <Money v={each} />

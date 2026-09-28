@@ -552,34 +552,48 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           <h3 className="subhead" style={{ marginTop: 28 }}>Tire quote add-ons</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             What the tire quote offers after the tires. Ticked ones start checked. "Per tire" multiplies by the number of tires; "once" is one charge per
-            quote. Labor and fees aren't taxed; parts are (California rules, per your pricing settings).
+            quote. Price it in dollars, or as a percent of the tire's price (road hazard at 15% of a $100 tire is $15 a tire). The description prints
+            under the line on the estimate, the signing screen, and the invoice. Labor and fees aren't taxed; parts are.
           </p>
-          <div className="miniLines">
+          <div className="tqSetList">
             {tireAddOns(d).map((a, i, list) => {
               const put = (patch) => set("tireAddOns")(list.map((x, j) => (j === i ? { ...x, ...patch } : x)));
               return (
-                <div key={a.id || i} className="miniLine" style={{ gridTemplateColumns: "34px 1.6fr 90px 100px 90px 30px" }}>
-                  <input type="checkbox" checked={!!a.on} onChange={(e) => put({ on: e.target.checked })} title="Checked by default" />
-                  <input value={a.label || ""} onChange={(e) => put({ label: e.target.value })} placeholder="Lug nut locks" />
-                  <input value={a.price ?? ""} onChange={(e) => put({ price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="Price" />
-                  <select value={a.per || "tire"} onChange={(e) => put({ per: e.target.value })}>
-                    <option value="tire">Per tire</option>
-                    <option value="ticket">Once</option>
-                  </select>
-                  <select value={a.kind || "fee"} onChange={(e) => put({ kind: e.target.value })}>
-                    <option value="labor">Labor</option>
-                    <option value="part">Part</option>
-                    <option value="fee">Fee</option>
-                  </select>
-                  <button type="button" className="lineX" title="Remove" onClick={() => set("tireAddOns")(list.filter((_, j) => j !== i))}>
-                    ✕
-                  </button>
+                <div key={a.id || i} className="tqSetItem">
+                  <div className="miniLine" style={{ gridTemplateColumns: "34px 1.6fr 70px 90px 100px 90px 30px" }}>
+                    <input type="checkbox" checked={!!a.on} onChange={(e) => put({ on: e.target.checked })} title="Checked by default" />
+                    <input value={a.label || ""} onChange={(e) => put({ label: e.target.value })} placeholder="Lug nut locks" />
+                    <select value={a.mode === "percent" ? "percent" : "flat"} onChange={(e) => put({ mode: e.target.value === "percent" ? "percent" : undefined })} title="Dollars, or a percent of the tire's price">
+                      <option value="flat">$</option>
+                      <option value="percent">%</option>
+                    </select>
+                    <input value={a.price ?? ""} onChange={(e) => put({ price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder={a.mode === "percent" ? "15" : "Price"} />
+                    <select value={a.per || "tire"} onChange={(e) => put({ per: e.target.value })}>
+                      <option value="tire">Per tire</option>
+                      <option value="ticket">Once</option>
+                    </select>
+                    <select value={a.kind || "fee"} onChange={(e) => put({ kind: e.target.value })}>
+                      <option value="labor">Labor</option>
+                      <option value="part">Part</option>
+                      <option value="fee">Fee</option>
+                    </select>
+                    <button type="button" className="lineX" title="Remove" onClick={() => set("tireAddOns")(list.filter((_, j) => j !== i))}>
+                      ✕
+                    </button>
+                  </div>
+                  <textarea
+                    className="ta tqSetDetails"
+                    value={a.details ?? a.note ?? ""}
+                    onChange={(e) => put({ details: e.target.value, note: undefined })}
+                    placeholder="Description for the receipt (optional): what it covers, terms, how long it lasts"
+                    rows={2}
+                  />
                 </div>
               );
             })}
           </div>
           <div className="rowBtns" style={{ marginTop: 8 }}>
-            <button type="button" className="btn tiny" onClick={() => set("tireAddOns")([...tireAddOns(d), { id: "a" + Math.random().toString(36).slice(2, 7), label: "", price: "", per: "tire", kind: "fee", on: false }])}>
+            <button type="button" className="btn tiny" onClick={() => set("tireAddOns")([...tireAddOns(d), { id: "a" + Math.random().toString(36).slice(2, 7), label: "", price: "", per: "tire", kind: "fee", on: false, details: "" }])}>
               + Add-on
             </button>
             {Array.isArray(d.tireAddOns) && (
