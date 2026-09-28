@@ -44,6 +44,18 @@ const SAMPLE_CONTENT = {
   WiringDiagrams: ["Charging System", "Starting System", "Power Distribution"],
 };
 
+/* a made-up but realistic answer, numbers matching the demo shop's shelf */
+const SAMPLE_FILTERS = {
+  engines: [{ id: "3476", description: "3.5L V6 (J35Z2) GAS FI", liters: "3.5", cylinders: "6", code: "J35Z2" }],
+  parts: [
+    { type: "oil", engineId: "3476", position: "", label: "", numbers: ["VO-106"] },
+    { type: "air", engineId: "3476", position: "", label: "", numbers: ["CA10467"] },
+    { type: "cabin", engineId: "3476", position: "", label: "", numbers: ["CF10285"] },
+    { type: "wiper", engineId: "3476", position: "Front Left", label: "Beam Blade", numbers: ["VB-26"] },
+    { type: "wiper", engineId: "3476", position: "Front Right", label: "Beam Blade", numbers: ["VB-19"] },
+  ],
+};
+
 async function call(body) {
   try {
     return await cloud.invoke("motor", body);
@@ -54,6 +66,7 @@ async function call(body) {
     if (body.action === "fluids") return { fluids: SAMPLE_FLUIDS, sample: true };
     if (body.action === "parts") return { parts: [], sample: true };
     if (body.action === "maintenance") return { services: SAMPLE_MAINTENANCE, sample: true };
+    if (body.action === "filters") return { ...SAMPLE_FILTERS, sample: true };
     if (body.action === "content") return { items: (SAMPLE_CONTENT[body.type] || []).map((name) => ({ name, id: 0 })), sample: true };
     if (body.action === "content-detail") return { detail: { Note: "Sample — connect MOTOR to see the full detail for this item." }, sample: true };
     return { sample: true };
@@ -86,3 +99,8 @@ export const motorContent = (baseVehicleId, type) => call({ action: "content", b
 /* The detail for one content item. Returns { detail, sample } — the raw MOTOR
    record (engine/submodel block stripped), rendered generically by the panel. */
 export const motorContentDetail = (baseVehicleId, type, id) => call({ action: "content-detail", baseVehicleId, type, id });
+
+/* Filters and wiper blades for a vehicle from the Valvoline aftermarket
+   catalog, per engine. Returns { engines, parts: [{ type: oil|air|cabin|
+   fuel|wiper, engineId, position, label, numbers }], sample }. */
+export const motorFilters = (baseVehicleId) => call({ action: "filters", baseVehicleId });

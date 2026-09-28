@@ -42,7 +42,9 @@ import {
 } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
 import { CATALOGS, cartToLines } from "../lib/parts.js";
-import { findSpec, matchOil, matchFilter } from "../lib/specs.js";
+import { findSpec, matchOil, matchFilter, blankSpec } from "../lib/specs.js";
+import { motorVehicle, motorFilters } from "../lib/motor.js";
+import { pickEngine, specFromMotorFilters, mergeMotorFilters } from "../lib/motorFilters.js";
 import { loadValvolineSpecs, findValvolineSpec } from "../lib/valvolineSpecs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
@@ -100,6 +102,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   const [pick, setPick] = useState(null); // customer | part | job | pay | confirm
   const [combineWith, setCombineWith] = useState(null); // another open ticket for this car, to merge onto this receipt
   const [fullView, setFullView] = useState(false); // show every tool on a quick-lube ticket
+  const [motorBusy, setMotorBusy] = useState(false); // filters-from-MOTOR lookup running
   /* opened from the Cashier page: go straight to taking payment */
   useEffect(() => {
     if (autoPay) setPick("pay");
@@ -546,6 +549,38 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
 
   const writerName = (id) => (employees.find((e) => e.id === id) || {}).name;
 
+  /* filters and wipers from MOTOR (Valvoline catalog) onto the car's spec,
+     so the oil change picker can recommend the right filter */
+  const fillFromMotor = async () => {
+    if (!vehicle) return;
+    if (String(vehicle.vin || "").trim().length !== 17) return flash("Add the car's 17-character VIN first. MOTOR looks it up by VIN.", "out");
+    setMotorBusy(true);
+    try {
+      const r = await motorVehicle(vehicle.vin);
+      const mv = r && r.vehicle;
+      if (!mv || !mv.baseVehicleId) throw new Error((r && r.error) || "MOTOR didn't find that VIN.");
+      const f = await motorFilters(mv.baseVehicleId);
+      if (f && f.error) throw new Error(f.error);
+      if ((r.sample || f.sample) && !DEMO) throw new Error("MOTOR isn't connected yet. Deploy the motor function with your keys, then try again.");
+      const en = pickEngine(f.engines, { engineId: mv.engineId, engineText: vehicle.engine });
+      if (!en && (f.engines || []).length > 1) throw new Error(`MOTOR lists ${f.engines.length} engines for this car. Set the car's engine (for example "${f.engines[0].description}") and try again.`);
+      const found = specFromMotorFilters(f, en);
+      const n = found.oilFilters.length + found.airFilters.length + found.cabinFilters.length + found.fuelFilters.length + found.wipers.length;
+      if (!n) throw new Error("MOTOR has no Valvoline filters listed for this car.");
+      const cur = findSpec(shop.specs, vehicle);
+      const base =
+        cur && cur.exact
+          ? cur.spec
+          : { ...blankSpec(vehicle), ...(vvSpec ? { oilViscosity: vvSpec.grade || "", oilCapacityQt: vvSpec.qt || "" } : {}), source: "motor" };
+      await shop.saveSpec(mergeMotorFilters(base, found));
+      flash(`From MOTOR${f.sample ? " (sample)" : ""}: oil filter ${found.oilFilters.map((x) => x.number).join(", ") || "none"}${found.airFilters.length ? `, air ${found.airFilters[0].number}` : ""}${found.cabinFilters.length ? `, cabin ${found.cabinFilters[0].number}` : ""}`);
+    } catch (e) {
+      flash(e.message || "MOTOR lookup failed", "out");
+    } finally {
+      setMotorBusy(false);
+    }
+  };
+
   /* departments: which ones this ticket's work spans, and other open
      tickets for the same car that could share its receipt */
   const depts = orderDepts(o, shop.parts);
@@ -934,6 +969,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               cfg={cfg}
               locked={locked}
               vvSpec={vvSpec}
+              onMotor={fillFromMotor}
+              motorBusy={motorBusy}
               onEdit={() => setSpecEdit(true)}
               onAdd={() => setPick("oil")}
             />
@@ -2183,7 +2220,12 @@ const vvShort = (name) =>
     .trim();
 const vvOilLabel = (name) => "Valvoline " + vvShort(name);
 
-function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
+function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd, onMotor, motorBusy }) {
+  const motorBtn = !locked && onMotor && (
+    <button className="btn tiny" onClick={onMotor} disabled={motorBusy} title="Look up this car's Valvoline oil, air, cabin and fuel filters and wiper blades from MOTOR">
+      {motorBusy ? "Looking up…" : "Filters from MOTOR"}
+    </button>
+  );
   const found = findSpec(shop.specs, vehicle);
   const sp = found && found.spec;
   /* Nothing entered by the shop, but Valvoline has this exact engine —
@@ -2195,6 +2237,7 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
           <h3>Service specs <span className="st" style={{ marginLeft: 8 }}>from Valvoline</span></h3>
           {!locked && (
             <span className="rowBtns">
+              {motorBtn}
               <button className="btn tiny" onClick={onEdit}>
                 Edit
               </button>
@@ -2240,9 +2283,12 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
         <div className="cardHead">
           <h3>Service specs</h3>
           {!locked && (
-            <button className="btn tiny" onClick={onEdit}>
-              Add specs for this engine
-            </button>
+            <span className="rowBtns">
+              {motorBtn}
+              <button className="btn tiny" onClick={onEdit}>
+                Add specs for this engine
+              </button>
+            </span>
           )}
         </div>
         <p className="muted" style={{ margin: 0 }}>
@@ -2264,6 +2310,7 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
         </h3>
         {!locked && (
           <span className="rowBtns">
+            {motorBtn}
             <button className="btn tiny" onClick={onEdit}>
               Edit
             </button>
@@ -2276,11 +2323,15 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
       <div className="specGrid">
         <div>
           <span>Oil</span>
-          <strong>
-            {sp.oilViscosity} · {sp.oilCapacityQt} qt
-          </strong>
+          <strong>{[sp.oilViscosity, sp.oilCapacityQt ? `${sp.oilCapacityQt} qt` : ""].filter(Boolean).join(" · ") || "—"}</strong>
           {sp.oilSpec ? <em>{sp.oilSpec}</em> : null}
-          {oils.length ? <em className="ok">Stocked: {oils[0].description}</em> : <em className="warn">No {sp.oilViscosity} oil in inventory</em>}
+          {!sp.oilViscosity ? (
+            <em className="warn">No grade yet. Tap Edit to add it.</em>
+          ) : oils.length ? (
+            <em className="ok">Stocked: {oils[0].description}</em>
+          ) : (
+            <em className="warn">No {sp.oilViscosity} oil in inventory</em>
+          )}
         </div>
         <div>
           <span>Oil filter</span>
@@ -2299,7 +2350,34 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd }) {
           <strong>{sp.drainPlugTorque || "—"}</strong>
           {sp.resetProcedure ? <em>{sp.resetProcedure}</em> : null}
         </div>
+        {[
+          ["Air filter", sp.airFilters],
+          ["Cabin filter", sp.cabinFilters],
+          ["Fuel filter", sp.fuelFilters],
+        ]
+          .filter(([, l]) => (l || []).length)
+          .map(([label, l]) => {
+            const have = matchFilter(shop.parts, l);
+            return (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{l.map((f) => [f.brand, f.number].filter(Boolean).join(" ")).join(" · ")}</strong>
+                {have.length ? <em className="ok">Stocked: {have[0].number}</em> : <em className="warn">Not in inventory</em>}
+              </div>
+            );
+          })}
+        {(sp.wipers || []).length > 0 && (
+          <div>
+            <span>Wiper blades</span>
+            {sp.wipers.map((w, i) => (
+              <em key={i}>
+                {[w.side, w.number, w.kind].filter(Boolean).join(" · ")}
+              </em>
+            ))}
+          </div>
+        )}
       </div>
+      {sp.motorFiltersAt ? <p className="legalNote" style={{ margin: "8px 0 0" }}>Filters and wipers from MOTOR (Valvoline catalog), {fmtDate(sp.motorFiltersAt)}.</p> : null}
       {(sp.otherFluids || sp.notes) && (
         <p className="muted" style={{ margin: "10px 0 0", fontSize: 13, whiteSpace: "pre-wrap" }}>
           {[sp.otherFluids, sp.notes].filter(Boolean).join("\n")}

@@ -140,7 +140,76 @@ function normParts(data: Record<string, unknown>, q: string) {
   return q ? out.filter((p) => String(p.name).toLowerCase().includes(q.toLowerCase())) : out;
 }
 
+/* ---- filters and wipers from the Valvoline aftermarket catalog ----
+   Two steps, verified against the sandbox (2026-09-28):
+   1. Summaries/Of/Parts?ContentSilos=98 lists each part type per engine
+      (AttributeMappings EN = the engine it fits), paged 30 at a time.
+   2. Details/Of/Parts/{ApplicationID}?EN={engineId} gives the part number.
+      Without EN the details call answers 403 "Invalid Combination". */
+const VALVOLINE_SILO = 98;
+const FILTER_TYPES: Record<string, string> = {
+  "Engine Oil Filter": "oil",
+  "Engine Air Filter": "air",
+  "Cabin Air Filter": "cabin",
+  "Fuel Filter": "fuel",
+  "Wiper Blade": "wiper",
+};
+type Rec = Record<string, unknown>;
+const arr = (v: unknown) => (Array.isArray(v) ? (v as Rec[]) : v ? [v as Rec] : []);
+async function motorFilters(V: string) {
+  const apps: Rec[] = [];
+  const engines: Rec[] = [];
+  for (let page = 0; page < 6; page++) {
+    const d = await motorGet(`${V}/Content/Summaries/Of/Parts?ContentSilos=${VALVOLINE_SILO}&AttributeStandard=MOTOR&PageIndex=${page}`);
+    const body = (d.Body as Rec) || {};
+    if (page === 0) engines.push(...arr(((body.Attributes as Rec) || {}).Engines));
+    apps.push(...arr(body.Applications));
+    const paging = (((d.Header as Rec) || {}).PagingInfo as Rec) || {};
+    const total = Number(paging.TotalItemCount) || 0;
+    const end = Number(paging.EndIndex);
+    if (!total || !Number.isFinite(end) || end + 1 >= total) break;
+  }
+  const wanted = apps.filter((a) => FILTER_TYPES[String(((a.PCDBPart as Rec) || {}).PartTerminologyName || a.DisplayName || "")]);
+  const enOf = (a: Rec) => String((arr(a.AttributeMappings).find((m) => m.Type === "EN") || {}).ID || "");
+  const details = await Promise.all(
+    wanted.map((a) => {
+      const en = enOf(a);
+      return motorGet(`${V}/Content/Details/Of/Parts/${a.ApplicationID}?AttributeStandard=MOTOR${en ? `&EN=${en}` : ""}`).catch(() => null);
+    }),
+  );
+  const parts: Rec[] = [];
+  wanted.forEach((a, i) => {
+    const d = details[i];
+    const papp = d ? arr(((d.Body as Rec) || {}).Parts)[0] || {} : {};
+    const numbers = arr(papp.Items).map((it) => String(it.PartNumber || "").trim()).filter(Boolean);
+    if (!numbers.length) return;
+    const name = String(((a.PCDBPart as Rec) || {}).PartTerminologyName || a.DisplayName || "");
+    parts.push({
+      type: FILTER_TYPES[name],
+      name,
+      engineId: enOf(a),
+      position: ((a.Position as Rec) || {}).Name || "",
+      label: a.ManufacturerLabel || "",
+      numbers,
+    });
+  });
+  return {
+    engines: engines.map((e) => ({ id: String(e.EngineID || ""), description: e.Description || "", liters: e.CylinderLiter || "", cylinders: e.Cylinders || "", code: e.Designation || "" })),
+    parts,
+  };
+}
+
 /* ---- sample data (used until MOTOR keys are set) ---- */
+const SAMPLE_FILTERS = {
+  engines: [{ id: "3476", description: "3.5L V6 (J35Z2) GAS FI", liters: "3.5", cylinders: "6", code: "J35Z2" }],
+  parts: [
+    { type: "oil", name: "Engine Oil Filter", engineId: "3476", position: "", label: "", numbers: ["VO-106"] },
+    { type: "air", name: "Engine Air Filter", engineId: "3476", position: "", label: "", numbers: ["CA10467"] },
+    { type: "cabin", name: "Cabin Air Filter", engineId: "3476", position: "", label: "", numbers: ["CF10285"] },
+    { type: "wiper", name: "Wiper Blade", engineId: "3476", position: "Front Left", label: "Beam Blade", numbers: ["VB-26"] },
+    { type: "wiper", name: "Wiper Blade", engineId: "3476", position: "Front Right", label: "Beam Blade", numbers: ["VB-19"] },
+  ],
+};
 const SAMPLE_LABOR = [
   { name: "Brake Pads Replace — Front", hours: 1.2, warrantyHours: 1.0, serviceType: "Replace", skill: "Standard", notes: ["Includes: R&I front pads, clean and lubricate hardware, road test."] },
   { name: "Brake Pads Replace — Rear", hours: 1.3, warrantyHours: 1.1, serviceType: "Replace", skill: "Standard", notes: [] },
@@ -211,6 +280,7 @@ Deno.serve(async (req) => {
       if (action === "fluids") return json({ fluids: SAMPLE_FLUIDS, sample: true });
       if (action === "parts") return json({ parts: [], sample: true });
       if (action === "maintenance") return json({ services: SAMPLE_MAINTENANCE, sample: true });
+      if (action === "filters") return json({ ...SAMPLE_FILTERS, sample: true });
       if (action === "content") return json({ items: (SAMPLE_CONTENT[String(body.type || "")] || []).map((name) => ({ name, id: 0 })), sample: true });
       if (action === "content-detail") return json({ detail: { Note: "Sample — connect MOTOR to see the full detail for this item." }, sample: true });
       return json({ error: "Unknown action" }, 400);
@@ -227,6 +297,7 @@ Deno.serve(async (req) => {
     if (action === "fluids") return json({ fluids: normFluids(await motorGet(`${V}/Content/Summaries/Of/Fluids`)) });
     if (action === "parts") return json({ parts: normParts(await motorGet(`${V}/Content/Summaries/Of/Parts`), q) });
     if (action === "maintenance") return json({ services: await motorMaintenance(V) });
+    if (action === "filters") return json(await motorFilters(V));
     if (action === "content") {
       const type = String(body.type || "");
       if (!CONTENT_TYPES.includes(type)) return json({ error: "Unknown content type" }, 400);
