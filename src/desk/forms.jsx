@@ -8,6 +8,7 @@ import { customerName, vehicleName, activeList, searchText } from "./useShop.js"
 import { realNameError } from "../lib/names.js";
 import { AddressField } from "./AddressField.jsx";
 import { normalizeTireSize } from "../lib/tires.js";
+import { motorYmme } from "../lib/motor.js";
 
 /* Merge two option lists, the shop's own first, de-duplicated case-insensitively. */
 function mergeOpts(a, b) {
@@ -210,13 +211,61 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
     loadValvolineSpecs().then((d) => ok && setVv(d)).catch(() => {});
     return () => { ok = false; };
   }, []);
-  const makeOptions = useMemo(() => mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []), [ymme, d.year, vv]);
-  const modelOptions = useMemo(() => mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : []), [ymme, d.year, d.make, vv]);
-  /* Valvoline's year-accurate engines lead, then the shop's own — so a
-     2027 G90 shows its real 3.5L, not a stray engine from an old ticket. */
+  /* With MOTOR connected, Make → Model → Engine come from MOTOR itself:
+     makes A–Z, and only the engines MOTOR lists for that car. Picking the
+     engine links the car to MOTOR (labor guide, filters, service review).
+     Without MOTOR (demo, offline, not set up) the shop's own cars and
+     Valvoline's list fill in, sorted A–Z. */
+  const low = (x) => String(x || "").trim().toLowerCase();
+  const [mm, setMm] = useState({ on: false, makes: [], models: [], veh: null });
+  useEffect(() => {
+    let ok = true;
+    if (!/^\d{4}$/.test(String(d.year || ""))) {
+      setMm({ on: false, makes: [], models: [], veh: null });
+      return;
+    }
+    motorYmme("makes", { year: d.year })
+      .then((r) => {
+        if (!ok) return;
+        const on = !!(r && !r.sample && !r.error && (r.makes || []).length);
+        setMm({ on, makes: on ? r.makes : [], models: [], veh: null });
+      })
+      .catch(() => ok && setMm({ on: false, makes: [], models: [], veh: null }));
+    return () => { ok = false; };
+  }, [d.year]);
+  const motorMake = mm.on ? mm.makes.find((m) => low(m.name) === low(d.make)) : null;
+  useEffect(() => {
+    let ok = true;
+    if (!motorMake) return;
+    motorYmme("models", { year: d.year, makeId: motorMake.id }).then((r) => ok && setMm((x) => ({ ...x, models: r.models || [], veh: null })));
+    return () => { ok = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motorMake && motorMake.id]);
+  const motorModel = motorMake ? mm.models.find((m) => low(m.name) === low(d.model)) : null;
+  useEffect(() => {
+    let ok = true;
+    if (!motorModel) return;
+    motorYmme("vehicle", { year: d.year, makeId: motorMake.id, modelId: motorModel.id }).then((r) => ok && r.baseVehicleId && setMm((x) => ({ ...x, veh: r })));
+    return () => { ok = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motorModel && motorModel.id]);
+  const az = (list) => [...list].sort((a, b) => String(a).localeCompare(String(b)));
+  const makeOptions = useMemo(
+    () => (mm.on ? az(mm.makes.map((m) => m.name)) : az(mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []))),
+    [mm.on, mm.makes, ymme, d.year, vv]
+  );
+  const modelOptions = useMemo(
+    () => (motorMake && mm.models.length ? az(mm.models.map((m) => m.name)) : az(mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : []))),
+    [motorMake, mm.models, ymme, d.year, d.make, vv]
+  );
+  /* MOTOR's engines only, when it knows the car; otherwise Valvoline's
+     year-accurate engines, then the shop's own */
   const engineOptions = useMemo(
-    () => mergeOpts(vv && d.make && d.model ? vvEngineList(vv, d.make, d.model, d.year) : [], ymme.enginesFor(d.year, d.make, d.model)),
-    [ymme, d.year, d.make, d.model, vv]
+    () =>
+      mm.veh && (mm.veh.engines || []).length
+        ? mm.veh.engines.map((e) => e.name)
+        : mergeOpts(vv && d.make && d.model ? vvEngineList(vv, d.make, d.model, d.year) : [], ymme.enginesFor(d.year, d.make, d.model)),
+    [mm.veh, ymme, d.year, d.make, d.model, vv]
   );
   const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "" }));
   const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "" }));
@@ -279,8 +328,26 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const save = () => {
     if (!d.make.trim() && !d.model.trim()) return setErr("At least a make and model.");
+    /* the MOTOR link, when the car was picked from MOTOR's lists */
+    const motorEngine = mm.veh && (mm.veh.engines || []).find((e) => low(e.name) === low(d.engine));
+    const motor =
+      mm.veh && mm.veh.baseVehicleId && (motorEngine || !(mm.veh.engines || []).length)
+        ? {
+            baseVehicleId: String(mm.veh.baseVehicleId),
+            engineId: motorEngine ? String(motorEngine.id) : "",
+            year: String(d.year),
+            make: motorMake ? motorMake.name : d.make,
+            model: motorModel ? motorModel.name : d.model,
+            engine: motorEngine ? motorEngine.name : "",
+            linkedAt: Date.now(),
+          }
+        : /* an old link only stays while it's still the same car */
+          d.motor && String(d.motor.year || d.year) === String(d.year) && low(d.motor.make || d.make) === low(d.make) && low(d.motor.model || d.model) === low(d.model)
+          ? d.motor
+          : null;
     onSave({
       ...d,
+      motor,
       vin: d.vin.toUpperCase().trim(),
       plate: d.plate.toUpperCase().trim(),
       year: d.year ? Number(d.year) : "",

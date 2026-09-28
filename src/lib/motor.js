@@ -115,7 +115,14 @@ export const motorFilters = (baseVehicleId) => call({ action: "filters", baseVeh
    level "years" → { years }, "makes" (year) → { makes: [{ id, name }] },
    "models" (year, makeId) → { models }, "vehicle" (year, makeId, modelId)
    → { baseVehicleId, engines: [{ id, name }] }. */
-export const motorYmme = (level, args = {}) => call({ action: "ymme", level, ...args });
+const ymmeCache = new Map(); // real answers only, for this session
+export async function motorYmme(level, args = {}) {
+  const key = JSON.stringify([level, args.year || "", args.makeId || "", args.modelId || ""]);
+  if (ymmeCache.has(key)) return ymmeCache.get(key);
+  const r = await call({ action: "ymme", level, ...args });
+  if (r && !r.sample && !r.error) ymmeCache.set(key, r);
+  return r;
+}
 
 /* The MOTOR vehicle for a car on file: the link saved on the car (from
    the Year/Make/Model picker or an earlier VIN decode) wins; otherwise
