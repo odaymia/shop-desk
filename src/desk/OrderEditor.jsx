@@ -573,7 +573,16 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
           ? cur.spec
           : { ...blankSpec(vehicle), ...(vvSpec ? { oilViscosity: vvSpec.grade || "", oilCapacityQt: vvSpec.qt || "" } : {}), source: "motor" };
       await shop.saveSpec(mergeMotorFilters(base, found));
-      flash(`From MOTOR${f.sample ? " (sample)" : ""}: oil filter ${found.oilFilters.map((x) => x.number).join(", ") || "none"}${found.airFilters.length ? `, air ${found.airFilters[0].number}` : ""}${found.cabinFilters.length ? `, cabin ${found.cabinFilters[0].number}` : ""}`);
+      /* say what came back for the wipers, so a missing size is obvious */
+      const sizes = Object.entries(wiperSizes(found));
+      const wiperMsg = found.wipers.length
+        ? sizes.length
+          ? `, wipers ${sizes.map(([side, sz]) => `${side} ${sz}"`).join(" / ")}`
+          : (f.parts || []).some((p) => p.type === "wiper" && (p.items || []).some((it) => (it.notes || []).length))
+          ? ", wipers found but no size in MOTOR's notes"
+          : ", wipers found but MOTOR sent no notes (redeploy the motor function)"
+        : "";
+      flash(`From MOTOR${f.sample ? " (sample)" : ""}: oil filter ${found.oilFilters.map((x) => x.number).join(", ") || "none"}${found.airFilters.length ? `, air ${found.airFilters[0].number}` : ""}${found.cabinFilters.length ? `, cabin ${found.cabinFilters[0].number}` : ""}${wiperMsg}`);
     } catch (e) {
       flash(e.message || "MOTOR lookup failed", "out");
     } finally {

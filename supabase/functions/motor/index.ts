@@ -184,13 +184,29 @@ async function motorFilters(V: string) {
     /* each part number with its notes: wipers carry the size ("24 in."),
        the arm connector ("Arm Connector: Hook 9x3") and the original
        blade style ("Original (OEM): Hybrid") there */
-    const items = arr(papp.Items)
-      .map((it) => {
-        const part = (it.Part as Rec) || it;
-        const noteBox = (part.Notes as Rec) || {};
-        const notes = arr(noteBox.Note || part.Notes).map((n) => String(n.Text || "").trim()).filter(Boolean);
-        return { number: String(part.PartNumber || "").trim(), notes };
-      })
+    /* MOTOR's JSON nests these differently from its XML (Items → Part →
+       Notes → Note → Text), so find part numbers and note texts by name
+       wherever they sit */
+    const textsUnder = (v: unknown, out: string[] = [], depth = 0): string[] => {
+      if (depth > 6 || v == null) return out;
+      if (Array.isArray(v)) v.forEach((x) => textsUnder(x, out, depth + 1));
+      else if (typeof v === "object") {
+        for (const [k, x] of Object.entries(v as Rec)) {
+          if (/^text$/i.test(k) && typeof x === "string") out.push(x.trim());
+          else textsUnder(x, out, depth + 1);
+        }
+      }
+      return out;
+    };
+    const partsUnder = (v: unknown, out: Rec[] = [], depth = 0): Rec[] => {
+      if (depth > 5 || v == null || typeof v !== "object") return out;
+      if (Array.isArray(v)) v.forEach((x) => partsUnder(x, out, depth + 1));
+      else if ((v as Rec).PartNumber != null) out.push(v as Rec);
+      else Object.values(v as Rec).forEach((x) => partsUnder(x, out, depth + 1));
+      return out;
+    };
+    const items = partsUnder(papp.Items)
+      .map((part) => ({ number: String(part.PartNumber || "").trim(), notes: textsUnder(part.Notes).filter(Boolean) }))
       .filter((x) => x.number);
     const numbers = items.map((x) => x.number);
     if (!numbers.length) return;
