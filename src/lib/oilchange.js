@@ -267,3 +267,25 @@ export function oilFilterItems(parts) {
     return /oil\s*filter/i.test(text) || /\boil\b/i.test(String(p.category || ""));
   });
 }
+
+/* The oil capacities on file for a car's spec: [{ qt, label }]. Usually
+   one (spec.oilCapacityQt). Some engines differ by drive (FWD / AWD,
+   2WD / 4WD); those come as spec.oilCapacities [{ qt, label }] and the
+   oil change asks which. */
+export function capacityOptions(spec) {
+  const list = ((spec && spec.oilCapacities) || [])
+    .map((c) => ({ qt: Number(c.qt) || 0, label: String(c.label || "").trim() }))
+    .filter((c) => c.qt > 0);
+  const seen = new Set();
+  const uniq = list.filter((c) => {
+    const k = `${c.qt}|${c.label.toLowerCase()}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  /* the same amount under several labels is really one answer */
+  if (uniq.length > 1 && new Set(uniq.map((c) => c.qt)).size === 1) return [{ qt: uniq[0].qt, label: "" }];
+  if (uniq.length) return uniq;
+  const one = Number(spec && spec.oilCapacityQt) || 0;
+  return one > 0 ? [{ qt: one, label: "" }] : [];
+}

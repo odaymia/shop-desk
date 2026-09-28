@@ -253,3 +253,13 @@ test("packages that fit the car's recommended oil", () => {
   assert.deepEqual(ids({ oilViscosity: "" }), []);
   assert.deepEqual(ids({ oilViscosity: "0W-16" }), []); // nothing in stock in that grade
 });
+
+import { capacityOptions } from "../src/lib/oilchange.js";
+
+test("oil capacity: one on file skips the question, several by drive asks", () => {
+  assert.deepEqual(capacityOptions({ oilCapacityQt: 4.6 }), [{ qt: 4.6, label: "" }]);
+  assert.deepEqual(capacityOptions({}), []);
+  assert.deepEqual(capacityOptions({ oilCapacityQt: 5, oilCapacities: [{ qt: 5.7, label: "FWD" }, { qt: 6.1, label: "AWD" }] }).map((c) => c.label), ["FWD", "AWD"]);
+  // the same amount listed twice (FWD and AWD both 4.6) is one answer
+  assert.deepEqual(capacityOptions({ oilCapacities: [{ qt: 4.6, label: "FWD" }, { qt: 4.6, label: "AWD" }] }), [{ qt: 4.6, label: "" }]);
+});

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal, Money, toNum, Field } from "./ui.jsx";
-import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType, recommendedPackages } from "../lib/oilchange.js";
+import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType, recommendedPackages, capacityOptions } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
 import { OilSpecLookup } from "./OilSpecLookup.jsx";
 import { uid } from "../lib/ids.js";
@@ -81,6 +81,8 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const [step, setStep] = useState("package"); // package | quarts | oil | filter
   const [lookup, setLookup] = useState(false); // the Valvoline grade/capacity lookup
   const [lookedGrade, setLookedGrade] = useState(""); // grade the lookup filled in
+  const [autoQt, setAutoQt] = useState(false); // quarts came from the spec without asking
+  const caps = capacityOptions(spec);
   const oils = oilItems(shop.parts);
   const filters = oilFilterItems(shop.parts);
   const grade = lookedGrade || (spec ? spec.oilViscosity : "");
@@ -126,7 +128,13 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
               className={rec.ids.has(p.id) ? "rec" : ""}
               onClick={() => {
                 setPkg(p);
-                setStep("quarts");
+                /* one capacity on file: use it and go straight to the oil;
+                   several (by drive) or none: ask */
+                if (caps.length === 1 && !lookedGrade) {
+                  setQuarts(String(caps[0].qt));
+                  setAutoQt(true);
+                  setStep("oil");
+                } else setStep("quarts");
               }}
             >
               <div className="main">
@@ -157,7 +165,27 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
         <p className="muted" style={{ marginTop: 0 }}>
           How many quarts does this engine take?{spec && spec.oilCapacityQt ? ` The spec on file says ${spec.oilCapacityQt} qt${grade ? ` of ${grade}` : ""}.` : " Check the cap or the specs card."}
         </p>
-        <Field label="Quarts">
+        {caps.length > 1 && (
+          <>
+            <p style={{ margin: "0 0 8px", fontWeight: 600 }}>This engine's capacity depends on the car. Which one is it?</p>
+            <div className="chipRow" style={{ marginBottom: 12 }}>
+              {caps.map((c) => (
+                <button
+                  key={`${c.qt}${c.label}`}
+                  type="button"
+                  className={`btn lg ${toNum(quarts) === c.qt ? "primary" : ""}`}
+                  onClick={() => {
+                    setQuarts(String(c.qt));
+                    setStep("oil");
+                  }}
+                >
+                  {c.qt} qt{c.label ? ` · ${c.label}` : ""}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <Field label={caps.length > 1 ? "Or type the quarts" : "Quarts"}>
           <input
             inputMode="decimal"
             value={quarts}
@@ -194,6 +222,13 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
           </button>
         </div>
         <p className="muted" style={{ margin: "8px 0 0" }}>
+          <strong style={{ color: "var(--ink)" }}>{q} qt</strong>
+          {autoQt ? " from the car's spec" : ""}
+          {q > pkg.quarts ? ` (${Math.round((q - pkg.quarts) * 10) / 10} extra at $${Number(pkg.extraQuart || 0).toFixed(2)})` : ""} ·{" "}
+          <button type="button" className="linkBtn" style={{ fontSize: 13 }} onClick={() => (setAutoQt(false), setStep("quarts"))}>
+            change quarts
+          </button>
+          <br />
           Only oils that fit the {pkg.name}. To offer another oil here, set its packages under Inventory.
         </p>
         <PickList
