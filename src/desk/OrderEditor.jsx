@@ -80,6 +80,10 @@ const MENU_PART_CATS = {
   wiper: "Wipers",
   "wiper blades": "Wipers",
 };
+/* a Details box tall enough to read what's in it (MOTOR's labor notes run
+   a few lines), one line when empty */
+const detailRows = (t) => Math.min(8, Math.max(1, Math.ceil(String(t || "").length / 80)));
+
 function menuPartCat(m) {
   if (m.partCat) return m.partCat;
   const key = String(m.category || m.name || "").trim().toLowerCase();
@@ -1660,6 +1664,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
           onAddLabor={(op) => {
             addLine("labor", {
               description: op.name,
+              /* MOTOR's "Includes: … Does not include: …" prints under the
+                 line on the estimate, the signing screen and the invoice */
+              details: (op.notes || []).map((n) => String(n).trim()).filter(Boolean).join(" "),
               hours: op.hours || 1,
               rate: toNum(cfg.laborRate),
               unit: op.hours ? "hr" : "service",
@@ -1861,18 +1868,19 @@ function LineRow({ l, prev, rules, techs, locked, set, remove, removeJob }) {
               {l.kind === "labor" ? (
                 <div className="laborCell">
                   <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="What was done" readOnly={locked} />
-                  <input
+                  <textarea
                     value={l.details || ""}
                     onChange={(e) => set({ details: e.target.value })}
                     placeholder="Details (print under the line)"
                     readOnly={locked}
                     className="details"
+                    rows={detailRows(l.details)}
                   />
                 </div>
               ) : l.details ? (
                 <div className="laborCell">
                   <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="Description" readOnly={locked} />
-                  <input value={l.details} onChange={(e) => set({ details: e.target.value })} placeholder="Details (print under the line)" readOnly={locked} className="details" />
+                  <textarea value={l.details} onChange={(e) => set({ details: e.target.value })} placeholder="Details (print under the line)" readOnly={locked} className="details" rows={detailRows(l.details)} />
                 </div>
               ) : (
                 <input value={l.description} onChange={(e) => set({ description: e.target.value })} placeholder="Description" readOnly={locked} />

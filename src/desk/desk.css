@@ -850,3 +850,4 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .motorLinkRow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
 .motorChip { font-size:12px; font-weight:600; padding:2px 9px; border-radius:99px; background:#e0f2fe; color:#075985; }
 .motorChip.sample { background:#f3f4f6; color:#4b5563; }
+.laborCell textarea.details { width:100%; box-sizing:border-box; resize:vertical; font:inherit; font-size:13px; line-height:1.4; padding:6px 10px; border:1px solid var(--line); border-radius:8px; color:var(--ink); background:#fff; }
