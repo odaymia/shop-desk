@@ -155,7 +155,13 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                       <>
                         {miles(r.miles)}
                         {r.months ? ` / ${r.months} mo` : ""}
-                        {r.source === "MOTOR" && mode !== "both" ? <span className="sub" style={{ color: "#1657d6" }}>Manufacturer</span> : null}
+                        {mode !== "both" && motorState !== "store" ? (
+                          r.source === "MOTOR" ? (
+                            <span className="sub" style={{ color: "#1657d6" }}>Manufacturer</span>
+                          ) : (
+                            <span className="sub" style={{ color: "#92400e" }}>{storeLabel} recommendation</span>
+                          )
+                        ) : null}
                         {mode === "both" && r.motorMiles > 0 ? (
                           <span className="sub">
                             {storeLabel} {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Manufacturer {miles(r.motorMiles)}</span>
@@ -166,7 +172,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                             Maker says inspect every {r.motorInspectMiles ? miles(r.motorInspectMiles) : `${r.motorInspectMonths} mo`}
                           </span>
                         ) : null}
-                        {r.noFactory ? <span className="sub">No factory interval for this car · using your {storeLabel.toLowerCase()} interval</span> : null}
+
                       </>
                     )}
                   </td>
