@@ -1590,7 +1590,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
             addLines(lines.map((l) => (l.kind === "labor" ? { ...l, techId: o.topTechId || o.techId || null } : l)));
             /* an oil change is the moment to review what else is due — pop the
                service review, then fall through to the walk-around checklist */
-            checklistAfterReview.current = o.status === STATUS.open && !o.checklist && cfg.checklistOnOil !== false;
+            checklistAfterReview.current = (o.status === STATUS.open || o.status === STATUS.estimate) && !o.checklist && cfg.checklistOnOil !== false;
             /* after the walk-around checklist, go straight to the reminder-
                sticker screen to record the mileage, the crew, and print */
             stickerAfterChecklist.current = checklistAfterReview.current && cfg.oilSticker !== false ? { id: o.id } : null;
