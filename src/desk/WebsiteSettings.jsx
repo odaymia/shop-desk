@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Field, Text, fmtDate } from "./ui.jsx";
-import { cloud } from "../storage/index.js";
+import { Field, Text } from "./ui.jsx";
 import { DEFAULT_WEBSITE, FALLBACK_HIGHLIGHTS, DEFAULT_FAQ, DAY_NAMES, parseHoursText, normalizeHoursWeek, hoursText, slugify, couponText } from "../lib/website.js";
 import { renderSite } from "../lib/siteRender.js";
 import { offerSlug } from "../lib/website.js";
@@ -74,12 +73,6 @@ export function WebsiteSettings({ d, set, shop, flash }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d, shop]);
 
-  const [requests, setRequests] = useState([]);
-  const loadRequests = () => cloud.listSiteRequests().then(setRequests).catch(() => setRequests([]));
-  useEffect(() => {
-    loadRequests();
-  }, []);
-
   const coupons = useMemo(
     () =>
       Object.values((shop && shop.coupons) || {})
@@ -135,35 +128,6 @@ export function WebsiteSettings({ d, set, shop, flash }) {
       <Field label="Your domain (once it's connected, emails and links use it)">
         <Text value={w.domain || ""} onChange={(v) => setW({ domain: v.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") })} placeholder="www.yourshop.com" />
       </Field>
-
-      {requests.length > 0 && (
-        <>
-          <h3 className="subhead" style={{ marginTop: 28 }}>
-            Appointment requests ({requests.length})
-          </h3>
-          {requests.map((r) => (
-            <div key={r.id} className="card" style={{ padding: 12, marginBottom: 8 }}>
-              <b>{r.name}</b> · {r.phone || r.email} {r.email && r.phone ? `· ${r.email}` : ""}
-              <div>
-                {[r.service, r.vehicle, r.preferred_day && `wants ${r.preferred_day}`].filter(Boolean).join(" · ")}
-              </div>
-              {r.note && <div style={{ color: "var(--muted)" }}>{r.note}</div>}
-              <div className="rowBtns" style={{ marginTop: 6, alignItems: "center" }}>
-                <span style={{ color: "var(--muted)", fontSize: 13 }}>Sent {fmtDate(new Date(r.created_at).getTime())}</span>
-                <button
-                  className="btn tiny"
-                  onClick={async () => {
-                    await cloud.handleSiteRequest(r.id);
-                    loadRequests();
-                  }}
-                >
-                  Done — we called them
-                </button>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
 
       <h3 className="subhead" style={{ marginTop: 28 }}>
         What it says
@@ -245,7 +209,7 @@ export function WebsiteSettings({ d, set, shop, flash }) {
         ["showPrices", "Prices: oil change packages and canned jobs ticked \"Show on the customer portal\""],
         ["quoteTool", "Oil change price finder: customers pick their car, see the oil it takes and their price (from your service specs)"],
         ["showStats", "Your history: the year you started and how many services you've done"],
-        ["booking", "Appointment request form (requests show up here)"],
+        ["booking", "Appointment request form (requests show up on the Requests tab)"],
         ["signup", "\"Get specials by email\" signup box (signups show up on the Email list page)"],
       ].map(([k, label]) => (
         <label key={k} style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "8px 0" }}>

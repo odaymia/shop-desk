@@ -20,6 +20,8 @@ import { SignatureStation } from "./Signing.jsx";
 import { BayDisplay } from "./BayDisplay.jsx";
 import { Fleet } from "./Fleet.jsx";
 import { Cashier, dueOrders } from "./Cashier.jsx";
+import { AppointmentRequests } from "./AppointmentRequests.jsx";
+import { cloud } from "../storage/index.js";
 import { DEMO } from "../lib/demo.js";
 import { activeDepts, DEPTS, startStatus } from "../lib/departments.js";
 import defaultLogo from "../assets/genie-logo.png";
@@ -29,6 +31,7 @@ import defaultLogo from "../assets/genie-logo.png";
 const PAGES = [
   ["orders", "Tickets"],
   ["cashier", "Cashier"],
+  ["requests", "Requests"],
   ["customers", "Customers"],
   ["fleet", "Fleet"],
   ["inventory", "Inventory"],
@@ -131,6 +134,27 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
     }
     setCardsHidden(true);
   };
+  /* appointment requests from the website: a count on the Requests tab so a
+     new one is noticed. Polled here, refreshed on the page when handled. */
+  const [reqCount, setReqCount] = useState(0);
+  const checkRequests = () =>
+    cloud
+      .listSiteRequests()
+      .then((r) => setReqCount((r || []).length))
+      .catch(() => {});
+  useEffect(() => {
+    if (!shop.loaded) return;
+    let live = true;
+    const check = () => live && checkRequests();
+    const first = setTimeout(check, 5000);
+    const every = setInterval(check, 3 * 60000);
+    return () => {
+      live = false;
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, [shop.loaded]);
+
   const [orderId, setOrderId] = useState(null);
   const [autoPay, setAutoPay] = useState(false); // open the ticket straight to Take payment (from Cashier)
   const [customerId, setCustomerId] = useState(null);
@@ -246,6 +270,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
             <button key={k} className={`deskNavBtn ${sub ? "sub" : ""} ${page === k ? "on" : ""}`} onClick={() => nav.go(k)}>
               {label}
               {k === "cashier" && dueCount > 0 && <span className="navCount">{dueCount}</span>}
+              {k === "requests" && reqCount > 0 && (
+                <span className="navCount" title={`${reqCount} appointment request${reqCount === 1 ? "" : "s"} waiting`}>
+                  {reqCount}
+                </span>
+              )}
               {k === "email" && cardsDue > 0 && (
                 <span title={`${cardsDue} postcards ready to mail`} style={{ marginLeft: 8, background: "var(--amber, #d9a400)", color: "#15171b", borderRadius: 99, padding: "1px 8px", fontSize: 12, fontWeight: 700 }}>
                   {cardsDue}
@@ -285,6 +314,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "customers" && (
             <Customers shop={shop} cfg={cfg} nav={nav} flash={flash} customerId={customerId} onNew={newTicket} />
           )}
+          {page === "requests" && <AppointmentRequests cfg={cfg} flash={flash} onChange={checkRequests} />}
           {page === "fleet" && <Fleet shop={shop} cfg={cfg} nav={nav} flash={flash} onNew={newTicket} />}
           {page === "inventory" && <Inventory shop={shop} cfg={cfg} flash={flash} />}
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
