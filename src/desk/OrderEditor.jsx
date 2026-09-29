@@ -1406,8 +1406,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
             const v = ord && shop.vehicles[ord.vehicleId];
             /* remember the interval on the car so its next visit defaults to it */
             if (v) shop.saveVehicle({ ...v, reminderMonths: months || null, reminderMiles: miles || null });
-            /* record the mileage on this ticket if it had none */
-            if (mileage && ord && !ord.mileageOut && !ord.mileageIn) update((dd) => (dd.id === ord.id ? { ...dd, mileageOut: mileage } : dd));
+            /* the mileage is saved on the ticket as it's typed (onAssign); this
+               is a fallback for the case where it somehow wasn't */
+            if (mileage && ord && !ord.mileageOut && !ord.mileageIn) update((dd) => (dd.id === ord.id ? { ...dd, mileageIn: Number(mileage) } : dd));
           }}
         />
       )}

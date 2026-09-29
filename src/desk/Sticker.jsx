@@ -127,7 +127,20 @@ export function Sticker({ order, cfg, vehicle, employees, requireCrew, onAssign,
           <div className="stkSectHead">Next service reminder</div>
           <div className="stkGrid3">
             <Field label="Current mileage">
-              <input className={!d.mileage ? "need" : ""} inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value)} placeholder="odometer" autoFocus={!known} />
+              {/* save to the ticket as it's typed, so it sticks whether or not
+                  the label is printed */}
+              <input
+                className={!d.mileage ? "need" : ""}
+                inputMode="numeric"
+                value={mileage}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d]/g, "");
+                  setMileage(v);
+                  if (onAssign) onAssign({ mileageIn: v ? Number(v) : null });
+                }}
+                placeholder="odometer"
+                autoFocus={!known}
+              />
             </Field>
             <Field label="Next service in (months)">
               <input inputMode="numeric" value={months} onChange={(e) => setMonths(e.target.value)} />
