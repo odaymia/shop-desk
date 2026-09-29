@@ -1,7 +1,9 @@
 import { useMemo, useState, useEffect } from "react";
-import { Modal, fmtDate } from "./ui.jsx";
+import { createPortal } from "react-dom";
+import { Modal, fmtDate, fmtPhone } from "./ui.jsx";
+import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { motorVehicleFor, motorMaintenance, motorFluids } from "../lib/motor.js";
 
 const STATUS = {
@@ -74,7 +76,13 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const [mileage, setMileage] = useState(String(guessMileage || ""));
   const cur = Number(mileage) || 0;
 
-  const rows = useMemo(() => serviceReview(intervals, vehOrders, cur, order.id), [intervals, vehOrders, cur, order.id]);
+  /* attach the real inventory part (number + price) to services that install one */
+  const rows = useMemo(() => {
+    return serviceReview(intervals, vehOrders, cur, order.id).map((r) => {
+      const part = servicePart(shop.parts, r);
+      return { ...r, part, effPrice: part ? Number(part.price) || 0 : Number(r.price) || 0 };
+    });
+  }, [intervals, vehOrders, cur, order.id, shop.parts]);
   const counts = reviewCounts(rows);
   const [added, setAdded] = useState({});
 
@@ -85,10 +93,64 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const addAllDue = () => {
     rows.filter((r) => r.status === "due" && !added[r.id]).forEach(add);
   };
+  const print = () => window.print();
 
   const veh = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "This vehicle";
+  const idBits = [vehicle.plate ? `Plate ${vehicle.plate}${vehicle.plateState ? ` (${vehicle.plateState})` : ""}` : "", vehicle.vin ? `VIN ${vehicle.vin}` : ""].filter(Boolean).join(" · ");
+  const target = (typeof document !== "undefined" && (document.querySelector(".root") || document.body)) || null;
+  const printNode = (
+    <div className="printSheet">
+      <style>{`@media print { @page { size: auto; margin: 0.5in; } }`}</style>
+      <div className="printWrap">
+        <div className="srSheet">
+          <div className="srSheetHead">
+            <div>
+              <div className="srShop">{cfg.shopName || "Service Review"}</div>
+              {cfg.shopAddress ? <div className="srSub">{cfg.shopAddress}</div> : null}
+              {cfg.shopPhone ? <div className="srSub">{fmtPhone(cfg.shopPhone)}</div> : null}
+            </div>
+            <div className="srWhen">
+              Service Review
+              <span>{new Date().toLocaleDateString()}</span>
+            </div>
+          </div>
+          <div className="srVeh">
+            <strong>{veh}</strong>
+            {idBits ? ` · ${idBits}` : ""}
+            {cur ? ` · ${cur.toLocaleString()} mi` : ""}
+          </div>
+          <table className="srTable">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Part #</th>
+                <th>Every</th>
+                <th>Last done</th>
+                <th>Status</th>
+                <th className="r">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.name}</td>
+                  <td>{r.part && r.part.number ? r.part.number : ""}</td>
+                  <td>{r.basis === "inspect" ? "On inspection" : `${miles(r.miles)}${r.months ? ` / ${r.months} mo` : ""}`}</td>
+                  <td>{r.lastDone ? `${miles(r.lastDone.mileage)} · ${fmtDate(r.lastDone.at)}` : "—"}</td>
+                  <td>{(STATUS[r.status] || STATUS.unknown).label}</td>
+                  <td className="r">{r.effPrice ? fmtMoney(r.effPrice) : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="srNote">Recommendations from your maintenance schedule, checked against this vehicle's service history. Prices are estimates and may change once the work is inspected.</p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
+    <>
     <Modal title="Service review" onClose={onClose} size="huge">
       <div className="svcHead">
         <div>
@@ -115,8 +177,11 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         <b className="vAdvise">{counts.soon} soon</b>
         {counts.inspect ? <b style={{ color: "#1657d6" }}>{counts.inspect} inspect</b> : null}
         <b className="vGood">{counts.done} up to date</b>
+        <button className="btn tiny" style={{ marginLeft: "auto" }} onClick={print}>
+          🖨 Print
+        </button>
         {counts.due > 0 && (
-          <button className="btn tiny primary" style={{ marginLeft: "auto" }} onClick={addAllDue}>
+          <button className="btn tiny primary" onClick={addAllDue}>
             Add all due to estimate
           </button>
         )}
@@ -130,6 +195,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
               <th>Every</th>
               <th>Last done</th>
               <th>Status</th>
+              <th className="r">Price</th>
               <th></th>
             </tr>
           </thead>
@@ -140,6 +206,9 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                 <tr key={r.id}>
                   <td>
                     <strong>{r.name}</strong>
+                    {r.part && r.part.number ? (
+                      <span className="sub muted">Part #{r.part.number} · {Number(r.part.onHand) || 0} in stock</span>
+                    ) : null}
                     {r.status === "due" && r.lastDone && r.nextDueMiles ? (
                       <span className="sub muted">was due at {miles(r.nextDueMiles)}</span>
                     ) : r.status === "due" && !r.lastDone ? (
@@ -180,6 +249,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
                   <td>
                     <span className={`svcBadge ${st.cls}`}>{st.label}</span>
                   </td>
+                  <td className="r" style={{ fontVariantNumeric: "tabular-nums" }}>{r.effPrice ? fmtMoney(r.effPrice) : "—"}</td>
                   <td className="r">
                     {r.status !== "done" && (
                       <button className="btn tiny primary" onClick={() => add(r)}>
@@ -204,5 +274,7 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         "Done" is detected from this car's past tickets. Which services and source are set in Settings.
       </p>
     </Modal>
+    {target ? createPortal(printNode, target) : printNode}
+    </>
   );
 }

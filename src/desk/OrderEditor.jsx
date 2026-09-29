@@ -1705,14 +1705,28 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
             setPick(next);
           }}
           onAdd={(r) => {
-            addLine("labor", {
-              description: r.name,
-              hours: 1,
-              rate: toNum(r.price),
-              unit: "service",
-              job: "Recommended service",
-              techId: o.topTechId || o.techId || null,
-            });
+            if (r.part) {
+              /* a parts-based service (air filter, etc.): add the real part off
+                 the shelf at its own price, grouped under the service name */
+              addLine("part", {
+                partId: r.part.id,
+                number: r.part.number,
+                description: r.part.description,
+                price: toNum(r.part.price),
+                cost: toNum(r.part.cost),
+                taxable: r.part.taxable === false ? false : null,
+                job: r.name,
+              });
+            } else {
+              addLine("labor", {
+                description: r.name,
+                hours: 1,
+                rate: toNum(r.price),
+                unit: "service",
+                job: "Recommended service",
+                techId: o.topTechId || o.techId || null,
+              });
+            }
             flash(`Added: ${r.name}`);
           }}
         />

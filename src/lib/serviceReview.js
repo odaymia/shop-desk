@@ -37,6 +37,29 @@ export const DEFAULT_SERVICE_INTERVALS = [
   { id: "wipers", name: "Wiper blades", basis: "inspect", miles: 15000, months: 12, match: "wiper", motorKeys: ["wiper"], price: 25 },
 ];
 
+/* Parts-based services install a physical part; these keywords find that part
+   in the shop's inventory so the review can show the real part number and the
+   shop's own price instead of a generic menu price. Fluid/labor-only services
+   (brake fluid, coolant…) aren't here and keep the menu price. */
+const PART_MATCH = {
+  engineAir: "air filter -cabin -fuel -oil",
+  cabinAir: "cabin air filter | cabin filter",
+  fuelFilter: "fuel filter",
+  sparkPlugs: "spark plug",
+  serpentine: "serpentine | drive belt -timing",
+  wipers: "wiper blade | wiper",
+};
+/* The inventory item a parts-based service installs — an in-stock match first,
+   else any match, else null. Pure. */
+export function servicePart(parts, svc) {
+  const pat = (svc && (svc.partMatch || PART_MATCH[svc.id])) || "";
+  if (!pat) return null;
+  const cands = Object.values(parts || {}).filter(
+    (p) => p && p.active !== false && !p.tire && matchesAuto(pat, `${p.category || ""} ${p.description || ""} ${p.number || ""}`)
+  );
+  return cands.find((p) => num(p.onHand) > 0) || cands[0] || null;
+}
+
 /* Drop services for equipment the vehicle doesn't have. `motorNames` is the pool
    of fluid + maintenance names MOTOR returned for this vehicle; a service whose
    `requiresFluid` keyword isn't present is hidden. With no MOTOR data we can't
