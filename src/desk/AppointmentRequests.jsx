@@ -165,12 +165,8 @@ export function AppointmentRequests({ cfg, flash, onChange }) {
                   <dd>{r.email}</dd>
                 </>
               )}
-              {r.service && (
-                <>
-                  <dt>Wants</dt>
-                  <dd>{r.service}</dd>
-                </>
-              )}
+              <dt>Wants</dt>
+              <dd>{r.service || <span style={{ color: "var(--muted)", fontWeight: 400 }}>Not specified</span>}</dd>
               {r.vehicle && (
                 <>
                   <dt>Vehicle</dt>

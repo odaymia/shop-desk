@@ -958,7 +958,7 @@ ${p.booking ? `<section id="book" class="alt"><div class="wrap">
       <label>Phone<input name="phone" type="tel" autocomplete="tel" maxlength="20"></label>
       <label>Email (optional)<input name="email" type="email" autocomplete="email" maxlength="120"></label>
       <label>Vehicle<input name="vehicle" placeholder="2018 Honda Civic" maxlength="80"></label>
-      <label>Service<select name="service"><option value="">Choose one</option>${svcOptions}<option>Something else</option></select></label>
+      <label>What do you need?<select name="service" required><option value="">Choose one</option>${svcOptions}<option>Something else</option></select></label>
       <label>Preferred day<input name="day" type="date"></label>
       <label class="full">Anything we should know?<textarea name="note" rows="3" maxlength="1000" placeholder="Noise when braking, check engine light, etc."></textarea></label>
       <label class="hp" aria-hidden="true">Leave blank<input name="website" tabindex="-1" autocomplete="off"></label>
@@ -1093,6 +1093,7 @@ document.querySelectorAll("form.book").forEach(function(form){var msg=form.query
   var ph=v("phone").replace(/\\D/g,""),em=v("email");
   if(!v("name")){msg.className="formMsg err";msg.textContent="Please tell us your name.";return}
   if(ph.length<10&&!/^\\S+@\\S+\\.\\S+$/.test(em)){msg.className="formMsg err";msg.textContent=f.email?"Leave a phone number or email so we can confirm.":"Leave a phone number so we can confirm.";return}
+  if(f.service&&!v("service")){msg.className="formMsg err";msg.textContent="Please tell us what you need.";return}
   if(S.preview||!S.api){msg.className="formMsg ok";msg.textContent=S.preview?"Preview: this is where the request is sent once the site is published.":"Thanks! Please call us to confirm.";return}
   var btn=form.querySelector("button");btn.disabled=true;
   var note=(v("offer")?"Offer: "+v("offer")+". ":"")+v("note");
