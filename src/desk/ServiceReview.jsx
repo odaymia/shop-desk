@@ -1,11 +1,14 @@
 import { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Modal, fmtDate, fmtPhone } from "./ui.jsx";
+import { Modal, fmtDate } from "./ui.jsx";
 import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
 import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { motorVehicleFor, motorMaintenance, motorFluids, motorFilters } from "../lib/motor.js";
 import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
+import { reviewReport } from "../lib/serviceReviewReport.js";
+import { reviewReportHtml } from "../lib/serviceReviewHtml.js";
+import { QR } from "./QR.jsx";
 
 const STATUS = {
   due: { label: "Due now", cls: "due" },
@@ -19,9 +22,10 @@ const miles = (n) => (Number(n) || 0).toLocaleString() + " mi";
 /* Service review: for the ticket's vehicle, show every maintenance service, when
    it was last done (from this car's history), and whether it's due — so the
    writer can recommend what's due at an oil change. */
-export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd }) {
+export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare, flash }) {
   const vehicle = shop.vehicles[order.vehicleId] || {};
   const [motorFilterSpec, setMotorFilterSpec] = useState(null); // exact filter numbers from live MOTOR
+  const [shared, setShared] = useState(null); // { link, sent } after sending the customer a link
   const vehOrders = useMemo(() => ordersOf(shop.orders, { vehicleId: order.vehicleId }), [shop.orders, order.vehicleId]);
   const mode = cfg.serviceIntervalSource || "both"; // store | motor | both
   const storeLabel = String(cfg.serviceStoreLabel || "Store").trim() || "Store";
@@ -125,56 +129,21 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd }) {
   const print = () => window.print();
 
   const veh = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "This vehicle";
-  const idBits = [vehicle.plate ? `Plate ${vehicle.plate}${vehicle.plateState ? ` (${vehicle.plateState})` : ""}` : "", vehicle.vin ? `VIN ${vehicle.vin}` : ""].filter(Boolean).join(" · ");
+  /* the customer-facing report — one design used by the printout and the
+     online page (built from the same rows the writer sees) */
+  const report = useMemo(() => reviewReport({ cfg, vehicle, mileage: cur, rows }), [cfg, vehicle, cur, rows]);
+
+  const sendLink = async () => {
+    if (!onShare) return;
+    const r = await onShare(report);
+    if (r && r.link) setShared(r);
+  };
+
   const target = (typeof document !== "undefined" && (document.querySelector(".root") || document.body)) || null;
   const printNode = (
     <div className="printSheet">
-      <style>{`@media print { @page { size: auto; margin: 0.5in; } }`}</style>
-      <div className="printWrap">
-        <div className="srSheet">
-          <div className="srSheetHead">
-            <div>
-              <div className="srShop">{cfg.shopName || "Service Review"}</div>
-              {cfg.shopAddress ? <div className="srSub">{cfg.shopAddress}</div> : null}
-              {cfg.shopPhone ? <div className="srSub">{fmtPhone(cfg.shopPhone)}</div> : null}
-            </div>
-            <div className="srWhen">
-              Service Review
-              <span>{new Date().toLocaleDateString()}</span>
-            </div>
-          </div>
-          <div className="srVeh">
-            <strong>{veh}</strong>
-            {idBits ? ` · ${idBits}` : ""}
-            {cur ? ` · ${cur.toLocaleString()} mi` : ""}
-          </div>
-          <table className="srTable">
-            <thead>
-              <tr>
-                <th>Service</th>
-                <th>Part #</th>
-                <th>Every</th>
-                <th>Last done</th>
-                <th>Status</th>
-                <th className="r">Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.name}</td>
-                  <td>{r.part && r.part.number ? r.part.number : ""}</td>
-                  <td>{r.basis === "inspect" ? "On inspection" : `${miles(r.miles)}${r.months ? ` / ${r.months} mo` : ""}`}</td>
-                  <td>{r.lastDone ? `${miles(r.lastDone.mileage)} · ${fmtDate(r.lastDone.at)}` : "—"}</td>
-                  <td>{(STATUS[r.status] || STATUS.unknown).label}</td>
-                  <td className="r">{r.effPrice ? fmtMoney(r.effPrice) : ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="srNote">Recommendations from your maintenance schedule, checked against this vehicle's service history. Prices are estimates and may change once the work is inspected.</p>
-        </div>
-      </div>
+      <style>{`@media print { @page { size: auto; margin: 0.4in; } }`}</style>
+      <div className="printWrap" dangerouslySetInnerHTML={{ __html: reviewReportHtml(report) }} />
     </div>
   );
 
@@ -209,12 +178,44 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd }) {
         <button className="btn tiny" style={{ marginLeft: "auto" }} onClick={print}>
           🖨 Print
         </button>
+        {onShare && (
+          <button className="btn tiny" onClick={sendLink} title="Text the customer a link to this review, or copy it to post or share">
+            📱 Send to customer
+          </button>
+        )}
         {counts.due > 0 && (
           <button className="btn tiny primary" onClick={addAllDue}>
             Add all due to estimate
           </button>
         )}
       </div>
+
+      {shared && (
+        <div className="card" style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+          <QR value={shared.link} size={110} />
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <b>{shared.sent ? "Texted to the customer." : "Link ready to share."}</b>
+            <div style={{ fontSize: 13, color: "var(--muted)", wordBreak: "break-all", margin: "4px 0 8px" }}>{shared.link}</div>
+            <div className="rowBtns">
+              <button
+                className="btn tiny"
+                onClick={() =>
+                  navigator.clipboard.writeText(shared.link).then(
+                    () => flash && flash("Link copied"),
+                    () => flash && flash("Couldn't copy — select the link and copy it.", "out")
+                  )
+                }
+              >
+                Copy link
+              </button>
+              <a className="btn tiny" href={shared.link} target="_blank" rel="noreferrer">
+                Open ↗
+              </a>
+            </div>
+            <p className="legalNote" style={{ margin: "6px 0 0" }}>Scan the code to open it, or post it in the shop for the customer to see.</p>
+          </div>
+        </div>
+      )}
 
       <div className="dataScroll">
         <table className="dk">

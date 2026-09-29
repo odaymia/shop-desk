@@ -1700,6 +1700,24 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
           cfg={cfg}
           shop={shop}
           spec={shopSpec}
+          flash={flash}
+          onShare={async (report) => {
+            if (!customer || !customer.phone) {
+              flash("Add the customer's cell number first to text or link the review.", "out");
+              return null;
+            }
+            await flushNow();
+            try {
+              const res = await cloud.invoke("sign", { action: "create", orderId: o.id, kind: "review", phone: customer.phone, payload: report });
+              if (res && res.sent) flash("Service review texted to the customer.");
+              else if (res && res.link) flash("Texting isn't set up — link ready to copy or scan.", "out");
+              return res || null;
+            } catch (e) {
+              console.error("share review failed", e);
+              flash("Couldn't create the link — the shop must be online and set up.", "out");
+              return null;
+            }
+          }}
           onClose={() => {
             const next = checklistAfterReview.current ? "checklist" : null;
             checklistAfterReview.current = false;

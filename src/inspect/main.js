@@ -3,6 +3,8 @@
    results, notes, photos, and recommended work. Read-only; the token in the URL
    is the key. Talks only to the "sign" Edge Function. `?t=demo` shows a sample. */
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/cloudConfig.js";
+import { reviewReportHtml } from "../lib/serviceReviewHtml.js";
+import { reviewReport } from "../lib/serviceReviewReport.js";
 
 const FN = `${SUPABASE_URL}/functions/v1/sign`;
 const app = document.getElementById("app");
@@ -90,6 +92,43 @@ function render(p) {
   lb.addEventListener("click", () => lb.classList.remove("on"));
 }
 
+/* The customer Service Review page — same report the shop prints, on the web,
+   with a Print button. Read-only. */
+function renderReview(p) {
+  try {
+    document.title = `Service Review${p && p.vehicle ? ` · ${p.vehicle}` : ""}`;
+  } catch { /* ignore */ }
+  app.className = "";
+  app.innerHTML = `
+    <style>
+      .srBar{position:sticky;top:0;z-index:5;display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;background:#fff;border-bottom:1px solid #e4e7ec;}
+      .srBar button{font:inherit;font-weight:700;border:1px solid #d6dbe2;background:#fff;border-radius:10px;padding:10px 18px;cursor:pointer;}
+      @media print{.srBar{display:none;}}
+    </style>
+    <div class="srBar"><button id="srPrint">🖨 Print this</button></div>
+    ${reviewReportHtml(p)}`;
+  const b = document.getElementById("srPrint");
+  if (b) b.addEventListener("click", () => window.print());
+}
+
+function demoReview() {
+  const days = (n) => Date.now() - n * 86400000;
+  const rows = [
+    { id: "brakeFluid", name: "Brake fluid service", status: "due", basis: "interval", miles: 30000, months: 24, effPrice: 109.99, lastDone: null },
+    { id: "cabinAir", name: "Cabin air filter", status: "due", basis: "inspect", effPrice: 18.99, part: { number: "CF10285" }, lastDone: null },
+    { id: "engineAir", name: "Engine air filter", status: "soon", basis: "inspect", effPrice: 15.99, part: { number: "CA10467" }, lastDone: null },
+    { id: "wipers", name: "Wiper blades", status: "inspect", basis: "inspect", effPrice: 14.99, part: { number: "WB-22" } },
+    { id: "oil", name: "Engine oil & filter", status: "done", basis: "interval", miles: 5000, months: 6, lastDone: { mileage: 69500, at: days(95) } },
+    { id: "tireRotate", name: "Tire rotation", status: "done", basis: "interval", effPrice: 25, lastDone: { mileage: 69500, at: days(95) } },
+  ];
+  return reviewReport({
+    cfg: { shopName: "Genie Auto Center", shopPhone: "619-312-2480", shopAddress: "830 N 2nd St, El Cajon, CA 92021" },
+    vehicle: { year: 2010, make: "Toyota", model: "Camry", plate: "7ABC123", plateState: "CA", vin: "4T1BF3EK0AU000000" },
+    mileage: 72500,
+    rows,
+  });
+}
+
 function demo() {
   return {
     kind: "inspection",
@@ -125,11 +164,13 @@ const token = new URLSearchParams(location.search).get("t");
 (async () => {
   if (!token) return fail("This link is missing its code. Please ask the shop to resend it.");
   if (token === "demo") return render(demo());
+  if (token === "demo-review") return renderReview(demoReview());
   try {
     const { ok, data } = await get(token);
     if (!ok || !data || !data.payload) return fail((data && data.error) || "This link is no longer valid.");
+    if (data.payload.kind === "review") return renderReview(data.payload);
     render(data.payload);
   } catch {
-    fail("Couldn't load the inspection. Please check your connection and try again.");
+    fail("Couldn't load this. Please check your connection and try again.");
   }
 })();

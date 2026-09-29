@@ -119,20 +119,24 @@ Deno.serve(async (req) => {
     if (phone.length < 10) return json({ error: "The customer needs a valid cell number on file." }, 400);
 
     const p = payload as Record<string, unknown>;
-    // A texted inspection report is read-only (no signature). Everything else is
-    // a signing request. The link points at the matching public page.
-    const isInspection = p.kind === "inspection" || body.kind === "inspection";
-    const slot = isInspection ? "inspection" : body.slot === "delivery" ? "delivery" : "authorization";
+    // A texted inspection report or service review is read-only (no signature),
+    // and shows on the public report page. Everything else is a signing request.
+    const kind = String(p.kind || body.kind || "");
+    const isReport = kind === "inspection" || kind === "review";
+    const slot = kind === "inspection" ? "inspection" : kind === "review" ? "review" : body.slot === "delivery" ? "delivery" : "authorization";
 
     const t = token();
     await admin.from("sign_requests").insert({ token: t, shop_id: shopId, order_id: orderId, slot, payload });
     const base = (Deno.env.get("SIGN_BASE_URL") || "").replace(/\/$/, "");
-    const page = isInspection ? "inspect" : "sign";
+    const page = isReport ? "inspect" : "sign";
     const link = base ? `${base}/${page}/?t=${t}` : `${page}/?t=${t}`;
 
-    const msg = isInspection
-      ? `${p.shopName || "Your shop"}: your vehicle inspection is ready to view. ${link} Reply STOP to opt out.`
-      : `${p.shopName || "Your shop"}: please review and sign your ${p.kind === "invoice" ? "invoice" : "estimate"} #${p.number || ""}. ${link} Reply STOP to opt out.`;
+    const msg =
+      kind === "review"
+        ? `${p.shopName || "Your shop"}: here's the service review for your ${p.vehicle || "vehicle"}. ${link} Reply STOP to opt out.`
+        : kind === "inspection"
+          ? `${p.shopName || "Your shop"}: your vehicle inspection is ready to view. ${link} Reply STOP to opt out.`
+          : `${p.shopName || "Your shop"}: please review and sign your ${p.kind === "invoice" ? "invoice" : "estimate"} #${p.number || ""}. ${link} Reply STOP to opt out.`;
     const { sent, error } = await sendSms(phone, msg);
     return json({ token: t, link, sent, sendError: error || null });
   }
