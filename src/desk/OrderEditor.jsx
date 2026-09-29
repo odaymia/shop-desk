@@ -1945,8 +1945,13 @@ function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose
   const amt = toNum(amount);
   const cashGiven = toNum(cash);
   const hasCash = String(cash).trim() !== "";
-  const short = method === "cash" && hasCash && cashGiven < amt;
-  const change = method === "cash" ? round2(Math.max(0, cashGiven - amt)) : 0;
+  // Cash tender: what the customer physically hands over. If it doesn't cover
+  // the amount typed, take what they gave as a partial cash payment and leave
+  // the rest for another tender (a split) — never a hard stop, so cash can go
+  // first or second. If they hand over more, the extra comes back as change.
+  const cashApplied = method === "cash" && hasCash ? round2(Math.min(amt, cashGiven)) : amt;
+  const cashSplit = method === "cash" && hasCash && cashGiven < amt - 0.001; // covers only part of the amount typed
+  const change = method === "cash" && hasCash ? round2(Math.max(0, cashGiven - cashApplied)) : 0;
   // When card processing is on and we're online, charge the card right here
   // instead of just recording it.
   const chargeHere = method === "card" && canCharge && !manualCard;
@@ -1965,8 +1970,8 @@ function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose
   };
   const save = () => {
     if (!amt) return setErr("Enter an amount. Use a negative number for a refund.");
-    if (short) return setErr("Cash given is less than the amount owed.");
-    const p = { method, amount: amt, ref: ref.trim() };
+    if (method === "cash" && hasCash && cashApplied <= 0) return setErr("Enter how much cash the customer gave.");
+    const p = { method, amount: method === "cash" ? cashApplied : amt, ref: ref.trim() };
     if (method === "card") p.cardType = cardType;
     if (method === "cash" && hasCash) {
       p.cashGiven = cashGiven;
@@ -1975,7 +1980,8 @@ function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose
     record(p);
   };
   const splits = due > 0 ? [["All", due], ["Half", round2(due / 2)], ["A third", round2(due / 3)]] : [];
-  const partial = amt > 0 && due > 0 && amt < due - 0.001;
+  const applyNow = method === "cash" ? cashApplied : amt; // what this click records
+  const partial = applyNow > 0 && due > 0 && applyNow < due - 0.001;
 
   return (
     <Modal title={taken.length ? "Next payment" : "Record a payment"} onClose={onClose}>
@@ -2022,7 +2028,7 @@ function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose
       )}
       {partial && (
         <p className="legalNote" style={{ marginTop: -4 }}>
-          Splitting it: after this, you'll take the other {fmtMoney(due - amt)} (another card, cash, and so on).
+          Splitting it: after this, you'll take the other {fmtMoney(round2(due - applyNow))} (another card, cash, and so on).
         </p>
       )}
 
@@ -2075,9 +2081,9 @@ function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose
               </button>
             )}
           </div>
-          <div className={`changeBox ${short ? "short" : change > 0 ? "due" : ""}`}>
-            <span>{short ? "Still owed" : "Change owed"}</span>
-            <b>{!hasCash ? "—" : short ? fmtMoney(amt - cashGiven) : fmtMoney(change)}</b>
+          <div className={`changeBox ${cashSplit || change > 0 ? "due" : ""}`}>
+            <span>{cashSplit ? "Cash covers — rest left to pay" : "Change owed"}</span>
+            <b>{!hasCash ? "—" : cashSplit ? `${fmtMoney(applyNow)} · ${fmtMoney(round2(due - applyNow))} left` : fmtMoney(change)}</b>
           </div>
         </>
       )}
@@ -2102,7 +2108,7 @@ function PaymentModal({ balance, total, order, cfg, customer, canCharge, onClose
         <>
           {err && <p className="fldErr">{err}</p>}
           <button className="btn primary lg full" onClick={save}>
-            {partial ? `Save ${fmtMoney(amt)} and take the rest` : "Save payment"}
+            {partial ? `Save ${fmtMoney(applyNow)} and take the rest` : "Save payment"}
           </button>
           {taken.length > 0 && (
             <button type="button" className="btn ghost sm full" style={{ marginTop: 8 }} onClick={onClose}>
