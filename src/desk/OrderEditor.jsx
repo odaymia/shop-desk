@@ -100,7 +100,8 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   const draftRef = useRef(order);
   const dirty = useRef(false);
   const timer = useRef(null);
-  const stickerAfterChecklist = useRef(null); // sticker to print once a post-time checklist is closed
+  const stickerAfterChecklist = useRef(null); // sticker to open once a checklist is closed (mileage, crew, print)
+  const oilStickerShown = useRef(false); // the reminder-sticker screen has already popped for this oil change
   const checklistAfterReview = useRef(false); // open the checklist once the oil-change service review is closed
   const saveRef = useRef(shop.saveOrder);
   saveRef.current = shop.saveOrder;
@@ -488,7 +489,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
       const needsChecklist =
         !reopening && oilOnTicket && !saved.checklist && cfg.checklistOnOil !== false && (to === STATUS.open || to === STATUS.invoiced);
       /* the reminder sticker pops on both a repair order and a post */
-      const stickerNow = !reopening && (to === STATUS.open || to === STATUS.invoiced) && oilOnTicket && cfg.oilSticker !== false;
+      const stickerNow = !reopening && (to === STATUS.open || to === STATUS.invoiced) && oilOnTicket && cfg.oilSticker !== false && !oilStickerShown.current;
       if (needsChecklist) {
         setPick("checklist");
         /* the sticker also pops here — hold it until the checklist is
@@ -522,7 +523,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
     setPick(null);
     const s = stickerAfterChecklist.current;
     stickerAfterChecklist.current = null;
-    if (s) setSticker(s);
+    if (s) {
+      oilStickerShown.current = true; // don't pop it again when this ticket is posted
+      setSticker(s);
+    }
   };
   const askPost = () => {
     if (!o.lines.some((l) => l.kind !== "note")) return flash("Nothing on the ticket yet", "out");
@@ -1587,6 +1591,9 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
             /* an oil change is the moment to review what else is due — pop the
                service review, then fall through to the walk-around checklist */
             checklistAfterReview.current = o.status === STATUS.open && !o.checklist && cfg.checklistOnOil !== false;
+            /* after the walk-around checklist, go straight to the reminder-
+               sticker screen to record the mileage, the crew, and print */
+            stickerAfterChecklist.current = checklistAfterReview.current && cfg.oilSticker !== false ? { id: o.id } : null;
             setPick(cfg.serviceReviewOnOil === false ? (checklistAfterReview.current ? "checklist" : null) : "serviceReview");
             flash(`${pkg.name} added`);
           }}

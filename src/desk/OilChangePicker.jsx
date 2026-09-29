@@ -91,7 +91,17 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const q = toNum(quarts) || (pkg ? pkg.quarts : 5);
   const wantType = pkg ? packageOilType(pkg) : null; // the oil type this package calls for, or null
 
-  const finish = (filt) => onAdd(oilPackageLines(pkg, q, oil, filt, uid), pkg);
+  const finish = (filt, oilPart = oil) => onAdd(oilPackageLines(pkg, q, oilPart, filt, uid), pkg);
+  /* the filter the car calls for, picked off the shelf: an in-stock match
+     first, else any match. Null when the car's spec matches nothing stocked. */
+  const autoFilter = () => suggestedFilters.find((f) => toNum(f.onHand) > 0) || suggestedFilters[0] || null;
+  /* after the oil, finish straight away with the car's filter when we know
+     it; otherwise open the filter list to pick one. */
+  const goFilter = (oilPart) => {
+    const f = autoFilter();
+    if (f) return finish(f, oilPart);
+    setStep("filter");
+  };
 
   if (lookup)
     return (
@@ -217,7 +227,7 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
     return (
       <Modal title={`Which ${wantType ? `${wantType} ` : ""}oil?${grade ? ` (spec: ${grade})` : ""}`} onClose={onClose} size="wide">
         <div className="rowBtns">
-          <button className="btn" onClick={() => setStep("filter")}>
+          <button className="btn" onClick={() => goFilter(null)}>
             Choose later
           </button>
         </div>
@@ -237,7 +247,7 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
           kind={`${wantType ? `${wantType} ` : ""}motor oil`}
           onPick={(p) => {
             setOil(p);
-            setStep("filter");
+            goFilter(p);
           }}
         />
       </Modal>
