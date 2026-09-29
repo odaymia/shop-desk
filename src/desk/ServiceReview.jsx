@@ -4,7 +4,8 @@ import { Modal, fmtDate, fmtPhone } from "./ui.jsx";
 import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
 import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
-import { motorVehicleFor, motorMaintenance, motorFluids } from "../lib/motor.js";
+import { motorVehicleFor, motorMaintenance, motorFluids, motorFilters } from "../lib/motor.js";
+import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
 
 const STATUS = {
   due: { label: "Due now", cls: "due" },
@@ -18,8 +19,9 @@ const miles = (n) => (Number(n) || 0).toLocaleString() + " mi";
 /* Service review: for the ticket's vehicle, show every maintenance service, when
    it was last done (from this car's history), and whether it's due — so the
    writer can recommend what's due at an oil change. */
-export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
+export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd }) {
   const vehicle = shop.vehicles[order.vehicleId] || {};
+  const [motorFilterSpec, setMotorFilterSpec] = useState(null); // exact filter numbers from live MOTOR
   const vehOrders = useMemo(() => ordersOf(shop.orders, { vehicleId: order.vehicleId }), [shop.orders, order.vehicleId]);
   const mode = cfg.serviceIntervalSource || "both"; // store | motor | both
   const storeLabel = String(cfg.serviceStoreLabel || "Store").trim() || "Store";
@@ -41,9 +43,19 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
         const v = await motorVehicleFor(vehicle);
         if (!live) return;
         if (!v.vehicle) return setMotorWhy(v.error || "MOTOR didn't find this car."), setMotorState("store");
-        const [m, f] = await Promise.all([motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId), motorFluids(v.vehicle.baseVehicleId)]);
+        const [m, f, fil] = await Promise.all([
+          motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId),
+          motorFluids(v.vehicle.baseVehicleId),
+          motorFilters(v.vehicle.baseVehicleId).catch(() => null),
+        ]);
         if (!live) return;
         if (m.error) throw new Error(m.error);
+        /* the exact filter part numbers MOTOR lists for this car — used to put
+           the right part (and its price) on parts services. Real data only. */
+        if (fil && !fil.sample && !fil.error) {
+          const en = pickEngine(fil.engines, { engineId: v.vehicle.engineId, engineText: vehicle.engine });
+          if (en || (fil.engines || []).length <= 1) setMotorFilterSpec(specFromMotorFilters(fil, en));
+        }
         const isSample = v.sample || m.sample || f.sample;
         // only hide services from REAL per-vehicle data — never from the sample fallback
         const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
@@ -76,13 +88,30 @@ export function ServiceReview({ order, cfg, shop, onClose, onAdd }) {
   const [mileage, setMileage] = useState(String(guessMileage || ""));
   const cur = Number(mileage) || 0;
 
+  /* the filter numbers for this exact car: the shop's saved spec first, then
+     anything live MOTOR added, so parts match the right part for the vehicle */
+  const partSpec = useMemo(() => {
+    const base = spec || {};
+    const mf = motorFilterSpec;
+    if (!mf) return base;
+    const pick = (a, b) => (a && a.length ? a : b || []);
+    return {
+      ...base,
+      oilFilters: pick(base.oilFilters, mf.oilFilters),
+      airFilters: pick(base.airFilters, mf.airFilters),
+      cabinFilters: pick(base.cabinFilters, mf.cabinFilters),
+      fuelFilters: pick(base.fuelFilters, mf.fuelFilters),
+      wipers: pick(base.wipers, mf.wipers),
+    };
+  }, [spec, motorFilterSpec]);
+
   /* attach the real inventory part (number + price) to services that install one */
   const rows = useMemo(() => {
     return serviceReview(intervals, vehOrders, cur, order.id).map((r) => {
-      const part = servicePart(shop.parts, r);
+      const part = servicePart(shop.parts, r, partSpec);
       return { ...r, part, effPrice: part ? Number(part.price) || 0 : Number(r.price) || 0 };
     });
-  }, [intervals, vehOrders, cur, order.id, shop.parts]);
+  }, [intervals, vehOrders, cur, order.id, shop.parts, partSpec]);
   const counts = reviewCounts(rows);
   const [added, setAdded] = useState({});
 

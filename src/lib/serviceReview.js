@@ -9,6 +9,8 @@
    and — later — overridable per vehicle by MOTOR's factory schedule. Pure and
    tested (tests/serviceReview.test.js). */
 import { matchesAuto } from "./checklist.js";
+import { matchFilter } from "./specs.js";
+import { specNumbersFor } from "./motorFilters.js";
 
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -49,9 +51,24 @@ const PART_MATCH = {
   serpentine: "serpentine | drive belt -timing",
   wipers: "wiper blade | wiper",
 };
-/* The inventory item a parts-based service installs — an in-stock match first,
-   else any match, else null. Pure. */
-export function servicePart(parts, svc) {
+/* Which filter category on a spec (from MOTOR's Valvoline catalog) an install
+   service maps to, so we can pick the exact part number for THIS vehicle. */
+const SPEC_CAT = { oil: "oil", engineAir: "air", cabinAir: "cabin", fuelFilter: "fuel", wipers: "wiper" };
+
+/* The inventory item a parts-based service installs. When `spec` carries the
+   vehicle's MOTOR filter numbers, match the exact part for this car by number
+   first; otherwise fall back to a keyword match. An in-stock match wins over a
+   zero-stock one. Pure. */
+export function servicePart(parts, svc, spec) {
+  const cat = svc && SPEC_CAT[svc.id];
+  if (spec && cat) {
+    const nums = specNumbersFor(spec, cat);
+    if (nums.length) {
+      const exact = matchFilter(parts, nums);
+      const pick = exact.find((p) => num(p.onHand) > 0) || exact[0];
+      if (pick) return pick; // the exact part MOTOR lists for this vehicle
+    }
+  }
   const pat = (svc && (svc.partMatch || PART_MATCH[svc.id])) || "";
   if (!pat) return null;
   const cands = Object.values(parts || {}).filter(

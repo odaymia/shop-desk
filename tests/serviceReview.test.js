@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SERVICE_INTERVALS, lastDoneMap, serviceStatus, serviceReview, reviewCounts, mergeMotorIntervals, filterApplicable } from "../src/lib/serviceReview.js";
+import { DEFAULT_SERVICE_INTERVALS, lastDoneMap, serviceStatus, serviceReview, reviewCounts, mergeMotorIntervals, filterApplicable, servicePart } from "../src/lib/serviceReview.js";
 
 const now = Date.UTC(2026, 8, 23);
 const day = 24 * 3600 * 1000;
@@ -147,4 +147,20 @@ test("factory schedule: replace beats inspect, severe-only drops out of normal, 
   assert.equal(atf.miles, 30000); // the store interval stands in
   // severe schedule
   assert.equal(mergeMI(intervals, motor, "motor", "severe").intervals.find((x) => x.id === "af").miles, 15000);
+});
+
+test("servicePart: exact vehicle filter number wins over a keyword match", () => {
+  const parts = {
+    p1: { id: "p1", number: "GEN-AIR", description: "Engine air filter", category: "Filters", onHand: 9, price: 10 },
+    p2: { id: "p2", number: "CA10467", description: "Engine air filter", category: "Filters", onHand: 2, price: 16 },
+  };
+  const svc = { id: "engineAir" };
+  // no spec: keyword finds an air filter (in-stock first → p1)
+  assert.equal(servicePart(parts, svc).id, "p1");
+  // with the car's MOTOR spec number: the exact part for this vehicle (p2)
+  assert.equal(servicePart(parts, svc, { airFilters: [{ number: "CA10467" }] }).id, "p2");
+  // a spec number the shop doesn't stock: fall back to the keyword match
+  assert.equal(servicePart(parts, svc, { airFilters: [{ number: "NOT-STOCKED" }] }).id, "p1");
+  // a fluid-only service never matches a part
+  assert.equal(servicePart(parts, { id: "coolant" }), null);
 });

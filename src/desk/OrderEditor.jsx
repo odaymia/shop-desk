@@ -1699,6 +1699,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
           order={o}
           cfg={cfg}
           shop={shop}
+          spec={shopSpec}
           onClose={() => {
             const next = checklistAfterReview.current ? "checklist" : null;
             checklistAfterReview.current = false;
