@@ -88,15 +88,20 @@ export function Sticker({ order, cfg, vehicle, employees, requireCrew, onAssign,
     if (!("onafterprint" in window)) done();
   };
 
-  const crewSelect = (value, onPick) => (
-    <select value={value} onChange={(e) => onPick(e.target.value)}>
-      <option value="">—</option>
+  /* one tap picks the person for a role; tapping the picked one clears it */
+  const crewChips = (value, onPick) => (
+    <div className="crewChips">
+      {(employees || []).length === 0 && (
+        <span className="muted" style={{ fontSize: 13 }}>
+          No staff yet — add them under Staff.
+        </span>
+      )}
       {(employees || []).map((e) => (
-        <option key={e.id} value={e.id}>
+        <button key={e.id} type="button" className={`crewChip ${value === e.id ? "on" : ""}`} onClick={() => onPick(value === e.id ? "" : e.id)}>
           {e.name}
-        </option>
+        </button>
       ))}
-    </select>
+    </div>
   );
 
   const target = (typeof document !== "undefined" && (document.querySelector(".root") || document.body)) || null;
@@ -116,10 +121,19 @@ export function Sticker({ order, cfg, vehicle, employees, requireCrew, onAssign,
           <div className="stkSectHead">
             Who worked on this car{requireCrew ? <span className="req"> · required</span> : null}
           </div>
-          <div className="stkGrid3">
-            <Field label="Advisor (write-up)">{crewSelect(advisor, (v) => assign({ advisorId: v || null, writerId: v || null }, setAdvisor, v))}</Field>
-            <Field label="Top tech (hood)">{crewSelect(top, (v) => assign({ topTechId: v || null, techId: v || null }, setTop, v))}</Field>
-            <Field label="Pit tech (under car)">{crewSelect(pit, (v) => assign({ pitTechId: v || null }, setPit, v))}</Field>
+          <div className="stkCrew">
+            <div className="stkRole">
+              <span className="stkRoleLabel">Advisor (write-up)</span>
+              {crewChips(advisor, (v) => assign({ advisorId: v || null, writerId: v || null }, setAdvisor, v))}
+            </div>
+            <div className="stkRole">
+              <span className="stkRoleLabel">Top tech (hood)</span>
+              {crewChips(top, (v) => assign({ topTechId: v || null, techId: v || null }, setTop, v))}
+            </div>
+            <div className="stkRole">
+              <span className="stkRoleLabel">Pit tech (under car)</span>
+              {crewChips(pit, (v) => assign({ pitTechId: v || null }, setPit, v))}
+            </div>
           </div>
         </div>
 
