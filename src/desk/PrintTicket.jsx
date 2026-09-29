@@ -94,8 +94,9 @@ export function PrintTicket({ order: o, shop, cfg, employees, onClose }) {
               {v && v.plate ? <div>Plate {v.plate}{v.plateState ? ` (${v.plateState})` : ""}</div> : null}
               {o.mileageIn || o.mileageOut ? (
                 <div>
-                  Mileage {o.mileageIn ? `in ${Number(o.mileageIn).toLocaleString()}` : ""}
-                  {o.mileageOut ? ` · out ${Number(o.mileageOut).toLocaleString()}` : ""}
+                  {o.mileageIn && o.mileageOut
+                    ? `Mileage in ${Number(o.mileageIn).toLocaleString()} · out ${Number(o.mileageOut).toLocaleString()}`
+                    : `Mileage ${Number(o.mileageIn || o.mileageOut).toLocaleString()}`}
                 </div>
               ) : null}
             </div>

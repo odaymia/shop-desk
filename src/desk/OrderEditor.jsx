@@ -1353,12 +1353,21 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               </p>
             )}
             <div className="fldRow">
-              <Field label="Mileage in">
-                <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} readOnly={locked} />
-              </Field>
-              <Field label="Mileage out">
-                <Num value={o.mileageOut} onChange={(v) => update({ mileageOut: v })} readOnly={locked} />
-              </Field>
+              {/* oil changes take one mileage reading; in/out is for jobs that keep the car */}
+              {hasOilChange(o) ? (
+                <Field label="Mileage">
+                  <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} readOnly={locked} />
+                </Field>
+              ) : (
+                <>
+                  <Field label="Mileage in">
+                    <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} readOnly={locked} />
+                  </Field>
+                  <Field label="Mileage out">
+                    <Num value={o.mileageOut} onChange={(v) => update({ mileageOut: v })} readOnly={locked} />
+                  </Field>
+                </>
+              )}
             </div>
             <label className="fld inline">
               <input type="checkbox" checked={!!o.noSupplies} onChange={(e) => update({ noSupplies: e.target.checked })} disabled={locked} />
@@ -1752,12 +1761,22 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
           {!o.customerId && <p className="fldErr">No customer on this ticket. It will post as a walk-in.</p>}
           {o.vehicleId && (
             <div className="fldRow">
-              <Field label={`Mileage in${needsMileage(o) ? " (required)" : ""}`}>
-                <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} autoFocus={needsMileage(o)} placeholder={vehicle && vehicle.mileage ? `Last time: ${Number(vehicle.mileage).toLocaleString("en-US")}` : ""} />
-              </Field>
-              <Field label="Mileage out">
-                <Num value={o.mileageOut} onChange={(v) => update({ mileageOut: v })} />
-              </Field>
+              {/* an oil change is one odometer reading; only bigger jobs where the
+                  car is kept need a separate in and out */}
+              {hasOilChange(o) ? (
+                <Field label={`Mileage${needsMileage(o) ? " (required)" : ""}`}>
+                  <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} autoFocus={needsMileage(o)} placeholder={vehicle && vehicle.mileage ? `Last time: ${Number(vehicle.mileage).toLocaleString("en-US")}` : ""} />
+                </Field>
+              ) : (
+                <>
+                  <Field label={`Mileage in${needsMileage(o) ? " (required)" : ""}`}>
+                    <Num value={o.mileageIn} onChange={(v) => update({ mileageIn: v })} autoFocus={needsMileage(o)} placeholder={vehicle && vehicle.mileage ? `Last time: ${Number(vehicle.mileage).toLocaleString("en-US")}` : ""} />
+                  </Field>
+                  <Field label="Mileage out">
+                    <Num value={o.mileageOut} onChange={(v) => update({ mileageOut: v })} />
+                  </Field>
+                </>
+              )}
             </div>
           )}
           {needsMileage(o) && <p className="fldErr">Enter the car's mileage to post this invoice.</p>}
