@@ -53,7 +53,7 @@ test("oilIntervals: range filters by the later visit", () => {
   assert.equal(oilIntervals(v, t(0), t(50)).dayCount, 0); // later visit out of range
 });
 
-test("customerLtv: average and median spend, visits, rows sorted by spend", () => {
+test("customerLtv: average and median spend, visits, rows sorted by spend (all time)", () => {
   const l = customerLtv(visits);
   assert.equal(l.customers, 4);
   assert.equal(l.ltv, 152.5); // (300 + 60 + 200 + 50) / 4
@@ -61,4 +61,13 @@ test("customerLtv: average and median spend, visits, rows sorted by spend", () =
   assert.equal(l.avgVisits, 1.5); // (2 + 1 + 2 + 1) / 4
   assert.equal(l.rows[0].customerId, "A"); // biggest spender
   assert.equal(l.rows[0].revenue, 300);
+});
+
+test("customerLtv: a range scopes to customers active then, but still counts their whole history", () => {
+  const l = customerLtv(visits, FROM, TO); // A, B, C active in window; D is not
+  assert.equal(l.customers, 3); // D excluded
+  assert.equal(l.ltv, 186.67); // (300 + 60 + 200) / 3 — A's day-50 visit still counts
+  assert.equal(l.medianLtv, 200); // middle of [60, 200, 300]
+  assert.equal(l.avgVisits, 1.67); // (2 + 1 + 2) / 3
+  assert.ok(!l.rows.some((r) => r.customerId === "D"));
 });

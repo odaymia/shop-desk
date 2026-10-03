@@ -144,7 +144,7 @@ export function Reports({ shop, cfg, employees, nav }) {
   );
   const customers = useMemo(() => customerStats(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const oil = useMemo(() => oilIntervals(visits, fromTs, toTs), [visits, fromTs, toTs]);
-  const ltv = useMemo(() => customerLtv(visits), [visits]);
+  const ltv = useMemo(() => customerLtv(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const hasFleet = useMemo(() => Object.values(shop.customers).some(isFleet), [shop.customers]);
   const fleet = useMemo(() => fleetReport(shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs), [shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs]);
 
@@ -414,12 +414,12 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
           <strong>
             <Money v={ltv.ltv} />
           </strong>
-          <small style={{ color: "var(--muted)" }}>all-time avg · median <Money v={ltv.medianLtv} /></small>
+          <small style={{ color: "var(--muted)" }}>median <Money v={ltv.medianLtv} /> · {ltv.customers} customers</small>
         </div>
         <div className="stat">
           <span>Visits per customer</span>
           <strong>{ltv.avgVisits}</strong>
-          <small style={{ color: "var(--muted)" }}>over ~{ltv.avgLifespanDays} days</small>
+          <small style={{ color: "var(--muted)" }}>lifetime · over ~{ltv.avgLifespanDays} days</small>
         </div>
       </div>
 
@@ -511,9 +511,10 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
         New vs. returning and the average ticket cover the date range above. Miles and time between oil changes are the
-        gaps leading up to oil changes done in this range. Lifetime value is all-time, across every customer with a
-        posted invoice. Click a row to open the customer. Fleet (house) accounts are left out of these numbers — they have
-        their own tab.
+        gaps leading up to oil changes done in this range. Lifetime value and visits per customer cover the customers who
+        came in during this range, counting all their visits ever (their true lifetime value) — widen the range for the
+        whole-shop average. Click a row to open the customer. Fleet (house) accounts are left out of these numbers — they
+        have their own tab.
       </p>
     </>
   );

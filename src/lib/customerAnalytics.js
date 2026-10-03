@@ -106,11 +106,13 @@ export function oilIntervals(visits, fromTs = null, toTs = null) {
   };
 }
 
-/* Lifetime value across all customers (all time): average and median total
-   spend per customer, average visits, average lifespan, plus a per-customer
-   table sorted by spend. LTV is lifetime by nature, so this ignores the date
-   range. */
-export function customerLtv(visits) {
+/* Lifetime value per customer: average and median total spend, average visits
+   and lifespan, plus a per-customer table sorted by spend. Spend and visits are
+   always a customer's whole history (that's what "lifetime" means), but when a
+   range is given it covers only the customers who came in during that range —
+   so the numbers respond to the date picker without stopping being lifetime
+   figures. No range = every customer. */
+export function customerLtv(visits, fromTs = null, toTs = null) {
   const byCust = groupBy(visits, "customerId");
   let totalRev = 0;
   let totalVisits = 0;
@@ -118,6 +120,7 @@ export function customerLtv(visits) {
   const lifespans = [];
   const rows = [];
   for (const [cid, vs] of byCust) {
+    if (fromTs != null && !vs.some((v) => v.at >= fromTs && v.at <= toTs)) continue; // only customers active in the range
     const revenue = round2(vs.reduce((a, v) => a + num(v.total), 0));
     revs.push(revenue);
     totalRev += revenue;
@@ -126,7 +129,7 @@ export function customerLtv(visits) {
     lifespans.push(span);
     rows.push({ customerId: cid, revenue, visits: vs.length, firstAt: vs[0].at, lastAt: vs[vs.length - 1].at });
   }
-  const n = byCust.size;
+  const n = revs.length; // customers included (all, or those active in the range)
   revs.sort((a, b) => a - b);
   const median = n ? (n % 2 ? revs[(n - 1) / 2] : (revs[n / 2 - 1] + revs[n / 2]) / 2) : 0;
   rows.sort((a, b) => b.revenue - a.revenue);
