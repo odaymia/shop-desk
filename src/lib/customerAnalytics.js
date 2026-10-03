@@ -106,40 +106,67 @@ export function oilIntervals(visits, fromTs = null, toTs = null) {
   };
 }
 
-/* Lifetime value per customer: average and median total spend, average visits
-   and lifespan, plus a per-customer table sorted by spend. Spend and visits are
-   always a customer's whole history (that's what "lifetime" means), but when a
-   range is given it covers only the customers who came in during that range —
-   so the numbers respond to the date picker without stopping being lifetime
-   figures. No range = every customer. */
-export function customerLtv(visits, fromTs = null, toTs = null) {
-  const byCust = groupBy(visits, "customerId");
+/* Lifetime value grouped by a key (customer or vehicle): average and median
+   total spend, average visits and lifespan, plus a per-group table sorted by
+   spend. Spend and visits are always the group's whole history (that's what
+   "lifetime" means), but when a range is given it covers only the groups active
+   during that range — so the numbers respond to the date picker without
+   stopping being lifetime figures. No range = every group. */
+function ltvBy(visits, key, fromTs, toTs) {
+  const groups = groupBy(visits, key);
   let totalRev = 0;
   let totalVisits = 0;
   const revs = [];
   const lifespans = [];
   const rows = [];
-  for (const [cid, vs] of byCust) {
-    if (fromTs != null && !vs.some((v) => v.at >= fromTs && v.at <= toTs)) continue; // only customers active in the range
+  for (const [id, vs] of groups) {
+    if (fromTs != null && !vs.some((v) => v.at >= fromTs && v.at <= toTs)) continue; // only groups active in the range
     const revenue = round2(vs.reduce((a, v) => a + num(v.total), 0));
     revs.push(revenue);
     totalRev += revenue;
     totalVisits += vs.length;
-    const span = (vs[vs.length - 1].at - vs[0].at) / DAY;
-    lifespans.push(span);
-    rows.push({ customerId: cid, revenue, visits: vs.length, firstAt: vs[0].at, lastAt: vs[vs.length - 1].at });
+    lifespans.push((vs[vs.length - 1].at - vs[0].at) / DAY);
+    rows.push({ id, revenue, visits: vs.length, firstAt: vs[0].at, lastAt: vs[vs.length - 1].at });
   }
-  const n = revs.length; // customers included (all, or those active in the range)
+  const n = revs.length;
   revs.sort((a, b) => a - b);
   const median = n ? (n % 2 ? revs[(n - 1) / 2] : (revs[n / 2 - 1] + revs[n / 2]) / 2) : 0;
   rows.sort((a, b) => b.revenue - a.revenue);
   return {
-    customers: n,
-    ltv: n ? round2(totalRev / n) : 0,
-    medianLtv: round2(median),
+    count: n,
+    avg: n ? round2(totalRev / n) : 0,
+    median: round2(median),
     avgVisits: n ? round2(totalVisits / n) : 0,
     avgLifespanDays: n ? Math.round(mean(lifespans)) : 0,
-    totalRevenue: round2(totalRev),
+    total: round2(totalRev),
     rows,
+  };
+}
+
+/* Lifetime value per customer. rows carry customerId. */
+export function customerLtv(visits, fromTs = null, toTs = null) {
+  const r = ltvBy(visits, "customerId", fromTs, toTs);
+  return {
+    customers: r.count,
+    ltv: r.avg,
+    medianLtv: r.median,
+    avgVisits: r.avgVisits,
+    avgLifespanDays: r.avgLifespanDays,
+    totalRevenue: r.total,
+    rows: r.rows.map((x) => ({ customerId: x.id, revenue: x.revenue, visits: x.visits, firstAt: x.firstAt, lastAt: x.lastAt })),
+  };
+}
+
+/* Lifetime value per vehicle (per car). rows carry vehicleId. */
+export function vehicleLtv(visits, fromTs = null, toTs = null) {
+  const r = ltvBy(visits, "vehicleId", fromTs, toTs);
+  return {
+    vehicles: r.count,
+    ltv: r.avg,
+    medianLtv: r.median,
+    avgVisits: r.avgVisits,
+    avgLifespanDays: r.avgLifespanDays,
+    totalRevenue: r.total,
+    rows: r.rows.map((x) => ({ vehicleId: x.id, revenue: x.revenue, visits: x.visits, firstAt: x.firstAt, lastAt: x.lastAt })),
   };
 }

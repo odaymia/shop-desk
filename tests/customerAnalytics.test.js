@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { customerStats, oilIntervals, customerLtv } from "../src/lib/customerAnalytics.js";
+import { customerStats, oilIntervals, customerLtv, vehicleLtv } from "../src/lib/customerAnalytics.js";
 
 const DAY = 86400000;
 const t = (d) => Date.UTC(2026, 0, 1) + d * DAY; // day 0 = 2026-01-01
@@ -70,4 +70,14 @@ test("customerLtv: a range scopes to customers active then, but still counts the
   assert.equal(l.medianLtv, 200); // middle of [60, 200, 300]
   assert.equal(l.avgVisits, 1.67); // (2 + 1 + 2) / 3
   assert.ok(!l.rows.some((r) => r.customerId === "D"));
+});
+
+test("vehicleLtv: lifetime value grouped by car", () => {
+  const l = vehicleLtv(visits);
+  assert.equal(l.vehicles, 4);
+  assert.equal(l.ltv, 152.5); // (300 + 60 + 200 + 50) / 4
+  assert.equal(l.rows[0].vehicleId, "VA"); // VA spent the most (300)
+  assert.equal(l.rows[0].revenue, 300);
+  // range scopes to cars active in the window (VD is out)
+  assert.equal(vehicleLtv(visits, FROM, TO).vehicles, 3);
 });

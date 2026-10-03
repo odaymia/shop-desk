@@ -6,9 +6,28 @@ import { salesByItem, reorderPlan } from "../lib/inventoryReports.js";
 import { commissionByEmployee, commissionForOrder, orderPayout } from "../lib/commission.js";
 import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
-import { customerStats, oilIntervals, customerLtv } from "../lib/customerAnalytics.js";
+import { customerStats, oilIntervals, customerLtv, vehicleLtv } from "../lib/customerAnalytics.js";
 import { hasOilChange } from "../lib/sticker.js";
 import { isFleet, fleetReport, fleetName } from "../lib/fleet.js";
+
+/* An oil-change visit for the analytics: our own oil tickets (flagged), plus
+   imported ones that come in as a "Full service oil change" job or an engine-oil
+   part — so the oil-interval numbers work on LubeSoft history too. */
+function isOilChangeOrder(o, parts) {
+  if (hasOilChange(o)) return true;
+  return (o.lines || []).some((l) => {
+    if (/oil change/i.test(`${l.job || ""} ${l.description || ""}`)) return true;
+    const p = l.partId && parts[l.partId];
+    return !!(p && /^oil$/i.test(String(p.category || "")));
+  });
+}
+/* Show a name, else the phone, else "Walk-in" — imported cash customers often have no name. */
+function custLabel(c) {
+  const n = customerName(c);
+  if (n && n !== "Unnamed") return n;
+  const ph = c && (c.phone || c.phone2);
+  return ph ? String(ph) : "Walk-in";
+}
 
 const presets = (weekStart) => {
   const today = new Date();
@@ -138,13 +157,14 @@ export function Reports({ shop, cfg, employees, nav }) {
           at: o.invoicedAt,
           total: orderTotals(o, cfg, shop.customers[o.customerId]).total,
           miles: Number(o.mileageOut) || Number(o.mileageIn) || 0,
-          isOil: hasOilChange(o),
+          isOil: isOilChangeOrder(o, shop.parts),
         })),
-    [shop.orders, shop.customers, cfg]
+    [shop.orders, shop.customers, shop.parts, cfg]
   );
   const customers = useMemo(() => customerStats(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const oil = useMemo(() => oilIntervals(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const ltv = useMemo(() => customerLtv(visits, fromTs, toTs), [visits, fromTs, toTs]);
+  const vltv = useMemo(() => vehicleLtv(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const hasFleet = useMemo(() => Object.values(shop.customers).some(isFleet), [shop.customers]);
   const fleet = useMemo(() => fleetReport(shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs), [shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs]);
 
@@ -197,7 +217,7 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
       </header>
       <div className="deskBody">
-        {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} shop={shop} nav={nav} />}
+        {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} vltv={vltv} shop={shop} nav={nav} />}
         {view === "fleet" && <FleetReport data={fleet} shop={shop} nav={nav} />}
         {view === "commission" && <CommissionReport data={commission} shop={shop} cfg={cfg} techName={techName} nav={nav} />}
         {view === "coupons" && <CouponsReport data={coupons} />}
@@ -374,9 +394,11 @@ export function Reports({ shop, cfg, employees, nav }) {
   );
 }
 
-function CustomersReport({ customers, oil, ltv, shop, nav }) {
+function CustomersReport({ customers, oil, ltv, vltv, shop, nav }) {
+  const [topBy, setTopBy] = useState("customers"); // customers | vehicles
   const months = (d) => (d ? ` (~${Math.round((d / 30.44) * 10) / 10} mo)` : "");
   const topLtv = ltv.rows.slice(0, 15);
+  const topVeh = vltv.rows.slice(0, 15);
   return (
     <>
       <div className="statRow">
@@ -410,16 +432,28 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
           <strong>{oil.dayCount ? `${oil.avgDays} days${months(oil.avgDays)}` : "—"}</strong>
         </div>
         <div className="stat">
-          <span>Customer lifetime value</span>
+          <span>Lifetime value / customer</span>
           <strong>
             <Money v={ltv.ltv} />
           </strong>
           <small style={{ color: "var(--muted)" }}>median <Money v={ltv.medianLtv} /> · {ltv.customers} customers</small>
         </div>
         <div className="stat">
+          <span>Lifetime value / car</span>
+          <strong>
+            <Money v={vltv.ltv} />
+          </strong>
+          <small style={{ color: "var(--muted)" }}>median <Money v={vltv.medianLtv} /> · {vltv.vehicles} cars</small>
+        </div>
+        <div className="stat">
           <span>Visits per customer</span>
           <strong>{ltv.avgVisits}</strong>
-          <small style={{ color: "var(--muted)" }}>lifetime · over ~{ltv.avgLifespanDays} days</small>
+          <small style={{ color: "var(--muted)" }}>over ~{ltv.avgLifespanDays} days</small>
+        </div>
+        <div className="stat">
+          <span>Visits per car</span>
+          <strong>{vltv.avgVisits}</strong>
+          <small style={{ color: "var(--muted)" }}>over ~{vltv.avgLifespanDays} days</small>
         </div>
       </div>
 
@@ -450,7 +484,7 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
                 {customers.newCustomers.map((c) => (
                   <tr key={c.customerId} className="row" onClick={() => nav.openCustomer(c.customerId)}>
                     <td>
-                      <strong>{customerName(shop.customers[c.customerId])}</strong>
+                      <strong>{custLabel(shop.customers[c.customerId])}</strong>
                     </td>
                     <td className="muted">{fmtDate(c.firstAt)}</td>
                     <td className="r num">{c.visits}</td>
@@ -473,37 +507,71 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
         <div className="stack">
           <div className="card">
             <div className="cardHead">
-              <h3>Top customers by lifetime value</h3>
+              <h3>Top by lifetime value</h3>
+              <div className="seg">
+                <button className={topBy === "customers" ? "on" : ""} onClick={() => setTopBy("customers")}>
+                  Customers
+                </button>
+                <button className={topBy === "vehicles" ? "on" : ""} onClick={() => setTopBy("vehicles")}>
+                  Cars
+                </button>
+              </div>
             </div>
             <table className="dk">
               <thead>
                 <tr>
-                  <th>Customer</th>
+                  <th>{topBy === "vehicles" ? "Vehicle" : "Customer"}</th>
                   <th className="r">Visits</th>
                   <th>Last visit</th>
                   <th className="r">Lifetime</th>
                 </tr>
               </thead>
               <tbody>
-                {topLtv.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="emptyNote">
-                      No customer history yet.
-                    </td>
-                  </tr>
-                )}
-                {topLtv.map((c) => (
-                  <tr key={c.customerId} className="row" onClick={() => nav.openCustomer(c.customerId)}>
-                    <td>
-                      <strong>{customerName(shop.customers[c.customerId])}</strong>
-                    </td>
-                    <td className="r num">{c.visits}</td>
-                    <td className="muted">{fmtDate(c.lastAt)}</td>
-                    <td className="r num">
-                      <Money v={c.revenue} />
-                    </td>
-                  </tr>
-                ))}
+                {topBy === "customers" &&
+                  (topLtv.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="emptyNote">
+                        No customer history yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    topLtv.map((c) => (
+                      <tr key={c.customerId} className="row" onClick={() => nav.openCustomer(c.customerId)}>
+                        <td>
+                          <strong>{custLabel(shop.customers[c.customerId])}</strong>
+                        </td>
+                        <td className="r num">{c.visits}</td>
+                        <td className="muted">{fmtDate(c.lastAt)}</td>
+                        <td className="r num">
+                          <Money v={c.revenue} />
+                        </td>
+                      </tr>
+                    ))
+                  ))}
+                {topBy === "vehicles" &&
+                  (topVeh.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="emptyNote">
+                        No vehicle history yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    topVeh.map((v) => {
+                      const veh = shop.vehicles[v.vehicleId];
+                      return (
+                        <tr key={v.vehicleId} className="row" onClick={() => veh && nav.openCustomer(veh.customerId)}>
+                          <td>
+                            <strong>{vehicleName(veh) || "Vehicle"}</strong>
+                          </td>
+                          <td className="r num">{v.visits}</td>
+                          <td className="muted">{fmtDate(v.lastAt)}</td>
+                          <td className="r num">
+                            <Money v={v.revenue} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ))}
               </tbody>
             </table>
           </div>
@@ -511,10 +579,9 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
         New vs. returning and the average ticket cover the date range above. Miles and time between oil changes are the
-        gaps leading up to oil changes done in this range. Lifetime value and visits per customer cover the customers who
-        came in during this range, counting all their visits ever (their true lifetime value) — widen the range for the
-        whole-shop average. Click a row to open the customer. Fleet (house) accounts are left out of these numbers — they
-        have their own tab.
+        gaps leading up to oil changes done in this range. Lifetime value — by customer and by car — covers those active in
+        this range, counting their whole history (true lifetime value); widen the range for the whole-shop average. Click a
+        row to open it. Fleet (house) accounts are left out of these numbers — they have their own tab.
       </p>
     </>
   );
