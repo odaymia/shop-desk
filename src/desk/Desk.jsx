@@ -11,6 +11,7 @@ import { Jobs } from "./Jobs.jsx";
 import { Coupons } from "./Coupons.jsx";
 import { Staff } from "./Staff.jsx";
 import { Reports } from "./Reports.jsx";
+import { Analytics } from "./Analytics.jsx";
 import { DeskSettings } from "./DeskSettings.jsx";
 import { EmailCenter } from "./EmailCenter.jsx";
 import { dailyEmailTick, drainTick, postcardsWaiting } from "./emailRunner.js";
@@ -43,6 +44,7 @@ const PAGES = [
   ["vendors", "Vendors"],
   ["staff", "Staff"],
   ["reports", "Reports"],
+  ["analytics", "Analytics"],
   ["signpad", "Signature pad"],
   ["baydisplay", "Bay display"],
   ["settings", "Settings"],
@@ -341,6 +343,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}
+          {page === "analytics" && <Analytics shop={shop} cfg={cfg} nav={nav} />}
           {page === "signpad" && <SignatureStation shop={shop} cfg={cfg} flash={flash} onLock={lockKiosk} />}
           {page === "baydisplay" && <BayDisplay shop={shop} cfg={cfg} />}
           {page === "settings" && (
