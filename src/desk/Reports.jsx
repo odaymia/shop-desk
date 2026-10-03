@@ -8,6 +8,7 @@ import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
 import { customerStats, oilIntervals, customerLtv } from "../lib/customerAnalytics.js";
 import { hasOilChange } from "../lib/sticker.js";
+import { isFleet, fleetReport, fleetName } from "../lib/fleet.js";
 
 const presets = (weekStart) => {
   const today = new Date();
@@ -125,11 +126,12 @@ export function Reports({ shop, cfg, employees, nav }) {
     return { rows, total: round2(rows.reduce((a, x) => a + x.total, 0)), uses: rows.reduce((a, x) => a + x.uses, 0) };
   }, [r.inv, shop.coupons]);
 
-  /* one normalized visit per invoiced order, for the customer analytics */
+  /* one normalized visit per invoiced order, for the customer analytics —
+     fleet (house) accounts are left out; they get their own report below */
   const visits = useMemo(
     () =>
       Object.values(shop.orders)
-        .filter((o) => o.status === "invoiced" && o.invoicedAt)
+        .filter((o) => o.status === "invoiced" && o.invoicedAt && !isFleet(shop.customers[o.customerId]))
         .map((o) => ({
           customerId: o.customerId,
           vehicleId: o.vehicleId,
@@ -143,6 +145,8 @@ export function Reports({ shop, cfg, employees, nav }) {
   const customers = useMemo(() => customerStats(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const oil = useMemo(() => oilIntervals(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const ltv = useMemo(() => customerLtv(visits), [visits]);
+  const hasFleet = useMemo(() => Object.values(shop.customers).some(isFleet), [shop.customers]);
+  const fleet = useMemo(() => fleetReport(shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs), [shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs]);
 
   const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
   const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays), [shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays]);
@@ -161,6 +165,7 @@ export function Reports({ shop, cfg, employees, nav }) {
           {[
             ["sales", "Sales summary"],
             ["customers", "Customers"],
+            ...(hasFleet ? [["fleet", "Fleet accounts"]] : []),
             ["commission", "Commissions"],
             ["coupons", "Coupons"],
             ["items", "Sales by item"],
@@ -193,6 +198,7 @@ export function Reports({ shop, cfg, employees, nav }) {
       </header>
       <div className="deskBody">
         {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} shop={shop} nav={nav} />}
+        {view === "fleet" && <FleetReport data={fleet} shop={shop} nav={nav} />}
         {view === "commission" && <CommissionReport data={commission} shop={shop} cfg={cfg} techName={techName} nav={nav} />}
         {view === "coupons" && <CouponsReport data={coupons} />}
         {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} />}
@@ -506,7 +512,102 @@ function CustomersReport({ customers, oil, ltv, shop, nav }) {
       <p className="legalNote" style={{ marginTop: 12 }}>
         New vs. returning and the average ticket cover the date range above. Miles and time between oil changes are the
         gaps leading up to oil changes done in this range. Lifetime value is all-time, across every customer with a
-        posted invoice. Click a row to open the customer.
+        posted invoice. Click a row to open the customer. Fleet (house) accounts are left out of these numbers — they have
+        their own tab.
+      </p>
+    </>
+  );
+}
+
+function FleetReport({ data, shop, nav }) {
+  return (
+    <>
+      <div className="statRow">
+        <div className="stat">
+          <span>Fleet revenue</span>
+          <strong>
+            <Money v={data.revenue} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Fleet tickets</span>
+          <strong>{data.tickets}</strong>
+        </div>
+        <div className="stat">
+          <span>Active accounts</span>
+          <strong>
+            {data.activeAccounts}
+            <small style={{ color: "var(--muted)", fontWeight: 400 }}> of {data.accounts}</small>
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Average ticket</span>
+          <strong>
+            <Money v={data.tickets ? round2(data.revenue / data.tickets) : 0} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Fleet discounts given</span>
+          <strong>
+            <Money v={data.discounts} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Charged on account</span>
+          <strong>
+            <Money v={data.onAccount} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Owed on account (all-time)</span>
+          <strong style={data.outstanding > 0 ? { color: "var(--warn)" } : null}>
+            <Money v={data.outstanding} />
+          </strong>
+        </div>
+      </div>
+      <div className="card">
+        <div className="cardHead">
+          <h3>Fleet accounts</h3>
+        </div>
+        <table className="dk">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th className="r">Tickets</th>
+              <th className="r">Revenue</th>
+              <th className="r">Discounts</th>
+              <th>Last visit</th>
+              <th className="r">Owed on account</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="emptyNote">
+                  No fleet accounts yet. Flag a customer as a fleet account on their page.
+                </td>
+              </tr>
+            )}
+            {data.rows.map((f) => (
+              <tr key={f.id} className="row" onClick={() => nav.openCustomer(f.id)}>
+                <td>
+                  <strong>{f.name || fleetName(shop.customers[f.id])}</strong>
+                </td>
+                <td className="r num">{f.tickets}</td>
+                <td className="r num">
+                  <Money v={f.revenue} />
+                </td>
+                <td className="r num muted">{f.discounts ? <Money v={f.discounts} /> : "—"}</td>
+                <td className="muted">{f.last ? fmtDate(f.last) : "—"}</td>
+                <td className="r num">{f.balance > 0.001 ? <Money v={f.balance} /> : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="legalNote" style={{ marginTop: 12 }}>
+        Revenue, tickets, discounts, and what was charged on account cover the date range above; "owed on account" is the
+        all-time balance these accounts still owe. Click a row to open the account.
       </p>
     </>
   );

@@ -78,3 +78,26 @@ test("moving a car onto a fleet keeps past invoices' totals", () => {
   assert.equal(orderTotals(on.orders[0], cfg, fleet).total, before);
   assert.equal(on.orders[0].movedFrom, "c1");
 });
+
+import { fleetReport } from "../src/lib/fleet.js";
+test("fleetReport rolls up fleet accounts over a range, excluding retail customers", () => {
+  const customers = {
+    c1: { id: "c1", company: "Front Range Plumbing", fleet: { discounts: { oil: 10 } } },
+    c2: { id: "c2", first: "Joe", last: "Retail" }, // not a fleet
+  };
+  const orders = {
+    o1: { id: "o1", status: "invoiced", customerId: "c1", invoicedAt: 200, lines: [{ kind: "labor", oil: true, job: "Oil", hours: 1, rate: 50 }], payments: [{ method: "account", amount: 30, at: 200 }] },
+    o2: { id: "o2", status: "invoiced", customerId: "c1", invoicedAt: 50, lines: [{ kind: "labor", oil: true, job: "Oil", hours: 1, rate: 40 }], payments: [] }, // out of range
+    o3: { id: "o3", status: "invoiced", customerId: "c2", invoicedAt: 200, lines: [{ kind: "labor", job: "Oil", hours: 1, rate: 99 }], payments: [] }, // retail
+  };
+  const r = fleetReport(orders, customers, {}, {}, 100, 300);
+  assert.equal(r.accounts, 1); // only c1 is a fleet
+  assert.equal(r.activeAccounts, 1);
+  assert.equal(r.tickets, 1); // only o1 is in range
+  assert.equal(r.revenue, 50);
+  assert.equal(r.onAccount, 30);
+  assert.equal(r.outstanding, 60); // o1 balance 20 + o2 balance 40 (all-time)
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].id, "c1");
+  assert.equal(r.rows[0].balance, 60);
+});

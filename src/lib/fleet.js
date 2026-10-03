@@ -73,6 +73,51 @@ export function fleetStats(orders, customer, cfg, parts) {
   return { visits: inv.length, lifetime, last, byCat, onAccount, saved };
 }
 
+/* Shop-wide fleet report over [fromTs, toTs]: totals across every fleet
+   account, and a per-account row (revenue, tickets and discounts in the range,
+   plus the all-time balance still owed on account). Pure. */
+export function fleetReport(orders, customers, cfg, parts, fromTs, toTs) {
+  const fleets = Object.values(customers || {}).filter(isFleet);
+  const all = Object.values(orders || {});
+  let revenue = 0;
+  let tickets = 0;
+  let discounts = 0;
+  let onAccount = 0;
+  let outstanding = 0;
+  let activeAccounts = 0;
+  const rows = [];
+  for (const c of fleets) {
+    const inv = all.filter((o) => o && o.status === "invoiced" && o.customerId === c.id);
+    let rev = 0;
+    let disc = 0;
+    let onAcct = 0;
+    let last = null;
+    let bal = 0;
+    let n = 0;
+    for (const o of inv) {
+      const at = o.invoicedAt || 0;
+      const t = orderTotals(o, cfg, c);
+      bal = round2(bal + Math.max(0, t.balance));
+      if (at > (last || 0)) last = at || null;
+      if (at >= fromTs && at <= toTs) {
+        n += 1;
+        rev = round2(rev + t.total);
+        for (const l of o.lines || []) if (l.fleetDiscount) disc = round2(disc + Math.abs(lineAmount(l)));
+      }
+      for (const p of o.payments || []) if (p.method === "account" && p.at >= fromTs && p.at <= toTs) onAcct = round2(onAcct + (Number(p.amount) || 0));
+    }
+    revenue = round2(revenue + rev);
+    tickets += n;
+    discounts = round2(discounts + disc);
+    onAccount = round2(onAccount + onAcct);
+    outstanding = round2(outstanding + bal);
+    if (n) activeAccounts += 1;
+    rows.push({ id: c.id, name: fleetName(c), tickets: n, revenue: rev, discounts: disc, balance: bal, last });
+  }
+  rows.sort((a, b) => b.revenue - a.revenue);
+  return { accounts: fleets.length, activeAccounts, revenue, tickets, discounts, onAccount, outstanding, rows };
+}
+
 /* Moving a car the shop already knows onto a fleet account. The car
    changes owner; its past tickets move too only when asked (they then
    count in the account's history and report). A moved invoice keeps the
