@@ -6,6 +6,8 @@ import { salesByItem, reorderPlan } from "../lib/inventoryReports.js";
 import { commissionByEmployee, commissionForOrder, orderPayout } from "../lib/commission.js";
 import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
+import { customerStats, oilIntervals, customerLtv } from "../lib/customerAnalytics.js";
+import { hasOilChange } from "../lib/sticker.js";
 
 const presets = (weekStart) => {
   const today = new Date();
@@ -123,6 +125,25 @@ export function Reports({ shop, cfg, employees, nav }) {
     return { rows, total: round2(rows.reduce((a, x) => a + x.total, 0)), uses: rows.reduce((a, x) => a + x.uses, 0) };
   }, [r.inv, shop.coupons]);
 
+  /* one normalized visit per invoiced order, for the customer analytics */
+  const visits = useMemo(
+    () =>
+      Object.values(shop.orders)
+        .filter((o) => o.status === "invoiced" && o.invoicedAt)
+        .map((o) => ({
+          customerId: o.customerId,
+          vehicleId: o.vehicleId,
+          at: o.invoicedAt,
+          total: orderTotals(o, cfg, shop.customers[o.customerId]).total,
+          miles: Number(o.mileageOut) || Number(o.mileageIn) || 0,
+          isOil: hasOilChange(o),
+        })),
+    [shop.orders, shop.customers, cfg]
+  );
+  const customers = useMemo(() => customerStats(visits, fromTs, toTs), [visits, fromTs, toTs]);
+  const oil = useMemo(() => oilIntervals(visits, fromTs, toTs), [visits, fromTs, toTs]);
+  const ltv = useMemo(() => customerLtv(visits), [visits]);
+
   const items = useMemo(() => salesByItem(shop.orders, shop.parts, fromTs, toTs), [shop.orders, shop.parts, fromTs, toTs]);
   const reorder = useMemo(() => reorderPlan(shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays), [shop.orders, shop.parts, fromTs, toTs, coverDays, leadDays]);
   const cats = useMemo(() => [...new Set(items.map((it) => it.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
@@ -139,6 +160,7 @@ export function Reports({ shop, cfg, employees, nav }) {
         <div className="seg">
           {[
             ["sales", "Sales summary"],
+            ["customers", "Customers"],
             ["commission", "Commissions"],
             ["coupons", "Coupons"],
             ["items", "Sales by item"],
@@ -170,6 +192,7 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
       </header>
       <div className="deskBody">
+        {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} shop={shop} nav={nav} />}
         {view === "commission" && <CommissionReport data={commission} shop={shop} cfg={cfg} techName={techName} nav={nav} />}
         {view === "coupons" && <CouponsReport data={coupons} />}
         {view === "items" && <ItemsReport rows={itemRows} q={itemQ} setQ={setItemQ} cats={cats} cat={cat} setCat={setCat} />}
@@ -341,6 +364,150 @@ export function Reports({ shop, cfg, employees, nav }) {
         </>
         )}
       </div>
+    </>
+  );
+}
+
+function CustomersReport({ customers, oil, ltv, shop, nav }) {
+  const months = (d) => (d ? ` (~${Math.round((d / 30.44) * 10) / 10} mo)` : "");
+  const topLtv = ltv.rows.slice(0, 15);
+  return (
+    <>
+      <div className="statRow">
+        <div className="stat">
+          <span>New customers</span>
+          <strong>{customers.newCount}</strong>
+        </div>
+        <div className="stat">
+          <span>Of those, returned</span>
+          <strong>
+            {customers.newReturned}
+            {customers.newCount ? <small style={{ color: "var(--muted)", fontWeight: 400 }}> · {customers.newReturnRate}%</small> : null}
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Returning customers</span>
+          <strong>{customers.returningCount}</strong>
+        </div>
+        <div className="stat">
+          <span>Average ticket</span>
+          <strong>
+            <Money v={customers.avgTicket} />
+          </strong>
+        </div>
+        <div className="stat">
+          <span>Miles between oil changes</span>
+          <strong>{oil.mileCount ? `${oil.avgMiles.toLocaleString()} mi` : "—"}</strong>
+        </div>
+        <div className="stat">
+          <span>Time between oil changes</span>
+          <strong>{oil.dayCount ? `${oil.avgDays} days${months(oil.avgDays)}` : "—"}</strong>
+        </div>
+        <div className="stat">
+          <span>Customer lifetime value</span>
+          <strong>
+            <Money v={ltv.ltv} />
+          </strong>
+          <small style={{ color: "var(--muted)" }}>all-time avg · median <Money v={ltv.medianLtv} /></small>
+        </div>
+        <div className="stat">
+          <span>Visits per customer</span>
+          <strong>{ltv.avgVisits}</strong>
+          <small style={{ color: "var(--muted)" }}>over ~{ltv.avgLifespanDays} days</small>
+        </div>
+      </div>
+
+      <div className="deskSplit">
+        <div className="stack">
+          <div className="card">
+            <div className="cardHead">
+              <h3>New customers in this range ({customers.newCount})</h3>
+            </div>
+            <table className="dk">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>First visit</th>
+                  <th className="r">Visits</th>
+                  <th className="r">Spent so far</th>
+                  <th>Came back?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.newCustomers.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="emptyNote">
+                      No new customers in this range.
+                    </td>
+                  </tr>
+                )}
+                {customers.newCustomers.map((c) => (
+                  <tr key={c.customerId} className="row" onClick={() => nav.openCustomer(c.customerId)}>
+                    <td>
+                      <strong>{customerName(shop.customers[c.customerId])}</strong>
+                    </td>
+                    <td className="muted">{fmtDate(c.firstAt)}</td>
+                    <td className="r num">{c.visits}</td>
+                    <td className="r num">
+                      <Money v={c.lifetimeRevenue} />
+                    </td>
+                    <td>
+                      {c.returned ? (
+                        <span className="svcBadge done">Returned</span>
+                      ) : (
+                        <span className="muted">Not yet</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="stack">
+          <div className="card">
+            <div className="cardHead">
+              <h3>Top customers by lifetime value</h3>
+            </div>
+            <table className="dk">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th className="r">Visits</th>
+                  <th>Last visit</th>
+                  <th className="r">Lifetime</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topLtv.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="emptyNote">
+                      No customer history yet.
+                    </td>
+                  </tr>
+                )}
+                {topLtv.map((c) => (
+                  <tr key={c.customerId} className="row" onClick={() => nav.openCustomer(c.customerId)}>
+                    <td>
+                      <strong>{customerName(shop.customers[c.customerId])}</strong>
+                    </td>
+                    <td className="r num">{c.visits}</td>
+                    <td className="muted">{fmtDate(c.lastAt)}</td>
+                    <td className="r num">
+                      <Money v={c.revenue} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p className="legalNote" style={{ marginTop: 12 }}>
+        New vs. returning and the average ticket cover the date range above. Miles and time between oil changes are the
+        gaps leading up to oil changes done in this range. Lifetime value is all-time, across every customer with a
+        posted invoice. Click a row to open the customer.
+      </p>
     </>
   );
 }

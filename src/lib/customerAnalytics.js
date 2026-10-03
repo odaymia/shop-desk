@@ -1,0 +1,142 @@
+/* Customer analytics for the Reports tab: new vs. returning customers, how
+   many new customers came back, average ticket, how often cars come in for an
+   oil change (miles and days between visits), and customer lifetime value.
+
+   Works on a plain list of "visits" the Reports screen builds from invoiced
+   orders — { customerId, vehicleId, at, total, miles, isOil } — so this stays
+   pure (no React, no storage, no orderTotals) and easy to test. */
+import { round2 } from "./invoice.js";
+
+const DAY = 86400000;
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+
+/* Group visits by a key (customerId / vehicleId), each group sorted oldest
+   first; blank keys are dropped. */
+function groupBy(visits, key) {
+  const m = new Map();
+  for (const v of visits || []) {
+    const k = v && v[key];
+    if (k == null || k === "") continue;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(v);
+  }
+  for (const arr of m.values()) arr.sort((a, b) => a.at - b.at);
+  return m;
+}
+
+/* New vs. returning customers in [fromTs, toTs], and the average ticket over
+   the visits in that window. A customer is "new" when their very first visit
+   (ever) lands in the window; "returned" when a new customer has come back at
+   least once. "Returning" customers were acquired earlier but came in during
+   the window. */
+export function customerStats(visits, fromTs, toTs) {
+  const byCust = groupBy(visits, "customerId");
+  let newCount = 0;
+  let newReturned = 0;
+  let returningCount = 0;
+  let activeCount = 0;
+  let periodRevenue = 0;
+  let periodVisits = 0;
+  const newCustomers = [];
+  for (const [cid, vs] of byCust) {
+    const firstAt = vs[0].at;
+    const inRange = vs.filter((v) => v.at >= fromTs && v.at <= toTs);
+    if (inRange.length) {
+      activeCount += 1;
+      periodVisits += inRange.length;
+      for (const v of inRange) periodRevenue += num(v.total);
+    }
+    const isNew = firstAt >= fromTs && firstAt <= toTs;
+    if (isNew) {
+      newCount += 1;
+      const returned = vs.length > 1;
+      if (returned) newReturned += 1;
+      newCustomers.push({
+        customerId: cid,
+        firstAt,
+        lastAt: vs[vs.length - 1].at,
+        visits: vs.length,
+        lifetimeRevenue: round2(vs.reduce((a, v) => a + num(v.total), 0)),
+        returned,
+      });
+    } else if (inRange.length) {
+      returningCount += 1;
+    }
+  }
+  newCustomers.sort((a, b) => b.firstAt - a.firstAt);
+  return {
+    newCount,
+    newReturned,
+    newReturnRate: newCount ? Math.round((newReturned / newCount) * 100) : 0,
+    returningCount,
+    activeCount,
+    periodVisits,
+    periodRevenue: round2(periodRevenue),
+    avgTicket: periodVisits ? round2(periodRevenue / periodVisits) : 0,
+    newCustomers,
+  };
+}
+
+/* How far apart a car's oil changes are — miles and days between one oil
+   change and the next. An interval counts when the later of the two visits
+   falls in [fromTs, toTs] (pass null for all time). Nonsense gaps are dropped
+   (under a week or over two years; under 500 or over 30,000 miles) so one bad
+   odometer entry doesn't skew the average. */
+export function oilIntervals(visits, fromTs = null, toTs = null) {
+  const byVeh = groupBy((visits || []).filter((v) => v.isOil), "vehicleId");
+  const dayDeltas = [];
+  const mileDeltas = [];
+  for (const vs of byVeh.values()) {
+    for (let i = 1; i < vs.length; i++) {
+      const later = vs[i];
+      const prev = vs[i - 1];
+      if (fromTs != null && !(later.at >= fromTs && later.at <= toTs)) continue;
+      const days = (later.at - prev.at) / DAY;
+      if (days >= 7 && days <= 730) dayDeltas.push(days);
+      const miles = num(later.miles) - num(prev.miles);
+      if (miles >= 500 && miles <= 30000) mileDeltas.push(miles);
+    }
+  }
+  return {
+    avgDays: Math.round(mean(dayDeltas)),
+    avgMiles: Math.round(mean(mileDeltas)),
+    dayCount: dayDeltas.length,
+    mileCount: mileDeltas.length,
+  };
+}
+
+/* Lifetime value across all customers (all time): average and median total
+   spend per customer, average visits, average lifespan, plus a per-customer
+   table sorted by spend. LTV is lifetime by nature, so this ignores the date
+   range. */
+export function customerLtv(visits) {
+  const byCust = groupBy(visits, "customerId");
+  let totalRev = 0;
+  let totalVisits = 0;
+  const revs = [];
+  const lifespans = [];
+  const rows = [];
+  for (const [cid, vs] of byCust) {
+    const revenue = round2(vs.reduce((a, v) => a + num(v.total), 0));
+    revs.push(revenue);
+    totalRev += revenue;
+    totalVisits += vs.length;
+    const span = (vs[vs.length - 1].at - vs[0].at) / DAY;
+    lifespans.push(span);
+    rows.push({ customerId: cid, revenue, visits: vs.length, firstAt: vs[0].at, lastAt: vs[vs.length - 1].at });
+  }
+  const n = byCust.size;
+  revs.sort((a, b) => a - b);
+  const median = n ? (n % 2 ? revs[(n - 1) / 2] : (revs[n / 2 - 1] + revs[n / 2]) / 2) : 0;
+  rows.sort((a, b) => b.revenue - a.revenue);
+  return {
+    customers: n,
+    ltv: n ? round2(totalRev / n) : 0,
+    medianLtv: round2(median),
+    avgVisits: n ? round2(totalVisits / n) : 0,
+    avgLifespanDays: n ? Math.round(mean(lifespans)) : 0,
+    totalRevenue: round2(totalRev),
+    rows,
+  };
+}
