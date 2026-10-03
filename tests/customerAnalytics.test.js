@@ -1,6 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { customerStats, oilIntervals, customerLtv, vehicleLtv } from "../src/lib/customerAnalytics.js";
+import { customerStats, oilIntervals, customerLtv, vehicleLtv, isOilChangeOrder } from "../src/lib/customerAnalytics.js";
+
+test("isOilChangeOrder: catches our own tickets and the LubeSoft names", () => {
+  const parts = { pOil: { category: "Oil" }, pFilt: { category: "Filters" } };
+  const oil = (lines) => isOilChangeOrder({ lines }, parts);
+  assert.ok(oil([{ oil: true, description: "Motor oil" }])); // our native flag
+  assert.ok(oil([{ kind: "labor", job: "Full service oil change", description: "Full Svc" }])); // current import
+  assert.ok(oil([{ kind: "labor", description: "Full service oil change", job: "" }])); // historical summary
+  assert.ok(oil([{ kind: "labor", description: "Basic service" }])); // LubeSoft "BS1"
+  assert.ok(oil([{ kind: "labor", description: "Signature Service" }]));
+  assert.ok(oil([{ kind: "labor", description: "Synthetic Oil Change" }]));
+  assert.ok(oil([{ kind: "part", partId: "pOil", description: "5W-20" }])); // sold engine oil
+  assert.ok(!oil([{ kind: "labor", description: "Front brake pads replacement" }])); // not an oil change
+  assert.ok(!oil([{ kind: "part", partId: "pFilt", description: "Oil filter" }])); // a filter alone isn't
+});
 
 const DAY = 86400000;
 const t = (d) => Date.UTC(2026, 0, 1) + d * DAY; // day 0 = 2026-01-01

@@ -11,6 +11,23 @@ const DAY = 86400000;
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
 
+/* Does an order look like an oil-change / lube visit? Catches our own tickets
+   (the oil flag), and the many ways imported LubeSoft history names one —
+   "Full service oil change", "Basic service", "Signature service", a synthetic
+   or conventional oil change, a plain lube, or any line that sold engine oil.
+   Deliberately broad: for a quick lube nearly every repeat visit is an oil
+   change, and the mile/day sanity limits downstream drop anything odd. */
+const OIL_TEXT = /oil change|oil & filter|oil and filter|full service|basic service|signature service|\blof\b|\blube\b|synthetic.{0,12}oil|conventional.{0,12}oil|high.?mileage.{0,12}oil|\boil\b.{0,14}(service|change|lube)|(service|change|lube).{0,14}\boil\b/i;
+export function isOilChangeOrder(order, parts) {
+  const lines = (order && order.lines) || [];
+  return lines.some((l) => {
+    if (l.oil) return true;
+    if (OIL_TEXT.test(`${l.job || ""} ${l.description || ""}`)) return true;
+    const p = l.partId && parts && parts[l.partId];
+    return !!(p && /^oil$/i.test(String((p && p.category) || "")));
+  });
+}
+
 /* Group visits by a key (customerId / vehicleId), each group sorted oldest
    first; blank keys are dropped. */
 function groupBy(visits, key) {

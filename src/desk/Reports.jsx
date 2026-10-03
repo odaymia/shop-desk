@@ -6,21 +6,9 @@ import { salesByItem, reorderPlan } from "../lib/inventoryReports.js";
 import { commissionByEmployee, commissionForOrder, orderPayout } from "../lib/commission.js";
 import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
-import { customerStats, oilIntervals, customerLtv, vehicleLtv } from "../lib/customerAnalytics.js";
-import { hasOilChange } from "../lib/sticker.js";
+import { customerStats, oilIntervals, customerLtv, vehicleLtv, isOilChangeOrder } from "../lib/customerAnalytics.js";
 import { isFleet, fleetReport, fleetName } from "../lib/fleet.js";
 
-/* An oil-change visit for the analytics: our own oil tickets (flagged), plus
-   imported ones that come in as a "Full service oil change" job or an engine-oil
-   part — so the oil-interval numbers work on LubeSoft history too. */
-function isOilChangeOrder(o, parts) {
-  if (hasOilChange(o)) return true;
-  return (o.lines || []).some((l) => {
-    if (/oil change/i.test(`${l.job || ""} ${l.description || ""}`)) return true;
-    const p = l.partId && parts[l.partId];
-    return !!(p && /^oil$/i.test(String(p.category || "")));
-  });
-}
 /* Show a name, else the phone, else "Walk-in" — imported cash customers often have no name. */
 function custLabel(c) {
   const n = customerName(c);
