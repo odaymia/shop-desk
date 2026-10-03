@@ -24,6 +24,7 @@ import { AppointmentRequests } from "./AppointmentRequests.jsx";
 import { cloud } from "../storage/index.js";
 import { DEMO } from "../lib/demo.js";
 import { activeDepts, DEPTS, startStatus } from "../lib/departments.js";
+import { editionOf } from "../lib/edition.js";
 import defaultLogo from "../assets/genie-logo.png";
 
 /* The front desk: tickets, customers, parts, reports. */
@@ -71,6 +72,15 @@ const lsDel = (k) => {
 
 export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const shop = useShop(cfg);
+
+  /* name the browser tab after the product edition */
+  useEffect(() => {
+    try {
+      document.title = editionOf(cfg).name;
+    } catch {
+      /* no document */
+    }
+  }, [cfg.edition]);
 
   /* automatic emails: check once a day who's due, and every 15 minutes nudge
      the sender to send what's waiting (see emailRunner.js) */
@@ -216,8 +226,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   /* from a customer or vehicle page the car is known; from anywhere else
      the ticket starts with the plate */
   const newTicket = async (opts) => {
-    /* a ticket started from a department page belongs to it */
-    const dept = (opts && opts.dept) || (page.startsWith("dept:") ? page.slice(5) : null);
+    /* a ticket started from a department page belongs to it; in a single-trade
+       edition (QuickLube OS, etc.) every ticket belongs to that department */
+    const active = activeDepts(cfg);
+    const soleDept = active.length === 1 ? active[0].id : null;
+    const dept = (opts && opts.dept) || (page.startsWith("dept:") ? page.slice(5) : null) || soleDept;
     if (!opts || (!opts.customerId && !opts.vehicleId && !opts.walkIn)) {
       setStarting({ dept });
       return;
@@ -253,7 +266,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   /* each department is its own page under Tickets (hidden when the shop
      runs only one) */
   const depts = activeDepts(cfg);
-  const navPages = PAGES.flatMap((pg) => (pg[0] === "orders" && depts.length > 1 ? [["orders", "All tickets"], ...depts.map((d) => [`dept:${d.id}`, d.label, true])] : [pg]));
+  const deptIds = new Set(depts.map((d) => d.id));
+  const navPages = PAGES
+    /* Tire inventory is only for shops that sell tires */
+    .filter((pg) => !(pg[0] === "tires" && !deptIds.has("tires")))
+    .flatMap((pg) => (pg[0] === "orders" && depts.length > 1 ? [["orders", "All tickets"], ...depts.map((d) => [`dept:${d.id}`, d.label, true])] : [pg]));
   const ticketPage = page === "orders" || page === "cashier" || page.startsWith("dept:");
 
   return (
@@ -263,7 +280,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           <div className="deskBrand">
             <img className="brandLogo" src={cfg.logo || defaultLogo} alt="" />
             <strong>{cfg.shopName}</strong>
-            <span>Front desk</span>
+            <span>{editionOf(cfg).short}</span>
             {DEMO && <span className="brandDemoNote">Your shop's logo &amp; name go here — set them in Settings</span>}
           </div>
           {navPages.map(([k, label, sub]) => (

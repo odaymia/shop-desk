@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DEPTS } from "../lib/departments.js";
+import { EDITIONS, editionOf } from "../lib/edition.js";
 import { tireAddOns } from "../lib/tireQuote.js";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
@@ -519,23 +520,40 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           )}
           {show("departments") && (
           <>
-          <h3 className="subhead">Departments</h3>
-          <p className="legalNote" style={{ marginTop: 0 }}>
-            Each department gets its own page under Tickets, with its own ticket list, New button, and today's cars and sales. A ticket with work from more than
-            one (an oil change and two tires) shows on each page and still prints as one receipt. Turn off the ones this shop doesn't run.
+          <h3 className="subhead">Product</h3>
+          <Field label="This shop runs">
+            <select value={editionOf(d).id} onChange={(e) => set("edition")(e.target.value)}>
+              {Object.values(EDITIONS).map((ed) => (
+                <option key={ed.id} value={ed.id}>
+                  {ed.name} — {ed.tagline}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="legalNote" style={{ marginTop: 4 }}>
+            QuickLube OS shows only oil &amp; lube; Tire OS only tires; Mechanical OS only repairs. Shop OS runs all three in one program. Switching here only
+            changes what's shown — no data is lost, so you can turn on another department later.
           </p>
-          {DEPTS.map((dp) => (
-            <label key={dp.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}>
-              <input
-                type="checkbox"
-                checked={((d.departments || {})[dp.id]) !== false}
-                onChange={(e) => set("departments")({ ...(d.departments || {}), [dp.id]: e.target.checked })}
-              />
-              <span>
-                {dp.icon} {dp.label}
-              </span>
-            </label>
-          ))}
+
+          <h3 className="subhead" style={{ marginTop: 28 }}>Departments</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            {editionOf(d).depts.length > 1
+              ? "Each department gets its own page under Tickets, with its own ticket list, New button, and today's cars and sales. A ticket with work from more than one (an oil change and two tires) shows on each page and still prints as one receipt. Turn off the ones this shop doesn't run."
+              : `${editionOf(d).name} runs the ${DEPTS.find((x) => x.id === editionOf(d).depts[0])?.label} department. Switch to Shop OS above to run more than one.`}
+          </p>
+          {editionOf(d).depts.length > 1 &&
+            DEPTS.map((dp) => (
+              <label key={dp.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}>
+                <input
+                  type="checkbox"
+                  checked={((d.departments || {})[dp.id]) !== false}
+                  onChange={(e) => set("departments")({ ...(d.departments || {}), [dp.id]: e.target.checked })}
+                />
+                <span>
+                  {dp.icon} {dp.label}
+                </span>
+              </label>
+            ))}
 
           <h3 className="subhead" style={{ marginTop: 28 }}>Oil change tickets</h3>
           <Field label="Oil & lube tickets">

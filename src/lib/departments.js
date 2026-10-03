@@ -7,6 +7,7 @@
    line), plus the department it was started in. Pure: no React, no storage. */
 import { lineCode } from "./serviceCodes.js";
 import { lineAmount, round2 } from "./invoice.js";
+import { editionDeptIds } from "./edition.js";
 
 export const DEPTS = [
   { id: "oil", label: "Oil & lube", noun: "oil change", icon: "🛢️" },
@@ -15,11 +16,13 @@ export const DEPTS = [
 ];
 export const deptLabel = (id) => (DEPTS.find((d) => d.id === id) || {}).label || "";
 
-/* Which departments the shop runs (Settings → Tickets). All three unless
-   turned off; a tire-only shop turns off the other two. */
+/* Which departments the shop runs: the edition's departments (QuickLube OS is
+   oil only, the full Shop OS is all three), minus any the shop turned off in
+   Settings. */
 export function activeDepts(cfg) {
+  const allow = new Set(editionDeptIds(cfg));
   const on = (cfg && cfg.departments) || {};
-  return DEPTS.filter((d) => on[d.id] !== false);
+  return DEPTS.filter((d) => allow.has(d.id) && on[d.id] !== false);
 }
 
 /* Quick-lube menu work: the oil change and the fluids, filters, wipers and

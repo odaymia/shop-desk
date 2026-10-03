@@ -6,6 +6,7 @@ import { DEFAULT_SERVICE_INTERVALS } from "./serviceReview.js";
 /* Shop settings and their defaults. Saved config is merged over these. */
 
 export const DEFAULT_CFG = {
+  edition: "quicklube", // which product this is: quicklube | tire | mechanical | full (Settings → Departments)
   shopName: "",
   shopPhone: "",
   shopAddress: "", // free text, printed on the invoice header
