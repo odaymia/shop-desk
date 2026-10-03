@@ -160,6 +160,24 @@ function ltvBy(visits, key, fromTs, toTs) {
   };
 }
 
+/* Average spend per group (customer or car) within [fromTs, toTs] only — the
+   money taken in during the selected window, divided by how many distinct
+   customers/cars came in. Updates with the date range (unlike lifetime value).
+   Pure. */
+export function periodSpend(visits, key, fromTs, toTs) {
+  const groups = new Set();
+  let revenue = 0;
+  for (const v of visits || []) {
+    if (!(v.at >= fromTs && v.at <= toTs)) continue;
+    const id = v && v[key];
+    if (id == null || id === "") continue;
+    groups.add(id);
+    revenue += num(v.total);
+  }
+  const n = groups.size;
+  return { groups: n, revenue: round2(revenue), perGroup: n ? round2(revenue / n) : 0 };
+}
+
 /* Lifetime value per customer. rows carry customerId. */
 export function customerLtv(visits, fromTs = null, toTs = null) {
   const r = ltvBy(visits, "customerId", fromTs, toTs);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { customerStats, oilIntervals, customerLtv, vehicleLtv, isOilChangeOrder } from "../src/lib/customerAnalytics.js";
+import { customerStats, oilIntervals, customerLtv, vehicleLtv, periodSpend, isOilChangeOrder } from "../src/lib/customerAnalytics.js";
 
 test("isOilChangeOrder: catches our own tickets and the LubeSoft names", () => {
   const parts = { pOil: { category: "Oil" }, pFilt: { category: "Filters" } };
@@ -94,4 +94,11 @@ test("vehicleLtv: lifetime value grouped by car", () => {
   assert.equal(l.rows[0].revenue, 300);
   // range scopes to cars active in the window (VD is out)
   assert.equal(vehicleLtv(visits, FROM, TO).vehicles, 3);
+});
+
+test("periodSpend: money per car taken in during the range only", () => {
+  const s = periodSpend(visits, "vehicleId", FROM, TO); // VA@12, VB@20, VC@30 in window
+  assert.equal(s.groups, 3); // VA, VB, VC (VD out of range, VA's day-50 visit out)
+  assert.equal(s.revenue, 280); // 100 + 60 + 120
+  assert.equal(s.perGroup, 93.33); // 280 / 3
 });

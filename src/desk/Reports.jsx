@@ -6,7 +6,7 @@ import { salesByItem, reorderPlan } from "../lib/inventoryReports.js";
 import { commissionByEmployee, commissionForOrder, orderPayout } from "../lib/commission.js";
 import { searchText } from "./useShop.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
-import { customerStats, oilIntervals, customerLtv, vehicleLtv, isOilChangeOrder } from "../lib/customerAnalytics.js";
+import { customerStats, oilIntervals, customerLtv, vehicleLtv, periodSpend, isOilChangeOrder } from "../lib/customerAnalytics.js";
 import { isFleet, fleetReport, fleetName } from "../lib/fleet.js";
 
 /* Show a name, else the phone, else "Walk-in" — imported cash customers often have no name. */
@@ -157,8 +157,11 @@ export function Reports({ shop, cfg, employees, nav }) {
   );
   const customers = useMemo(() => customerStats(visits, fromTs, toTs), [visits, fromTs, toTs]);
   const oil = useMemo(() => oilIntervals(visits, fromTs, toTs), [visits, fromTs, toTs]);
-  const ltv = useMemo(() => customerLtv(visits, fromTs, toTs), [visits, fromTs, toTs]);
-  const vltv = useMemo(() => vehicleLtv(visits, fromTs, toTs), [visits, fromTs, toTs]);
+  /* lifetime value is all-time by nature — the whole book, not the date range */
+  const ltv = useMemo(() => customerLtv(visits), [visits]);
+  const vltv = useMemo(() => vehicleLtv(visits), [visits]);
+  /* spend inside the selected range (this one tracks the date picker) */
+  const carSpend = useMemo(() => periodSpend(visits, "vehicleId", fromTs, toTs), [visits, fromTs, toTs]);
   const hasFleet = useMemo(() => Object.values(shop.customers).some(isFleet), [shop.customers]);
   const fleet = useMemo(() => fleetReport(shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs), [shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs]);
 
@@ -211,7 +214,7 @@ export function Reports({ shop, cfg, employees, nav }) {
         </div>
       </header>
       <div className="deskBody">
-        {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} vltv={vltv} shop={shop} nav={nav} />}
+        {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} vltv={vltv} carSpend={carSpend} shop={shop} nav={nav} />}
         {view === "fleet" && <FleetReport data={fleet} shop={shop} nav={nav} />}
         {view === "commission" && <CommissionReport data={commission} shop={shop} cfg={cfg} techName={techName} nav={nav} />}
         {view === "coupons" && <CouponsReport data={coupons} />}
@@ -388,7 +391,7 @@ export function Reports({ shop, cfg, employees, nav }) {
   );
 }
 
-function CustomersReport({ customers, oil, ltv, vltv, shop, nav }) {
+function CustomersReport({ customers, oil, ltv, vltv, carSpend, shop, nav }) {
   const [topBy, setTopBy] = useState("customers"); // customers | vehicles
   const months = (d) => (d ? ` (~${Math.round((d / 30.44) * 10) / 10} mo)` : "");
   const topLtv = ltv.rows.slice(0, 15);
@@ -418,6 +421,13 @@ function CustomersReport({ customers, oil, ltv, vltv, shop, nav }) {
           </strong>
         </div>
         <div className="stat">
+          <span>Spent per car</span>
+          <strong>
+            <Money v={carSpend.perGroup} />
+          </strong>
+          <small style={{ color: "var(--muted)" }}>in this range · {carSpend.groups} cars</small>
+        </div>
+        <div className="stat">
           <span>Miles between oil changes</span>
           <strong>{oil.mileCount ? `${oil.avgMiles.toLocaleString()} mi` : "—"}</strong>
         </div>
@@ -430,24 +440,19 @@ function CustomersReport({ customers, oil, ltv, vltv, shop, nav }) {
           <strong>
             <Money v={ltv.ltv} />
           </strong>
-          <small style={{ color: "var(--muted)" }}>median <Money v={ltv.medianLtv} /> · {ltv.customers} customers</small>
+          <small style={{ color: "var(--muted)" }}>all-time · median <Money v={ltv.medianLtv} /></small>
         </div>
         <div className="stat">
           <span>Lifetime value / car</span>
           <strong>
             <Money v={vltv.ltv} />
           </strong>
-          <small style={{ color: "var(--muted)" }}>median <Money v={vltv.medianLtv} /> · {vltv.vehicles} cars</small>
-        </div>
-        <div className="stat">
-          <span>Visits per customer</span>
-          <strong>{ltv.avgVisits}</strong>
-          <small style={{ color: "var(--muted)" }}>over ~{ltv.avgLifespanDays} days</small>
+          <small style={{ color: "var(--muted)" }}>all-time · median <Money v={vltv.medianLtv} /></small>
         </div>
         <div className="stat">
           <span>Visits per car</span>
           <strong>{vltv.avgVisits}</strong>
-          <small style={{ color: "var(--muted)" }}>over ~{vltv.avgLifespanDays} days</small>
+          <small style={{ color: "var(--muted)" }}>all-time · over ~{vltv.avgLifespanDays} days</small>
         </div>
       </div>
 
@@ -573,9 +578,10 @@ function CustomersReport({ customers, oil, ltv, vltv, shop, nav }) {
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
         New vs. returning and the average ticket cover the date range above. Miles and time between oil changes are the
-        gaps leading up to oil changes done in this range. Lifetime value — by customer and by car — covers those active in
-        this range, counting their whole history (true lifetime value); widen the range for the whole-shop average. Click a
-        row to open it. Fleet (house) accounts are left out of these numbers — they have their own tab.
+        gaps leading up to oil changes done in this range. "Spent per car" is the money taken in during the range divided by
+        the cars that came in. Lifetime value and visits per car are all-time across your whole book (a car's entire history,
+        not just this range) — that's what makes them "lifetime," so they don't move with the dates. Click a row to open it.
+        Fleet (house) accounts are left out of these numbers — they have their own tab.
       </p>
     </>
   );
