@@ -343,7 +343,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "vendors" && <Vendors shop={shop} flash={flash} />}
           {page === "staff" && <Staff roster={roster} saveRoster={saveRoster} flash={flash} />}
           {page === "reports" && <Reports shop={shop} cfg={cfg} employees={roster} nav={nav} />}
-          {page === "analytics" && <Analytics shop={shop} cfg={cfg} nav={nav} />}
+          {page === "analytics" && <Analytics shop={shop} cfg={cfg} nav={nav} flash={flash} />}
           {page === "signpad" && <SignatureStation shop={shop} cfg={cfg} flash={flash} onLock={lockKiosk} />}
           {page === "baydisplay" && <BayDisplay shop={shop} cfg={cfg} />}
           {page === "settings" && (

@@ -7,6 +7,7 @@ import { customerStats, oilIntervals, customerLtv, vehicleLtv, periodSpend, isOi
 import { isFleet, fleetReport, fleetName } from "../lib/fleet.js";
 import { dueBack } from "../lib/dueBack.js";
 import { throughput } from "../lib/lubeMetrics.js";
+import { WinBack } from "./WinBack.jsx";
 
 /* Customer analytics: who's new, who comes back, what a customer (or car) is
    worth, how often cars come in, and a fleet-account roll-up. Its own tab, with
@@ -33,7 +34,7 @@ const presets = (weekStart) => {
   };
 };
 
-export function Analytics({ shop, cfg, nav }) {
+export function Analytics({ shop, cfg, nav, flash }) {
   const p = useMemo(() => presets(cfg.weekStart), [cfg.weekStart]);
   const hasFleet = useMemo(() => Object.values(shop.customers).some(isFleet), [shop.customers]);
   const [view, setView] = useState("customers"); // customers | fleet
@@ -113,7 +114,7 @@ export function Analytics({ shop, cfg, nav }) {
       </header>
       <div className="deskBody">
         {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} vltv={vltv} carSpend={carSpend} shop={shop} nav={nav} />}
-        {view === "dueback" && <DueBackReport due={due} avgTicket={avgTicketAll} shop={shop} nav={nav} />}
+        {view === "dueback" && <DueBackReport due={due} avgTicket={avgTicketAll} shop={shop} cfg={cfg} nav={nav} flash={flash} />}
         {view === "trends" && <TrendsReport tp={tp} shop={shop} />}
         {view === "fleet" && <FleetReport data={fleet} shop={shop} nav={nav} />}
       </div>
@@ -412,9 +413,11 @@ function agoText(days) {
   return `${days} day${days === 1 ? "" : "s"}`;
 }
 
-function DueBackReport({ due, avgTicket, shop, nav }) {
+function DueBackReport({ due, avgTicket, shop, cfg, nav, flash }) {
   const list = [...due.overdue, ...due.soon].slice(0, 200);
   const potential = Math.round((due.overdue.length + due.soon.length) * (Number(avgTicket) || 0));
+  const [winBack, setWinBack] = useState(false);
+  const flashSafe = flash || (() => {});
   return (
     <>
       <div className="statRow">
@@ -442,6 +445,11 @@ function DueBackReport({ due, avgTicket, shop, nav }) {
       <div className="card">
         <div className="cardHead">
           <h3>Due back — call, text, or send a card ({due.overdue.length + due.soon.length})</h3>
+          {due.overdue.length + due.soon.length > 0 && (
+            <button className="btn primary" onClick={() => setWinBack(true)}>
+              Win them back
+            </button>
+          )}
         </div>
         <table className="dk">
           <thead>
@@ -493,6 +501,9 @@ function DueBackReport({ due, avgTicket, shop, nav }) {
         saved interval). "Lapsed" cars haven't been in for over 15 months. Click a row to open the customer and reach out.
         Fleet accounts are left out.
       </p>
+      {winBack && (
+        <WinBack shop={shop} cfg={cfg} rows={[...due.overdue, ...due.soon]} flash={flashSafe} onClose={() => setWinBack(false)} />
+      )}
     </>
   );
 }
