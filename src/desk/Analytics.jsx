@@ -504,11 +504,17 @@ const monthLabel = (m) => {
 const hourLabel = (h) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? "a" : "p"}`;
 
 function TrendsReport({ tp }) {
-  /* show the hour bars only across the hours that actually had cars */
-  const withData = (tp.hours || []).filter((h) => h.count > 0);
+  const [selDay, setSelDay] = useState(null); // 0..6, or null for every day
+  /* hour counts for the whole week, or just the clicked day */
+  const hourCounts = selDay == null ? tp.hours.map((h) => h.count) : tp.hoursByDay[selDay] || new Array(24).fill(0);
+  const hourPeak = Math.max(0, ...hourCounts);
+  const hourRows = hourCounts.map((count, hour) => ({ hour, count, share: hourPeak ? Math.round((count / hourPeak) * 100) : 0 }));
+  const withData = hourRows.filter((h) => h.count > 0);
+  const hasHours = withData.length > 1;
   const lo = withData.length ? withData[0].hour : 7;
   const hi = withData.length ? withData[withData.length - 1].hour : 19;
-  const shownHours = tp.hasHourData ? tp.hours.slice(lo, hi + 1) : [];
+  const shownHours = hasHours ? hourRows.slice(lo, hi + 1) : [];
+  const selName = selDay != null ? tp.weekdays[selDay].day : "";
   return (
     <>
       <div className="statRow">
@@ -546,24 +552,39 @@ function TrendsReport({ tp }) {
           <div className="card">
             <div className="cardHead">
               <h3>Cars by day of week</h3>
+              <span className="muted" style={{ fontSize: 12 }}>Click a day to filter the hours →</span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "4px 2px" }}>
-              {tp.weekdays.map((w) => (
-                <div key={w.day} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ width: 40, color: "var(--muted)", fontSize: 13 }}>{w.day}</span>
-                  <div style={{ flex: 1, background: "var(--panel)", borderRadius: 6, height: 18, overflow: "hidden" }}>
-                    <div style={{ width: `${w.share}%`, background: "var(--signal)", height: "100%" }} />
-                  </div>
-                  <span style={{ width: 46, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{w.count}</span>
-                </div>
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "4px 2px" }}>
+              {tp.weekdays.map((w, i) => {
+                const on = selDay === i;
+                return (
+                  <button
+                    key={w.day}
+                    type="button"
+                    onClick={() => setSelDay(on ? null : i)}
+                    title={`See ${w.day} hours`}
+                    style={{ display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "1px solid", borderColor: on ? "var(--signal)" : "transparent", borderRadius: 8, padding: "4px 6px", cursor: "pointer", width: "100%", textAlign: "left", font: "inherit" }}
+                  >
+                    <span style={{ width: 40, fontSize: 13, color: on ? "var(--signal)" : "var(--muted)", fontWeight: on ? 700 : 400 }}>{w.day}</span>
+                    <div style={{ flex: 1, background: "var(--panel)", borderRadius: 6, height: 18, overflow: "hidden" }}>
+                      <div style={{ width: `${w.share}%`, background: "var(--signal)", height: "100%" }} />
+                    </div>
+                    <span style={{ width: 46, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{w.count}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="card">
             <div className="cardHead">
-              <h3>Cars by hour</h3>
+              <h3>Cars by hour{selName ? ` · ${selName}` : ""}</h3>
+              {selDay != null && (
+                <button className="btn tiny" onClick={() => setSelDay(null)}>
+                  All days
+                </button>
+              )}
             </div>
-            {tp.hasHourData ? (
+            {hasHours ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "4px 2px" }}>
                 {shownHours.map((h) => (
                   <div key={h.hour} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -577,8 +598,9 @@ function TrendsReport({ tp }) {
               </div>
             ) : (
               <p className="legalNote" style={{ margin: "4px 2px" }}>
-                No time-of-day on these visits yet — imported history only kept the date. This fills in as you ring up
-                tickets in the app.
+                {!tp.hasHourData
+                  ? "No time-of-day on these visits yet — imported history only kept the date. This fills in as you ring up tickets in the app."
+                  : `Not enough ${selName} visits in this range to chart by hour.`}
               </p>
             )}
           </div>

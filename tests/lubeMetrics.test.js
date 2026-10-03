@@ -28,6 +28,10 @@ test("throughput: cars, tickets, open days, per-day, and month breakdown", () =>
   assert.equal(t.hours.reduce((a, h) => a + h.count, 0), 4);
   assert.equal(t.hasHourData, true);
   assert.equal(typeof t.peakHour, "number");
+  // per-weekday hour breakdown adds up to the overall hour totals
+  assert.equal(t.hoursByDay.length, 7);
+  const sumByDay = t.hoursByDay.reduce((a, day) => a + day.reduce((x, y) => x + y, 0), 0);
+  assert.equal(sumByDay, 4);
 });
 
 test("throughput: all visits at the same time means no usable hourly data", () => {

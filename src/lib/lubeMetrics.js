@@ -30,7 +30,14 @@ export function throughput(visits, fromTs, toTs) {
   const busiestDay = tickets ? WEEKDAYS[wd.indexOf(peak)] : "—";
 
   const hr = new Array(24).fill(0);
-  for (const v of inRange) hr[new Date(v.at).getHours()] += 1;
+  /* also keep an hour breakdown per weekday, so the screen can show one day's
+     hourly pattern (Saturday mornings, say) when a day is clicked */
+  const hoursByDay = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  for (const v of inRange) {
+    const d = new Date(v.at);
+    hr[d.getHours()] += 1;
+    hoursByDay[d.getDay()][d.getHours()] += 1;
+  }
   const hrPeak = Math.max(...hr);
   const hours = hr.map((count, hour) => ({ hour, count, share: hrPeak ? Math.round((count / hrPeak) * 100) : 0 }));
   /* imported history has no time of day (every visit at midnight); only trust
@@ -51,5 +58,5 @@ export function throughput(visits, fromTs, toTs) {
     .map((r) => ({ month: r.month, tickets: r.tickets, cars: r.cars.size, revenue: round2(r.revenue), avgTicket: r.tickets ? round2(r.revenue / r.tickets) : 0 }))
     .sort((a, b) => (a.month < b.month ? 1 : -1));
 
-  return { tickets, cars, revenue, openDays, perDay, busiestDay, weekdays, hours, peakHour, hasHourData, months };
+  return { tickets, cars, revenue, openDays, perDay, busiestDay, weekdays, hours, hoursByDay, peakHour, hasHourData, months };
 }
