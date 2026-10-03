@@ -24,6 +24,20 @@ test("throughput: cars, tickets, open days, per-day, and month breakdown", () =>
   assert.equal(t.months[1].month, "2026-06");
   assert.equal(t.months[1].cars, 2); // a, b in June
   assert.equal(t.months[1].revenue, 240);
+  // hourly: visits at 15:00 and 16:00 fall in more than one hour
+  assert.equal(t.hours.reduce((a, h) => a + h.count, 0), 4);
+  assert.equal(t.hasHourData, true);
+  assert.equal(typeof t.peakHour, "number");
+});
+
+test("throughput: all visits at the same time means no usable hourly data", () => {
+  const sameHour = [
+    { vehicleId: "a", at: Date.UTC(2026, 5, 10, 12), total: 50 },
+    { vehicleId: "b", at: Date.UTC(2026, 5, 11, 12), total: 50 },
+  ];
+  const t = throughput(sameHour, FROM, TO);
+  assert.equal(t.hasHourData, false); // only one distinct hour → flagged
+  assert.equal(t.peakHour, null);
 });
 
 test("throughput: empty range is zeroed, not divide-by-zero", () => {

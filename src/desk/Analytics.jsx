@@ -501,8 +501,14 @@ const monthLabel = (m) => {
   const [y, mo] = String(m).split("-");
   return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
 };
+const hourLabel = (h) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? "a" : "p"}`;
 
 function TrendsReport({ tp }) {
+  /* show the hour bars only across the hours that actually had cars */
+  const withData = (tp.hours || []).filter((h) => h.count > 0);
+  const lo = withData.length ? withData[0].hour : 7;
+  const hi = withData.length ? withData[withData.length - 1].hour : 19;
+  const shownHours = tp.hasHourData ? tp.hours.slice(lo, hi + 1) : [];
   return (
     <>
       <div className="statRow">
@@ -523,6 +529,10 @@ function TrendsReport({ tp }) {
         <div className="stat">
           <span>Busiest day</span>
           <strong>{tp.busiestDay}</strong>
+        </div>
+        <div className="stat">
+          <span>Busiest hour</span>
+          <strong>{tp.peakHour != null ? `${hourLabel(tp.peakHour)}–${hourLabel((tp.peakHour + 1) % 24)}` : "—"}</strong>
         </div>
         <div className="stat">
           <span>Revenue</span>
@@ -548,6 +558,29 @@ function TrendsReport({ tp }) {
                 </div>
               ))}
             </div>
+          </div>
+          <div className="card">
+            <div className="cardHead">
+              <h3>Cars by hour</h3>
+            </div>
+            {tp.hasHourData ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "4px 2px" }}>
+                {shownHours.map((h) => (
+                  <div key={h.hour} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ width: 40, color: "var(--muted)", fontSize: 13 }}>{hourLabel(h.hour)}</span>
+                    <div style={{ flex: 1, background: "var(--panel)", borderRadius: 6, height: 16, overflow: "hidden" }}>
+                      <div style={{ width: `${h.share}%`, background: "var(--signal)", height: "100%" }} />
+                    </div>
+                    <span style={{ width: 46, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{h.count}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="legalNote" style={{ margin: "4px 2px" }}>
+                No time-of-day on these visits yet — imported history only kept the date. This fills in as you ring up
+                tickets in the app.
+              </p>
+            )}
           </div>
         </div>
         <div className="stack">

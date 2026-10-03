@@ -29,6 +29,15 @@ export function throughput(visits, fromTs, toTs) {
   const weekdays = wd.map((count, i) => ({ day: WEEKDAYS[i], count, share: peak ? Math.round((count / peak) * 100) : 0 }));
   const busiestDay = tickets ? WEEKDAYS[wd.indexOf(peak)] : "—";
 
+  const hr = new Array(24).fill(0);
+  for (const v of inRange) hr[new Date(v.at).getHours()] += 1;
+  const hrPeak = Math.max(...hr);
+  const hours = hr.map((count, hour) => ({ hour, count, share: hrPeak ? Math.round((count / hrPeak) * 100) : 0 }));
+  /* imported history has no time of day (every visit at midnight); only trust
+     the hourly split once visits land in more than one hour */
+  const hasHourData = hr.filter((c) => c > 0).length > 1;
+  const peakHour = tickets && hasHourData ? hr.indexOf(hrPeak) : null;
+
   const m = new Map();
   for (const v of inRange) {
     const key = monthStr(v.at);
@@ -42,5 +51,5 @@ export function throughput(visits, fromTs, toTs) {
     .map((r) => ({ month: r.month, tickets: r.tickets, cars: r.cars.size, revenue: round2(r.revenue), avgTicket: r.tickets ? round2(r.revenue / r.tickets) : 0 }))
     .sort((a, b) => (a.month < b.month ? 1 : -1));
 
-  return { tickets, cars, revenue, openDays, perDay, busiestDay, weekdays, months };
+  return { tickets, cars, revenue, openDays, perDay, busiestDay, weekdays, hours, peakHour, hasHourData, months };
 }
