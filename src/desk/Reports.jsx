@@ -139,14 +139,20 @@ export function Reports({ shop, cfg, employees, nav }) {
     () =>
       Object.values(shop.orders)
         .filter((o) => o.status === "invoiced" && o.invoicedAt && !isFleet(shop.customers[o.customerId]))
-        .map((o) => ({
-          customerId: o.customerId,
-          vehicleId: o.vehicleId,
-          at: o.invoicedAt,
-          total: orderTotals(o, cfg, shop.customers[o.customerId]).total,
-          miles: Number(o.mileageOut) || Number(o.mileageIn) || 0,
-          isOil: isOilChangeOrder(o, shop.parts),
-        })),
+        .map((o) => {
+          /* imported LubeSoft invoices keep the real billed total in o.ls.total;
+             use it so LTV and average ticket match what the shop actually
+             charged, instead of re-deriving it from the line items */
+          const recorded = o.ls && Number(o.ls.total);
+          return {
+            customerId: o.customerId,
+            vehicleId: o.vehicleId,
+            at: o.invoicedAt,
+            total: recorded > 0 ? recorded : orderTotals(o, cfg, shop.customers[o.customerId]).total,
+            miles: Number(o.mileageOut) || Number(o.mileageIn) || 0,
+            isOil: isOilChangeOrder(o, shop.parts),
+          };
+        }),
     [shop.orders, shop.customers, shop.parts, cfg]
   );
   const customers = useMemo(() => customerStats(visits, fromTs, toTs), [visits, fromTs, toTs]);
