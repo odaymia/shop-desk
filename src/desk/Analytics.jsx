@@ -1,10 +1,12 @@
 import { useState, useMemo } from "react";
-import { Money, fmtDate } from "./ui.jsx";
+import { Money, fmtDate, fmtPhone } from "./ui.jsx";
 import { customerName, vehicleName } from "./useShop.js";
 import { orderTotals, round2 } from "../lib/invoice.js";
 import { dayKey, startOfWeek } from "../lib/time.js";
 import { customerStats, oilIntervals, customerLtv, vehicleLtv, periodSpend, isOilChangeOrder } from "../lib/customerAnalytics.js";
 import { isFleet, fleetReport, fleetName } from "../lib/fleet.js";
+import { dueBack } from "../lib/dueBack.js";
+import { throughput } from "../lib/lubeMetrics.js";
 
 /* Customer analytics: who's new, who comes back, what a customer (or car) is
    worth, how often cars come in, and a fleet-account roll-up. Its own tab, with
@@ -74,13 +76,17 @@ export function Analytics({ shop, cfg, nav }) {
   const vltv = useMemo(() => vehicleLtv(visits), [visits]); // all-time
   const carSpend = useMemo(() => periodSpend(visits, "vehicleId", fromTs, toTs), [visits, fromTs, toTs]);
   const fleet = useMemo(() => fleetReport(shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs), [shop.orders, shop.customers, cfg, shop.parts, fromTs, toTs]);
+  const tp = useMemo(() => throughput(visits, fromTs, toTs), [visits, fromTs, toTs]);
+  /* due-back is "as of now", not tied to the date range */
+  const due = useMemo(() => dueBack({ orders: shop.orders, vehicles: shop.vehicles, customers: shop.customers, parts: shop.parts, cfg }), [shop.orders, shop.vehicles, shop.customers, shop.parts, cfg]);
+  const avgTicketAll = useMemo(() => (visits.length ? round2(visits.reduce((a, v) => a + Number(v.total || 0), 0) / visits.length) : 0), [visits]);
 
   return (
     <>
       <header className="deskHead">
         <h1>Analytics</h1>
         <div className="seg">
-          {[["customers", "Customers"], ...(hasFleet ? [["fleet", "Fleet accounts"]] : [])].map(([k, label]) => (
+          {[["customers", "Customers"], ["dueback", "Due back"], ["trends", "Trends"], ...(hasFleet ? [["fleet", "Fleet accounts"]] : [])].map(([k, label]) => (
             <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>
               {label}
             </button>
@@ -107,6 +113,8 @@ export function Analytics({ shop, cfg, nav }) {
       </header>
       <div className="deskBody">
         {view === "customers" && <CustomersReport customers={customers} oil={oil} ltv={ltv} vltv={vltv} carSpend={carSpend} shop={shop} nav={nav} />}
+        {view === "dueback" && <DueBackReport due={due} avgTicket={avgTicketAll} shop={shop} nav={nav} />}
+        {view === "trends" && <TrendsReport tp={tp} shop={shop} />}
         {view === "fleet" && <FleetReport data={fleet} shop={shop} nav={nav} />}
       </div>
     </>
@@ -394,6 +402,195 @@ function FleetReport({ data, shop, nav }) {
         Revenue, tickets, discounts, and what was charged on account cover the date range above; "owed on account" is the
         all-time balance these accounts still owe. Click a row to open the account.
       </p>
+    </>
+  );
+}
+
+function agoText(days) {
+  if (days >= 60) return `~${Math.round(days / 30.44)} mo`;
+  if (days >= 14) return `~${Math.round(days / 7)} wk`;
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function DueBackReport({ due, avgTicket, shop, nav }) {
+  const list = [...due.overdue, ...due.soon].slice(0, 200);
+  const potential = Math.round((due.overdue.length + due.soon.length) * (Number(avgTicket) || 0));
+  return (
+    <>
+      <div className="statRow">
+        <div className="stat">
+          <span>Overdue for an oil change</span>
+          <strong style={due.overdue.length ? { color: "var(--warn)" } : null}>{due.overdue.length}</strong>
+        </div>
+        <div className="stat">
+          <span>Due within 30 days</span>
+          <strong>{due.soon.length}</strong>
+        </div>
+        <div className="stat">
+          <span>Potential revenue</span>
+          <strong>
+            <Money v={potential} />
+          </strong>
+          <small style={{ color: "var(--muted)" }}>if they return · at <Money v={avgTicket} /> avg</small>
+        </div>
+        <div className="stat">
+          <span>Lapsed</span>
+          <strong>{due.lapsed.length}</strong>
+          <small style={{ color: "var(--muted)" }}>quiet over 15 months</small>
+        </div>
+      </div>
+      <div className="card">
+        <div className="cardHead">
+          <h3>Due back — call, text, or send a card ({due.overdue.length + due.soon.length})</h3>
+        </div>
+        <table className="dk">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th>Vehicle</th>
+              <th>Last oil change</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 && (
+              <tr>
+                <td colSpan={5} className="emptyNote">
+                  No cars are due back right now.
+                </td>
+              </tr>
+            )}
+            {list.map((r) => {
+              const c = shop.customers[r.customerId];
+              const phone = c && (c.phone || c.phone2);
+              return (
+                <tr key={r.vehicleId} className="row" onClick={() => nav.openCustomer(r.customerId)}>
+                  <td>
+                    <strong>{custLabel(c)}</strong>
+                  </td>
+                  <td className="muted num">{phone ? fmtPhone(phone) : "—"}</td>
+                  <td className="muted">{vehicleName(shop.vehicles[r.vehicleId]) || "—"}</td>
+                  <td className="muted">
+                    {fmtDate(r.lastAt)}
+                    {r.lastMileage ? ` · ${r.lastMileage.toLocaleString()} mi` : ""}
+                  </td>
+                  <td>
+                    {r.dueDays > 0 ? (
+                      <span className="svcBadge due">overdue {agoText(r.dueDays)}</span>
+                    ) : (
+                      <span className="svcBadge soon">due in {-r.dueDays} days</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="legalNote" style={{ marginTop: 12 }}>
+        Based on each car's last oil change and your reminder interval (Settings → reminder months/miles, or a car's own
+        saved interval). "Lapsed" cars haven't been in for over 15 months. Click a row to open the customer and reach out.
+        Fleet accounts are left out.
+      </p>
+    </>
+  );
+}
+
+const monthLabel = (m) => {
+  const [y, mo] = String(m).split("-");
+  return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+};
+
+function TrendsReport({ tp }) {
+  return (
+    <>
+      <div className="statRow">
+        <div className="stat">
+          <span>Cars</span>
+          <strong>{tp.cars}</strong>
+          <small style={{ color: "var(--muted)" }}>in this range</small>
+        </div>
+        <div className="stat">
+          <span>Tickets</span>
+          <strong>{tp.tickets}</strong>
+        </div>
+        <div className="stat">
+          <span>Cars per day</span>
+          <strong>{tp.perDay}</strong>
+          <small style={{ color: "var(--muted)" }}>over {tp.openDays} open days</small>
+        </div>
+        <div className="stat">
+          <span>Busiest day</span>
+          <strong>{tp.busiestDay}</strong>
+        </div>
+        <div className="stat">
+          <span>Revenue</span>
+          <strong>
+            <Money v={tp.revenue} />
+          </strong>
+        </div>
+      </div>
+      <div className="deskSplit">
+        <div className="stack">
+          <div className="card">
+            <div className="cardHead">
+              <h3>Cars by day of week</h3>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "4px 2px" }}>
+              {tp.weekdays.map((w) => (
+                <div key={w.day} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 40, color: "var(--muted)", fontSize: 13 }}>{w.day}</span>
+                  <div style={{ flex: 1, background: "var(--panel)", borderRadius: 6, height: 18, overflow: "hidden" }}>
+                    <div style={{ width: `${w.share}%`, background: "var(--signal)", height: "100%" }} />
+                  </div>
+                  <span style={{ width: 46, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{w.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="stack">
+          <div className="card">
+            <div className="cardHead">
+              <h3>Month by month</h3>
+            </div>
+            <table className="dk">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th className="r">Cars</th>
+                  <th className="r">Tickets</th>
+                  <th className="r">Avg ticket</th>
+                  <th className="r">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tp.months.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="emptyNote">
+                      No visits in this range.
+                    </td>
+                  </tr>
+                )}
+                {tp.months.map((m) => (
+                  <tr key={m.month}>
+                    <td>{monthLabel(m.month)}</td>
+                    <td className="r num">{m.cars}</td>
+                    <td className="r num">{m.tickets}</td>
+                    <td className="r num muted">
+                      <Money v={m.avgTicket} />
+                    </td>
+                    <td className="r num">
+                      <Money v={m.revenue} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
