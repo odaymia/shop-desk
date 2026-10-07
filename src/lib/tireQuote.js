@@ -25,6 +25,7 @@ export const DEFAULT_TIRE_ADDONS = [
     mode: "percent",
     price: 15,
     on: false,
+    warranty: "hazard",
     details: "Covers repair or replacement of a covered tire damaged by a road hazard (nails, glass, potholes) under normal driving. Keep this invoice as proof of purchase. See the warranty terms for coverage and limits.",
   },
   { id: "tpms", label: "TPMS sensor", kind: "part", per: "tire", price: 55, on: false, details: "" },
@@ -80,7 +81,7 @@ export function stockedSizes(parts) {
    one ({ description, price }) for a tire ordered in; `picked` is the
    add-ons chosen with their (possibly edited) prices; `id` makes line ids.
    Everything shares one job name so it prints and removes as a group. */
-export function tireQuoteLines({ tire, size, count, picked, cfg, id }) {
+export function tireQuoteLines({ tire, size, count, picked, cfg, id, dots }) {
   const n = Math.max(1, Math.round(num(count)) || 1);
   const sz = normalizeTireSize(size || (tire && tire.size));
   /* an inventory tire reads as brand + model; a typed one as typed */
@@ -88,6 +89,11 @@ export function tireQuoteLines({ tire, size, count, picked, cfg, id }) {
   const job = `Tires: ${name} ${sz} × ${n}`.replace(/\s+/g, " ").trim();
   const lines = [];
   if (tire) {
+    /* the tire's own rated tread-life (miles), kept on the line so a
+       warranty claim years later doesn't depend on the part still existing;
+       DOT codes recorded for recall registration */
+    const treadlifeMiles = Math.round(num(tire.warrantyMiles)) || 0;
+    const dotList = (dots || []).map((s) => String(s || "").trim().toUpperCase()).filter(Boolean);
     lines.push({
       id: id(),
       kind: "part",
@@ -101,12 +107,16 @@ export function tireQuoteLines({ tire, size, count, picked, cfg, id }) {
       cost: round2(num(tire.cost)),
       condition: "new",
       taxable: null,
+      ...(treadlifeMiles ? { treadlifeMiles } : {}),
+      ...(dotList.length ? { dots: dotList } : {}),
     });
   }
   for (const a of picked || []) {
     const { qty, price } = addOnCharge(a, tire, n);
     const details = String(a.details || a.note || "").trim();
     const base = { id: id(), job, description: a.label, details, taxable: a.taxable === true || a.taxable === false ? a.taxable : null };
+    /* mark the road-hazard line so a warranty claim can find it later */
+    if (a.warranty) base.warranty = a.warranty;
     if (a.kind === "labor") lines.push({ ...base, kind: "labor", hours: qty, rate: price, unit: a.per === "ticket" ? "service" : "tire", techId: null });
     else if (a.kind === "part") lines.push({ ...base, kind: "part", partId: a.partId || null, number: a.number || "", qty, price, cost: round2(num(a.cost)), condition: "new" });
     else lines.push({ ...base, kind: "fee", qty, price });

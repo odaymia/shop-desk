@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { DEPTS } from "../lib/departments.js";
 import { PROGRAM_LIST, ownedPrograms, editionOf } from "../lib/edition.js";
 import { tireAddOns } from "../lib/tireQuote.js";
+import { warrantyTerms } from "../lib/warranty.js";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
 import defaultLogo from "../assets/genie-logo.png";
@@ -23,6 +24,13 @@ import { fmtMoney } from "../lib/invoice.js";
 import { DEMO } from "../lib/demo.js";
 import { WebsiteSettings } from "./WebsiteSettings.jsx";
 import { normalizeWebsite } from "../lib/website.js";
+
+/* digits-only for numeric settings fields, kept as a string so the box can be
+   cleared while typing */
+const clean = (v) => String(v == null ? "" : v).replace(/[^\d]/g, "");
+/* tire warranty terms, with the one being edited merged in */
+const warr = (d) => warrantyTerms(d);
+const setWarr = (set, d, patch) => set("warranty")({ ...warrantyTerms(d), ...patch });
 
 /* Shrink an uploaded image to something that fits in a settings record
    and prints crisply: at most 900px wide, PNG so transparency survives. */
@@ -627,6 +635,35 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
                 Back to the standard list
               </button>
             )}
+          </div>
+
+          <h3 className="subhead" style={{ marginTop: 28 }}>Tire warranties &amp; rotation</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            How tire coverage is tracked and redeemed on the Warranties page. Road hazard runs from the sale; a claim prorates the credit. Tread-life
+            (mileage) coverage comes from each tire's rated miles (set it on the tire in Tire inventory). Rotation sets when a car is due back for a
+            rotation.
+          </p>
+          <div className="fldRow">
+            <Field label="Road hazard lasts (months)">
+              <input inputMode="numeric" value={warr(d).roadHazardMonths} onChange={(e) => setWarr(set, d, { roadHazardMonths: clean(e.target.value) })} placeholder="36" />
+            </Field>
+            <Field label="Prorate a claim by">
+              <select value={warr(d).roadHazardBasis} onChange={(e) => setWarr(set, d, { roadHazardBasis: e.target.value })}>
+                <option value="tread">Tread remaining (measured at the claim)</option>
+                <option value="time">Time left on the coverage</option>
+              </select>
+            </Field>
+            <Field label="New tread depth (32nds)">
+              <input inputMode="numeric" value={warr(d).newTread32} onChange={(e) => setWarr(set, d, { newTread32: clean(e.target.value) })} placeholder="10" />
+            </Field>
+          </div>
+          <div className="fldRow">
+            <Field label="Rotate every (miles)">
+              <input inputMode="numeric" value={d.tireRotationMiles ?? ""} onChange={(e) => set("tireRotationMiles")(clean(e.target.value))} placeholder="5000" />
+            </Field>
+            <Field label="Rotate every (months)">
+              <input inputMode="numeric" value={d.tireRotationMonths ?? ""} onChange={(e) => set("tireRotationMonths")(clean(e.target.value))} placeholder="6" />
+            </Field>
           </div>
 
           <h3 className="subhead" style={{ marginTop: 28 }}>Signatures on maintenance-only tickets</h3>

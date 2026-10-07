@@ -104,9 +104,9 @@ function sampleData() {
     { id: "dp_wiper", number: "WB-22", description: "Wiper blade 22\"", category: "Wipers", cost: 6, price: 14.99, onHand: 18, reorderAt: 10 },
     /* a small tire rack, so the tire quote has something to show */
     { id: "dt1", tire: true, brand: "Ironman", model: "iMove Gen 3 AS", size: "215/55R17", loadSpeed: "94V", number: "IM-98221", description: "Ironman, iMove Gen 3 AS", category: "Tires", cost: 62, price: 98, onHand: 4, reorderAt: 4 },
-    { id: "dt2", tire: true, brand: "Michelin", model: "Defender2", size: "215/55R17", loadSpeed: "94H", number: "MI-03376", description: "Michelin, Defender2", category: "Tires", cost: 138, price: 189, onHand: 2, reorderAt: 0 },
-    { id: "dt3", tire: true, brand: "Ironman", model: "iMove Gen 3 AS", size: "225/50R17", loadSpeed: "98V", number: "IM-98254", description: "Ironman, iMove Gen 3 AS", category: "Tires", cost: 64, price: 102, onHand: 6, reorderAt: 4 },
-    { id: "dt4", tire: true, brand: "Hankook", model: "Kinergy PT", size: "225/50R17", loadSpeed: "94V", number: "HK-1025041", description: "Hankook, Kinergy PT", category: "Tires", cost: 96, price: 139, onHand: 0, reorderAt: 0 },
+    { id: "dt2", tire: true, brand: "Michelin", model: "Defender2", size: "215/55R17", loadSpeed: "94H", number: "MI-03376", description: "Michelin, Defender2", category: "Tires", cost: 138, price: 189, onHand: 2, reorderAt: 0, warrantyMiles: 80000 },
+    { id: "dt3", tire: true, brand: "Ironman", model: "iMove Gen 3 AS", size: "225/50R17", loadSpeed: "98V", number: "IM-98254", description: "Ironman, iMove Gen 3 AS", category: "Tires", cost: 64, price: 102, onHand: 6, reorderAt: 4, warrantyMiles: 50000 },
+    { id: "dt4", tire: true, brand: "Hankook", model: "Kinergy PT", size: "225/50R17", loadSpeed: "94V", number: "HK-1025041", description: "Hankook, Kinergy PT", category: "Tires", cost: 96, price: 139, onHand: 0, reorderAt: 0, warrantyMiles: 70000 },
     { id: "dt5", tire: true, brand: "Ironman", model: "All Country AT", size: "275/65R18", loadSpeed: "116T", number: "IM-91341", description: "Ironman, All Country AT", category: "Tires", cost: 108, price: 159, onHand: 2, reorderAt: 2 },
     { id: "dt6", tire: true, brand: "Cooper", model: "Discoverer AT3 4S", size: "275/65R18", loadSpeed: "116T", number: "CP-90000029", description: "Cooper, Discoverer AT3 4S", category: "Tires", cost: 162, price: 219, onHand: 4, reorderAt: 2 },
     { id: "dt7", tire: true, brand: "Cooper", model: "Discoverer AT3 LT", size: "275/70R18", loadSpeed: "125/122S", number: "CP-90000031", description: "Cooper, Discoverer AT3 LT", category: "Tires", cost: 196, price: 259, onHand: 4, reorderAt: 2 },
@@ -123,6 +123,15 @@ function sampleData() {
   const mkBrakes = () => [
     { id: "l1", kind: "part", partId: "dp_pads_f", number: "SCD914", description: "Front brake pads", qty: 1, price: 49.99, cost: 22, condition: "new", taxable: true, job: "Front brake pads replacement" },
     { id: "l2", kind: "labor", description: "Replace front brake pads", hours: 1, rate: 170, taxable: false, job: "Front brake pads replacement" },
+  ];
+  /* a set of four tires sold with mounting, the CA tire fee, and road hazard —
+     so the Warranties page has real coverage to show and claim against */
+  const TIRE_JOB = "Tires: Hankook Kinergy PT 225/50R17 × 4";
+  const mkTires = () => [
+    { id: "l1", kind: "part", partId: "dt4", number: "HK-1025041", description: "Hankook Kinergy PT 225/50R17 94V", tireSize: "225/50R17", qty: 4, price: 139, cost: 96, condition: "new", taxable: true, treadlifeMiles: 70000, dots: ["DOTHK9RPT2225"], job: TIRE_JOB },
+    { id: "l2", kind: "labor", description: "Mount, balance & disposal", hours: 4, rate: 25, unit: "tire", taxable: false, job: TIRE_JOB },
+    { id: "l3", kind: "fee", description: "CA tire fee", qty: 4, price: 1.75, details: "California tire fee, charged on every new tire sold.", job: TIRE_JOB },
+    { id: "l4", kind: "fee", description: "Road hazard warranty", qty: 4, price: 20.85, warranty: "hazard", details: "Covers repair or replacement of a covered tire damaged by a road hazard under normal driving. Keep this invoice as proof of purchase.", job: TIRE_JOB },
   ];
 
   const orderDefs = [
@@ -146,8 +155,15 @@ function sampleData() {
     base.paidAt = at;
     return base;
   });
+  // a tire sale with road hazard, so the Warranties page has coverage to show
+  const tat = now - 20 * DAY;
+  const tireOrder = { id: "dot1", number: 2052, status: "invoiced", customerId: "dc2", vehicleId: "dv2", lines: mkTires(), mileageIn: 34200, mileageOut: "", concern: "", notes: "", createdAt: tat, invoicedAt: tat, approvedAt: tat, updatedAt: tat, stockApplied: true, noSupplies: true, history: [{ at: tat, what: "invoiced (demo)" }] };
+  const tt = orderTotals(tireOrder, mergedCfg, null);
+  tireOrder.payments = [{ id: "pdot1", method: "card", amount: tt.total, ref: "", at: tat }];
+  tireOrder.paidAt = tat;
+  orders.push(tireOrder);
   // one open estimate so the ticket list isn't only invoices
-  orders.push({ id: "de1", number: 2051, status: "estimate", customerId: "dc4", vehicleId: "dv4", lines: mkOil("dp_oil_conv", 6.99), mileageIn: 121500, mileageOut: "", concern: "Due for an oil change; check brakes.", notes: "", createdAt: now - DAY, updatedAt: now - DAY, payments: [], history: [{ at: now - DAY, what: "estimate started (demo)" }] });
+  orders.push({ id: "de1", number: 2053, status: "estimate", customerId: "dc4", vehicleId: "dv4", lines: mkOil("dp_oil_conv", 6.99), mileageIn: 121500, mileageOut: "", concern: "Due for an oil change; check brakes.", notes: "", createdAt: now - DAY, updatedAt: now - DAY, payments: [], history: [{ at: now - DAY, what: "estimate started (demo)" }] });
 
   const specs = [
     { id: "2019|toyota|camry|2.5l 4-cyl", year: 2019, make: "Toyota", model: "Camry", engine: "2.5L 4-cyl", oilViscosity: "0W-20", oilSpec: "API SP", oilCapacityQt: 4.8, oilFilters: [{ brand: "Valvoline", number: "VO106" }], drainPlugTorque: "30 ft-lb", resetProcedure: "", otherFluids: "", notes: "", source: "demo", active: true },

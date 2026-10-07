@@ -6,6 +6,7 @@ import { OrderEditor } from "./OrderEditor.jsx";
 import { Customers } from "./Customers.jsx";
 import { Inventory } from "./Inventory.jsx";
 import { Tires } from "./Tires.jsx";
+import { Warranties } from "./Warranties.jsx";
 import { Vendors } from "./Vendors.jsx";
 import { Jobs } from "./Jobs.jsx";
 import { Coupons } from "./Coupons.jsx";
@@ -38,6 +39,7 @@ const PAGES = [
   ["fleet", "Fleet"],
   ["inventory", "Inventory"],
   ["tires", "Tire inventory"],
+  ["warranties", "Warranties"],
   ["jobs", "Canned jobs"],
   ["coupons", "Coupons"],
   ["email", "Marketing"],
@@ -239,7 +241,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       return;
     }
     setStarting(false);
-    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null, dept, status: startStatus(dept, cfg) });
+    const o = await shop.createOrder({ customerId: opts.customerId || null, vehicleId: opts.vehicleId || null, dept, status: startStatus(dept, cfg), lines: opts.lines || [] });
     nav.openOrder(o.id);
   };
 
@@ -272,7 +274,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const deptIds = new Set(depts.map((d) => d.id));
   const navPages = PAGES
     /* Tire inventory is only for shops that sell tires */
-    .filter((pg) => !(pg[0] === "tires" && !deptIds.has("tires")))
+    .filter((pg) => !((pg[0] === "tires" || pg[0] === "warranties") && !deptIds.has("tires")))
     .flatMap((pg) => (pg[0] === "orders" && depts.length > 1 ? [["orders", "All tickets"], ...depts.map((d) => [`dept:${d.id}`, d.label, true])] : [pg]));
   const ticketPage = page === "orders" || page === "cashier" || page.startsWith("dept:");
 
@@ -338,6 +340,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
           {page === "fleet" && <Fleet shop={shop} cfg={cfg} nav={nav} flash={flash} onNew={newTicket} />}
           {page === "inventory" && <Inventory shop={shop} cfg={cfg} flash={flash} />}
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
+          {page === "warranties" && <Warranties shop={shop} cfg={cfg} nav={nav} onNew={newTicket} flash={flash} />}
           {page === "jobs" && <Jobs shop={shop} cfg={cfg} flash={flash} />}
           {page === "coupons" && <Coupons shop={shop} cfg={cfg} flash={flash} />}
           {page === "email" && <EmailCenter shop={shop} cfg={cfg} saveCfg={saveCfg} flash={flash} />}

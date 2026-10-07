@@ -13,6 +13,8 @@ const blank = () => ({
   brand: "",
   model: "",
   size: "",
+  loadSpeed: "",
+  warrantyMiles: "",
   number: "",
   description: "",
   category: "Tires",
@@ -174,6 +176,8 @@ function TireForm({ tire, vendors, onClose, onSave }) {
       price: toNum(d.price),
       onHand: toNum(d.onHand),
       reorderAt: toNum(d.reorderAt),
+      loadSpeed: String(d.loadSpeed || "").trim().toUpperCase(),
+      warrantyMiles: toNum(d.warrantyMiles),
     });
   };
   return (
@@ -225,9 +229,17 @@ function TireForm({ tire, vendors, onClose, onSave }) {
           <Num value={d.reorderAt} onChange={set("reorderAt")} />
         </Field>
       </div>
-      <Field label="Rack / location">
-        <Text value={d.location} onChange={set("location")} placeholder="Rack B, row 3" />
-      </Field>
+      <div className="fldRow">
+        <Field label="Load / speed">
+          <Text value={d.loadSpeed || ""} onChange={set("loadSpeed")} placeholder="94V" />
+        </Field>
+        <Field label="Tread-life warranty (miles)">
+          <Num value={d.warrantyMiles} onChange={set("warrantyMiles")} placeholder="60000" />
+        </Field>
+        <Field label="Rack / location">
+          <Text value={d.location} onChange={set("location")} placeholder="Rack B, row 3" />
+        </Field>
+      </div>
       {d.id && (
         <label className="fld inline">
           <input type="checkbox" checked={d.active === false} onChange={(e) => set("active")(!e.target.checked)} />

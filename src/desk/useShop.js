@@ -284,7 +284,7 @@ export function useShop(cfg) {
   }, [cfg.nextOrderNumber, commit]);
 
   const createOrder = useCallback(
-    async ({ customerId = null, vehicleId = null, status = STATUS.estimate, writerId = null, dept = null } = {}) => {
+    async ({ customerId = null, vehicleId = null, status = STATUS.estimate, writerId = null, dept = null, lines = [] } = {}) => {
       const number = await takeNumber();
       return saveOrder({
         number,
@@ -298,7 +298,7 @@ export function useShop(cfg) {
         notes: "",
         writerId,
         techId: null,
-        lines: [],
+        lines: Array.isArray(lines) ? lines : [], // a ticket can open with work already on it (e.g. a warranty credit)
         payments: [],
         recommendations: [],
         stockApplied: false,
