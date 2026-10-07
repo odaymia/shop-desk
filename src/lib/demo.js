@@ -162,6 +162,13 @@ function sampleData() {
   tireOrder.payments = [{ id: "pdot1", method: "card", amount: tt.total, ref: "", at: tat }];
   tireOrder.paidAt = tat;
   orders.push(tireOrder);
+  // an older rotation so the Rotations-due reminder list has a car on it
+  const rat = now - 215 * DAY;
+  const rotOrder = { id: "dot2", number: 2054, status: "invoiced", customerId: "dc1", vehicleId: "dv1", lines: [{ id: "l1", kind: "labor", description: "Tire rotation & balance", hours: 0.5, rate: 39.99, taxable: false, job: "Tire rotation" }], mileageIn: 58400, mileageOut: "", concern: "", notes: "", createdAt: rat, invoicedAt: rat, approvedAt: rat, updatedAt: rat, stockApplied: true, noSupplies: true, history: [{ at: rat, what: "invoiced (demo)" }] };
+  const rt = orderTotals(rotOrder, mergedCfg, null);
+  rotOrder.payments = [{ id: "pdot2", method: "cash", amount: rt.total, ref: "", at: rat }];
+  rotOrder.paidAt = rat;
+  orders.push(rotOrder);
   // one open estimate so the ticket list isn't only invoices
   orders.push({ id: "de1", number: 2053, status: "estimate", customerId: "dc4", vehicleId: "dv4", lines: mkOil("dp_oil_conv", 6.99), mileageIn: 121500, mileageOut: "", concern: "Due for an oil change; check brakes.", notes: "", createdAt: now - DAY, updatedAt: now - DAY, payments: [], history: [{ at: now - DAY, what: "estimate started (demo)" }] });
 
