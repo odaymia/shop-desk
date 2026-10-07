@@ -75,14 +75,15 @@ const lsDel = (k) => {
 export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const shop = useShop(cfg);
 
-  /* name the browser tab after the product edition */
+  /* name the browser tab after the product this shop runs */
+  const productName = editionOf(cfg).name;
   useEffect(() => {
     try {
-      document.title = editionOf(cfg).name;
+      document.title = productName;
     } catch {
       /* no document */
     }
-  }, [cfg.edition]);
+  }, [productName]);
 
   /* automatic emails: check once a day who's due, and every 15 minutes nudge
      the sender to send what's waiting (see emailRunner.js) */

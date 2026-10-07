@@ -21,6 +21,30 @@ export const DEMO = (() => {
   }
 })();
 
+/* Which product the demo should present, so each program can be shown on its
+   own: ?demo=tire boots Tire Center OS, ?demo=quicklube the lube product,
+   ?demo=shop the whole shop. Plain ?demo keeps the default (QuickLube OS). */
+export const DEMO_PROGRAM = (() => {
+  if (!DEMO) return null;
+  try {
+    let v = new URLSearchParams(window.location.search).get("demo");
+    if (!v) {
+      const m = String(window.location.hash || "").match(/[?&#]demo=([a-z]+)/i);
+      if (m) v = m[1];
+    }
+    const map = { tire: "tire", tires: "tire", quicklube: "quicklube", oil: "quicklube", lube: "quicklube", mechanical: "mechanical", mech: "mechanical", shop: "full", full: "full", all: "full" };
+    return map[String(v || "").toLowerCase()] || null;
+  } catch {
+    return null;
+  }
+})();
+
+/* The cfg.programs the demo selection maps to, or null to leave the default. */
+export function demoPrograms() {
+  if (DEMO_PROGRAM === "full") return ["quicklube", "tire", "mechanical"];
+  return DEMO_PROGRAM ? [DEMO_PROGRAM] : null;
+}
+
 const DAY = 86400000;
 
 /* The fictional shop and its records. Ids are stable so a reseed is a

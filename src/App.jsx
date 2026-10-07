@@ -5,7 +5,7 @@ import { Toast } from "./components/Toast.jsx";
 import { DEFAULT_CFG } from "./lib/config.js";
 import { CFG_KEY, ROSTER_KEY } from "./lib/keys.js";
 import { cloud, sGet, sSet, sList, sDel, storageReady } from "./storage/index.js";
-import { DEMO, seedDemoIfEmpty, resetDemo } from "./lib/demo.js";
+import { DEMO, demoPrograms, seedDemoIfEmpty, resetDemo } from "./lib/demo.js";
 
 /* Saved settings over the defaults. `catalogs` is merged key by key, not
    replaced, so a catalog added to the defaults later (e.g. Valvoline) shows
@@ -32,7 +32,12 @@ export default function App() {
          (or a big post-import outbox) leaves the counter PC spinning. */
       if (DEMO) await seedDemoIfEmpty(sGet, sSet);
       const c = await sGet(CFG_KEY, null);
-      if (c) setCfg(mergeCfg(c));
+      if (c) {
+        let base = mergeCfg(c);
+        /* the demo URL pins which product is being shown (?demo=tire, etc.) */
+        if (DEMO && demoPrograms()) base = { ...base, programs: demoPrograms() };
+        setCfg(base);
+      }
       setRoster((await sGet(ROSTER_KEY, [])) || []);
       setReady(true);
       storageReady().catch((e) => console.error("cloud init failed", e));

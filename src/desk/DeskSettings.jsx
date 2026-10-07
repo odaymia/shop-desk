@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { DEPTS } from "../lib/departments.js";
-import { EDITIONS, editionOf } from "../lib/edition.js";
+import { PROGRAM_LIST, ownedPrograms, editionOf } from "../lib/edition.js";
 import { tireAddOns } from "../lib/tireQuote.js";
 import { Field, Text, Num, toNum } from "./ui.jsx";
 import { CloudSync } from "../components/CloudSync.jsx";
@@ -520,26 +520,34 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
           )}
           {show("departments") && (
           <>
-          <h3 className="subhead">Product</h3>
-          <Field label="This shop runs">
-            <select value={editionOf(d).id} onChange={(e) => set("edition")(e.target.value)}>
-              {Object.values(EDITIONS).map((ed) => (
-                <option key={ed.id} value={ed.id}>
-                  {ed.name} — {ed.tagline}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <p className="legalNote" style={{ marginTop: 4 }}>
-            QuickLube OS shows only oil &amp; lube; Tire OS only tires; Mechanical OS only repairs. Shop OS runs all three in one program. Switching here only
-            changes what's shown — no data is lost, so you can turn on another department later.
+          <h3 className="subhead">Programs</h3>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Each program is sold on its own — QuickLube OS (oil &amp; lube), Tire Center OS (tires), Mechanical OS (repairs). Turn on the ones this shop owns.
+            They share one customer book and one ticket history, so a customer's full record — every oil change, tire sale and repair — shows from every
+            program. Owning one shows just that product; owning more runs them together as Shop OS. No data is ever lost, so you can add a program anytime.
           </p>
+          {PROGRAM_LIST.map((p) => {
+            const owned = ownedPrograms(d);
+            const on = owned.includes(p.id);
+            const toggle = (e) => {
+              const next = e.target.checked ? [...owned, p.id] : owned.filter((id) => id !== p.id);
+              if (next.length) set("programs")(next); // never turn off the last program
+            };
+            return (
+              <label key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}>
+                <input type="checkbox" checked={on} onChange={toggle} disabled={on && owned.length === 1} />
+                <span>
+                  {p.short} — {p.tagline}
+                </span>
+              </label>
+            );
+          })}
 
           <h3 className="subhead" style={{ marginTop: 28 }}>Departments</h3>
           <p className="legalNote" style={{ marginTop: 0 }}>
             {editionOf(d).depts.length > 1
               ? "Each department gets its own page under Tickets, with its own ticket list, New button, and today's cars and sales. A ticket with work from more than one (an oil change and two tires) shows on each page and still prints as one receipt. Turn off the ones this shop doesn't run."
-              : `${editionOf(d).name} runs the ${DEPTS.find((x) => x.id === editionOf(d).depts[0])?.label} department. Switch to Shop OS above to run more than one.`}
+              : `${editionOf(d).name} runs the ${DEPTS.find((x) => x.id === editionOf(d).depts[0])?.label} department. Turn on another program above to run more than one.`}
           </p>
           {editionOf(d).depts.length > 1 &&
             DEPTS.map((dp) => (
