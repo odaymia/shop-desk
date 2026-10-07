@@ -23,6 +23,46 @@ export const STARTER_JOBS = [
       { kind: "fee", description: "CA tire recycling fee", qty: 1, price: 1.75, perUnit: true },
     ],
   },
+  /* à-la-carte tire services a tire shop rings up without selling tires —
+     filed under the Tires menu button. Flat prices here are a starting point;
+     set your own under Canned jobs. */
+  {
+    starterKey: "tire-rotation",
+    name: "Tire rotation and balance",
+    category: "Tire services",
+    lines: [{ kind: "labor", description: "Rotate and balance all four tires", hours: 1, rate: 29.99 }],
+  },
+  {
+    starterKey: "flat-repair",
+    name: "Flat repair",
+    category: "Tire services",
+    lines: [
+      { kind: "part", description: "Patch / plug kit", number: "", partId: null, qty: 1, price: 3.99, cost: null, condition: "new" },
+      { kind: "labor", description: "Dismount, repair, remount and balance", hours: 1, rate: 25 },
+    ],
+  },
+  {
+    starterKey: "tpms-service",
+    name: "TPMS service and relearn",
+    category: "Tire services",
+    lines: [{ kind: "labor", description: "Service tire pressure sensors and relearn", hours: 1, rate: 39.99 }],
+  },
+  {
+    starterKey: "tpms-sensor",
+    name: "TPMS sensor replacement",
+    category: "Tire services",
+    unit: "sensor",
+    lines: [
+      { kind: "part", description: "TPMS sensor", number: "", partId: null, qty: 1, price: 55, cost: null, condition: "new", perUnit: true },
+      { kind: "labor", description: "Install and relearn TPMS sensor", hours: 1, rate: 15, perUnit: true },
+    ],
+  },
+  {
+    starterKey: "wheel-alignment",
+    name: "4-wheel alignment",
+    category: "Tire services",
+    lines: [{ kind: "labor", description: "4-wheel alignment", hours: 1, rate: 99.99 }],
+  },
   {
     starterKey: "front-pads",
     name: "Front brake pads replacement",

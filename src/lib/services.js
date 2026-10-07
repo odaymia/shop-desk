@@ -6,6 +6,7 @@ export const DEFAULT_SERVICE_MENU = [
   { id: "oil", name: "Oil change", color: "red", oil: true },
   { id: "brakes", name: "Brakes", color: "red", category: "Brakes" },
   { id: "tires", name: "Tires", color: "red", category: "Tires" },
+  { id: "tireservice", name: "Tire service", color: "green", category: "Tire services" },
   { id: "air", name: "Air filters", color: "green", category: "Air filters" },
   { id: "cabin", name: "Cabin air filters", color: "green", category: "Cabin air filters" },
   { id: "wipers", name: "Wipers", color: "green", category: "Wipers" },
