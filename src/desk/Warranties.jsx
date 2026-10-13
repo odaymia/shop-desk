@@ -94,7 +94,7 @@ export function Warranties({ shop, cfg, nav, onNew }) {
                     <span className="sub">#{r.number}</span>
                   </td>
                   <td className="muted">{vehicleName(v) || "—"}</td>
-                  <td className="muted">{r.tires.map((t) => `${t.qty} × ${t.size}`).join(", ")}</td>
+                  <td className="muted">{r.tires.length ? r.tires.map((t) => `${t.qty} × ${t.size}`).join(", ") : "Road hazard (no tire on the ticket)"}</td>
                   <td>
                     {r.roadHazard ? (
                       st.roadHazard.active ? (
@@ -144,6 +144,9 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
 
   const [tireIx, setTireIx] = useState(0);
   const tire = record.tires[tireIx] || record.tires[0];
+  const noTire = record.tires.length === 0; // road hazard sold without a tire line on the ticket
+  const [manualPrice, setManualPrice] = useState(""); // replacement tire's price when none was recorded
+  const tirePrice = noTire ? toNum(manualPrice) : tire ? tire.price : 0;
   const canHazard = record.roadHazard && st.roadHazard.active;
   const canTread = !!(tire && tire.treadlifeMiles > 0);
   const [kind, setKind] = useState(canHazard ? "hazard" : canTread ? "treadlife" : "hazard");
@@ -152,20 +155,20 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
   const [miles, setMiles] = useState(v && v.mileage ? String(v.mileage) : ""); // current odometer (tread-life)
 
   const credit = useMemo(() => {
-    if (!tire) return 0;
     if (kind === "treadlife") {
+      if (!tire) return 0;
       const used = Math.max(0, toNum(miles) - record.mileage);
       return treadlifeCredit({ tirePrice: tire.price, warrantyMiles: tire.treadlifeMiles, milesUsed: used });
     }
-    return roadHazardCredit({ tirePrice: tire.price, soldAt: record.at, now, cfg, remainingTread32: toNum(tread) });
-  }, [tire, kind, tread, miles, record, cfg, now]);
+    return roadHazardCredit({ tirePrice, soldAt: record.at, now, cfg, remainingTread32: toNum(tread) });
+  }, [tire, tirePrice, kind, tread, miles, record, cfg, now]);
 
   const start = () => {
     const line = {
       id: uid(),
       kind: "discount",
-      description: claimLineLabel({ kind, fromNumber: record.number, size: tire.size }),
-      details: kind === "treadlife" ? `Tread-life adjustment on ${tire.description}. ${Math.max(0, toNum(miles) - record.mileage).toLocaleString()} of ${tire.treadlifeMiles.toLocaleString()} rated miles used.` : `Road hazard claim on ${tire.description}, sold ${fmtDate(record.at)}.`,
+      description: claimLineLabel({ kind, fromNumber: record.number, size: (tire && tire.size) || "" }),
+      details: kind === "treadlife" ? `Tread-life adjustment on ${tire.description}. ${Math.max(0, toNum(miles) - record.mileage).toLocaleString()} of ${tire.treadlifeMiles.toLocaleString()} rated miles used.` : `Road hazard claim${tire ? ` on ${tire.description}` : ""}, sold ${fmtDate(record.at)}.`,
       qty: 1,
       price: credit,
       warrantyClaim: { fromOrder: record.orderId, fromNumber: record.number, kind },
@@ -213,6 +216,12 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
       {kind === "hazard" && canHazard && terms.roadHazardBasis === "time" && (
         <p className="legalNote" style={{ marginTop: 0 }}>Prorated by time left: {st.roadHazard.daysLeft} of {terms.roadHazardMonths * 30} days remaining.</p>
       )}
+      {kind === "hazard" && canHazard && noTire && (
+        <Field label="Replacement tire price">
+          <Num value={manualPrice} onChange={setManualPrice} placeholder="0.00" />
+        </Field>
+      )}
+      {noTire && <p className="legalNote" style={{ marginTop: 0 }}>No tire was recorded on this sale — enter the replacement tire's price to prorate the credit.</p>}
       {kind === "treadlife" && canTread && (
         <Field label="Current odometer">
           <Num value={miles} onChange={setMiles} placeholder={String(record.mileage || "")} />
@@ -223,7 +232,7 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
         <div className="stat">
           <span>Tire price</span>
           <strong>
-            <Money v={tire ? tire.price : 0} />
+            <Money v={tirePrice} />
           </strong>
         </div>
         <div className="stat">

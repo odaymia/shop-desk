@@ -47,6 +47,18 @@ test("tireWarranties: skips merged and non-tire tickets", () => {
   assert.equal(recs.length, 0);
 });
 
+test("tireWarranties: a road-hazard sale with NO tire line still becomes a record", () => {
+  // road hazard added as a plain fee line (no marker, no tire) — detected by description
+  const standalone = order({ id: "o5", number: 3005, lines: [{ id: "l1", kind: "fee", description: "Road Hazard Warranty", qty: 4, price: 20 }] });
+  const recs = tireWarranties({ orders: { o5: standalone } });
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].roadHazard, true);
+  assert.equal(recs[0].tires.length, 0); // no tire on the ticket
+  assert.equal(recs[0].tireCount, 0);
+  // and the status still reports active road-hazard coverage
+  assert.equal(warrantyStatus(recs[0], { warranty: { roadHazardMonths: 36 } }, now).roadHazard.active, true);
+});
+
 test("warrantyStatus: road hazard active within term, expired after", () => {
   const r = tireWarranties({ orders: { o1: order() } })[0];
   const active = warrantyStatus(r, { warranty: { roadHazardMonths: 36 } }, now);

@@ -21,8 +21,11 @@ export const warrantyTerms = (cfg) => ({ ...DEFAULT_WARRANTY, ...((cfg && cfg.wa
 
 /* a sold tire on a ticket: a part line carrying a tire size */
 export const isTireLine = (l) => !!l && l.kind === "part" && !!l.tireSize;
+/* a road-hazard line: the tire quote stamps a marker, but a line added any
+   other way (a fee, a canned job, a typed line) is caught by its description */
+export const isRoadHazardLine = (l) => !!l && (l.warranty === "hazard" || /road\s*hazard/i.test(String(l.description || "")));
 /* was road hazard sold on this ticket? */
-export const hasRoadHazard = (order) => !!order && (order.lines || []).some((l) => l && l.warranty === "hazard");
+export const hasRoadHazard = (order) => !!order && (order.lines || []).some(isRoadHazardLine);
 
 /* add whole months to a timestamp, keeping the day of month where possible */
 function addMonths(ts, months) {
@@ -40,7 +43,10 @@ export function tireWarranties({ orders }) {
   for (const o of Object.values(orders || {})) {
     if (!o || o.status !== "invoiced" || o.mergedInto) continue;
     const tireLines = (o.lines || []).filter(isTireLine);
-    if (!tireLines.length) continue;
+    const roadHazard = hasRoadHazard(o);
+    /* a sale is a warranty record when it sold tires OR sold road hazard —
+       so a road-hazard sale shows even when it wasn't rung up with a tire line */
+    if (!tireLines.length && !roadHazard) continue;
     const tires = tireLines.map((l) => ({
       lineId: l.id,
       description: String(l.description || "Tire").trim(),
@@ -57,7 +63,7 @@ export function tireWarranties({ orders }) {
       customerId: o.customerId || null,
       vehicleId: o.vehicleId || null,
       mileage: Math.round(num(o.mileageOut) || num(o.mileageIn)) || 0,
-      roadHazard: hasRoadHazard(o),
+      roadHazard,
       tires,
       tireCount: tires.reduce((a, t) => a + t.qty, 0),
     });
