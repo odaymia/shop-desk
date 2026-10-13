@@ -671,6 +671,13 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
             Tread policy: the first {warr(d).freeWearPct || 25}% of tread wear is a free replacement, past that it's prorated by the tread still left,
             and coverage ends at {warr(d).floorTread32 || 2}/32 or {warr(d).roadHazardMonths || 36} months — whichever comes first.
           </p>
+          <Field label="Road hazard warranty terms (prints on the estimate &amp; invoice)">
+            <textarea rows={5} value={warr(d).roadHazardTerms} onChange={(e) => setWarr(set, d, { roadHazardTerms: e.target.value })} />
+          </Field>
+          <p className="legalNote" style={{ marginTop: 4 }}>
+            Your shop's own road-hazard coverage wording. It prints under the road hazard line on the estimate, the signing screen, and the invoice, so
+            the customer sees exactly what's covered. The numbers above drive the prorated credit; this text is the plain-language terms.
+          </p>
           <div className="fldRow">
             <Field label="Rotate every (miles)">
               <input inputMode="numeric" value={d.tireRotationMiles ?? ""} onChange={(e) => set("tireRotationMiles")(clean(e.target.value))} placeholder="5000" />

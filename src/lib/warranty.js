@@ -22,6 +22,10 @@ export const DEFAULT_WARRANTY = {
   newTread32: 10, // tread depth of a new passenger tire, in 32nds
   freeWearPct: 25, // the first this-% of usable tread wear is a free replacement
   floorTread32: 2, // coverage ends at this remaining tread (the wear-out depth)
+  // the warranty wording that prints under the road-hazard line on the
+  // estimate and invoice; each shop edits it under Settings → warranties
+  roadHazardTerms:
+    "Covers repair or, when the tire can't be safely repaired, replacement of a tire damaged by a road hazard (nails, glass, potholes, debris) under normal driving. Replacement is prorated by the tread remaining. Keep this invoice as proof of purchase. Excludes damage from collision, vandalism, off-road use, racing, improper inflation or maintenance, and tires worn to the wear-out depth.",
 };
 export const warrantyTerms = (cfg) => ({ ...DEFAULT_WARRANTY, ...((cfg && cfg.warranty) || {}) });
 

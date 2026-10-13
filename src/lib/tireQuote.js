@@ -2,6 +2,7 @@
    the estimate. Pure — no React, no storage. The desk's TireQuote screen
    walks the counter through it; this file does the picking and the math. */
 import { normalizeTireSize, isTireSize, tireSizeKey, tireName } from "./tires.js";
+import { warrantyTerms } from "./warranty.js";
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -113,9 +114,12 @@ export function tireQuoteLines({ tire, size, count, picked, cfg, id, dots }) {
       ...(dotList.length ? { dots: dotList } : {}),
     });
   }
+  const rhTerms = String(warrantyTerms(cfg).roadHazardTerms || "").trim();
   for (const a of picked || []) {
     const { qty, price } = addOnCharge(a, tire, n);
-    const details = String(a.details || a.note || "").trim();
+    /* the road-hazard line prints the shop's own warranty terms (Settings →
+       warranties); any other add-on prints its own details */
+    const details = a.warranty === "hazard" && rhTerms ? rhTerms : String(a.details || a.note || "").trim();
     const base = { id: id(), job, description: a.label, details, taxable: a.taxable === true || a.taxable === false ? a.taxable : null };
     /* mark the road-hazard line so a warranty claim can find it later */
     if (a.warranty) base.warranty = a.warranty;
