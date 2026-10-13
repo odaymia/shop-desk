@@ -71,14 +71,21 @@ test("warrantyStatus: road hazard active within term, expired after", () => {
   assert.equal(expired.roadHazard.active, false);
 });
 
-test("roadHazardCredit: tread basis prorates by remaining tread", () => {
-  // half the tread left on a $189 tire → ~$94.50
-  const c = roadHazardCredit({ tirePrice: 189, soldAt: now - 30 * DAY, now, cfg: { warranty: { roadHazardMonths: 36, roadHazardBasis: "tread", newTread32: 10 } }, remainingTread32: 5 });
-  assert.equal(c, 94.5);
-  // bald tire → nothing left to credit
-  assert.equal(roadHazardCredit({ tirePrice: 189, soldAt: now - 30 * DAY, now, cfg: { warranty: { roadHazardBasis: "tread", newTread32: 10 } }, remainingTread32: 0 }), 0);
-  // out of the coverage window → 0
-  assert.equal(roadHazardCredit({ tirePrice: 189, soldAt: now - 40 * 30 * DAY, now, cfg: { warranty: { roadHazardMonths: 36, roadHazardBasis: "tread" } }, remainingTread32: 8 }), 0);
+test("roadHazardCredit: free first 25%, then prorated to the 2/32 floor", () => {
+  const cfg = { warranty: { roadHazardMonths: 36, roadHazardBasis: "tread", newTread32: 10, freeWearPct: 25, floorTread32: 2 } };
+  const soldAt = now - 30 * DAY;
+  // new tire 10/32, usable 8, free until 8/32 remaining (first 2/32 of wear):
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, remainingTread32: 10 }), 200); // brand new → free
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, remainingTread32: 8 }), 200); // exactly 25% worn → still free
+  // past the free window: prorate full@8/32 → 0@2/32. At 5/32: (5-2)/(8-2)=50% → $100
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, remainingTread32: 5 }), 100);
+  // at 4/32: (4-2)/6 = 33.3% → $66.67
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, remainingTread32: 4 }), 66.67);
+  // at or below the 2/32 floor → no warranty
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, remainingTread32: 2 }), 0);
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, remainingTread32: 1 }), 0);
+  // past the 3-year time cap → no warranty even with tread left
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt: now - 40 * 30 * DAY, now, cfg, remainingTread32: 7 }), 0);
 });
 
 test("roadHazardCredit: time basis prorates by remaining months", () => {

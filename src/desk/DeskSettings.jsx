@@ -657,6 +657,20 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
               <input inputMode="numeric" value={warr(d).newTread32} onChange={(e) => setWarr(set, d, { newTread32: clean(e.target.value) })} placeholder="10" />
             </Field>
           </div>
+          {warr(d).roadHazardBasis === "tread" && (
+            <div className="fldRow">
+              <Field label="First % of wear is free">
+                <input inputMode="numeric" value={warr(d).freeWearPct} onChange={(e) => setWarr(set, d, { freeWearPct: clean(e.target.value) })} placeholder="25" />
+              </Field>
+              <Field label="No warranty below (32nds)">
+                <input inputMode="numeric" value={warr(d).floorTread32} onChange={(e) => setWarr(set, d, { floorTread32: clean(e.target.value) })} placeholder="2" />
+              </Field>
+            </div>
+          )}
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            Tread policy: the first {warr(d).freeWearPct || 25}% of tread wear is a free replacement, past that it's prorated by the tread still left,
+            and coverage ends at {warr(d).floorTread32 || 2}/32 or {warr(d).roadHazardMonths || 36} months — whichever comes first.
+          </p>
           <div className="fldRow">
             <Field label="Rotate every (miles)">
               <input inputMode="numeric" value={d.tireRotationMiles ?? ""} onChange={(e) => set("tireRotationMiles")(clean(e.target.value))} placeholder="5000" />

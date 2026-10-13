@@ -51,7 +51,7 @@ export const DEFAULT_CFG = {
   reminderMonths: 3, // oil-change reminder sticker: months until the next service
   reminderMiles: 3000, // oil-change reminder sticker: miles until the next service
   oilSticker: true, // pop the reminder sticker to print when an oil-change ticket is posted
-  warranty: { roadHazardMonths: 36, roadHazardBasis: "tread", newTread32: 10 }, // tire road-hazard coverage window and how a claim prorates (Settings → warranties)
+  warranty: { roadHazardMonths: 36, roadHazardBasis: "tread", newTread32: 10, freeWearPct: 25, floorTread32: 2 }, // tire road-hazard terms: time cap, proration basis, new tread, free-wear %, and wear-out depth (Settings → warranties)
   tireRotationMiles: 5000, // tires: miles between rotations, for the rotation reminder
   tireRotationMonths: 6, // tires: months between rotations, for the rotation reminder
   requireRealName: true, // a customer's name must be actual letters, not placeholder symbols or numbers

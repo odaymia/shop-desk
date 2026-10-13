@@ -11,11 +11,17 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const DAY = 86400000;
 
-/* default coverage terms; a shop overrides them under Settings → warranties */
+/* default coverage terms; a shop overrides them under Settings → warranties.
+   The default tread policy matches a common road-hazard structure: the first
+   25% of tread wear is a free replacement, past that it's prorated by the
+   tread still left, and coverage ends at the wear-out depth (2/32) or after
+   the time limit (3 years), whichever comes first. */
 export const DEFAULT_WARRANTY = {
-  roadHazardMonths: 36, // road hazard runs this long from the sale
+  roadHazardMonths: 36, // road hazard runs this long from the sale (the time cap)
   roadHazardBasis: "tread", // prorate a claim by remaining "tread" or by "time"
-  newTread32: 10, // tread depth of a new passenger tire, in 32nds (for the tread basis)
+  newTread32: 10, // tread depth of a new passenger tire, in 32nds
+  freeWearPct: 25, // the first this-% of usable tread wear is a free replacement
+  floorTread32: 2, // coverage ends at this remaining tread (the wear-out depth)
 };
 export const warrantyTerms = (cfg) => ({ ...DEFAULT_WARRANTY, ...((cfg && cfg.warranty) || {}) });
 
@@ -83,22 +89,37 @@ export function warrantyStatus(record, cfg, now = Date.now()) {
   return { roadHazard, treadlife };
 }
 
-/* Prorated road-hazard credit for one damaged tire. By "tread": the customer
-   gets back the value of the tread still left (remaining ÷ new). By "time":
-   the share of the coverage window still remaining. Expired → nothing. */
+/* Prorated road-hazard credit for one damaged tire.
+
+   By "tread" (the default policy): the first `freeWearPct` of usable tread
+   wear is a free replacement (full price back); past that it's prorated by the
+   tread still left, straight-lining down to nothing at the wear-out depth
+   (`floorTread32`); at or below that depth there's no warranty. Usable tread is
+   new depth minus the wear-out depth.
+
+   By "time": the share of the coverage window still remaining.
+
+   Either way, coverage also ends at the time limit (`roadHazardMonths`), so a
+   claim past 3 years (or whatever the shop set) returns nothing. */
 export function roadHazardCredit({ tirePrice, soldAt, now = Date.now(), cfg, newTread32, remainingTread32 }) {
   const t = warrantyTerms(cfg);
   const price = round2(num(tirePrice));
   if (price <= 0) return 0;
   const expiresAt = addMonths(soldAt, t.roadHazardMonths);
-  if (now >= expiresAt) return 0;
+  if (now >= expiresAt) return 0; // past the time limit → no warranty
   if (t.roadHazardBasis === "time") {
     const frac = (expiresAt - now) / (expiresAt - soldAt || 1);
     return clamp(round2(price * frac), 0, price);
   }
-  const nw = num(newTread32) || t.newTread32 || 10;
-  const rem = clamp(num(remainingTread32), 0, nw);
-  return clamp(round2(price * (rem / (nw || 1))), 0, price);
+  const nw = num(newTread32) || num(t.newTread32) || 10;
+  const floor = num(t.floorTread32); // wear-out depth; coverage ends here
+  const usable = Math.max(1, nw - floor);
+  const freeRemaining = nw - (num(t.freeWearPct) / 100) * usable; // at/above this remaining, still free
+  const r = clamp(num(remainingTread32), 0, nw);
+  if (r <= floor) return 0; // worn past the limit → no warranty
+  if (r >= freeRemaining) return price; // within the free-wear window → free replacement
+  // prorate: full at the free boundary down to nothing at the wear-out depth
+  return clamp(round2((price * (r - floor)) / (freeRemaining - floor)), 0, price);
 }
 
 /* Tread-life (mileage) adjustment credit: the share of rated miles not yet

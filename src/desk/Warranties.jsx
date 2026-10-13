@@ -124,10 +124,12 @@ export function Warranties({ shop, cfg, nav, onNew }) {
           </table>
         </div>
         <p className="legalNote" style={{ marginTop: 12 }}>
-          Road hazard runs {warrantyTerms(cfg).roadHazardMonths} months from the sale and a claim prorates by{" "}
-          {warrantyTerms(cfg).roadHazardBasis === "time" ? "time left on the coverage" : "the tread still left on the tire"}; tread-life credit is the
-          share of the tire's rated miles not yet driven. Change the terms under Settings → Departments &amp; signatures. Filing a claim opens a
-          replacement ticket with the credit already on it.
+          Road hazard runs {warrantyTerms(cfg).roadHazardMonths} months from the sale.{" "}
+          {warrantyTerms(cfg).roadHazardBasis === "time"
+            ? "A claim prorates by the time left on the coverage."
+            : `The first ${warrantyTerms(cfg).freeWearPct}% of tread wear is a free replacement, past that it's prorated by the tread still left, and coverage ends at ${warrantyTerms(cfg).floorTread32}/32.`}{" "}
+          Tread-life credit is the share of the tire's rated miles not yet driven. Change the terms under Settings → Departments &amp; signatures.
+          Filing a claim opens a replacement ticket with the credit already on it.
         </p>
       </div>
       {claim && <ClaimModal record={claim} shop={shop} cfg={cfg} onClose={() => setClaim(null)} onNew={onNew} nav={nav} />}
