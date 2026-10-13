@@ -15,6 +15,7 @@ const blank = () => ({
   size: "",
   loadSpeed: "",
   warrantyMiles: "",
+  treadDepth32: "",
   number: "",
   description: "",
   category: "Tires",
@@ -178,6 +179,7 @@ function TireForm({ tire, vendors, onClose, onSave }) {
       reorderAt: toNum(d.reorderAt),
       loadSpeed: String(d.loadSpeed || "").trim().toUpperCase(),
       warrantyMiles: toNum(d.warrantyMiles),
+      treadDepth32: toNum(d.treadDepth32),
     });
   };
   return (
@@ -235,6 +237,9 @@ function TireForm({ tire, vendors, onClose, onSave }) {
         </Field>
         <Field label="Tread-life warranty (miles)">
           <Num value={d.warrantyMiles} onChange={set("warrantyMiles")} placeholder="60000" />
+        </Field>
+        <Field label="Original tread (32nds)">
+          <Num value={d.treadDepth32} onChange={set("treadDepth32")} placeholder="10" />
         </Field>
         <Field label="Rack / location">
           <Text value={d.location} onChange={set("location")} placeholder="Rack B, row 3" />

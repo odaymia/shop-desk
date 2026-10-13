@@ -60,6 +60,7 @@ export function tireWarranties({ orders }) {
       qty: Math.max(1, Math.round(num(l.qty)) || 1),
       price: round2(num(l.price)),
       treadlifeMiles: Math.round(num(l.treadlifeMiles)) || 0,
+      newTread32: Math.round(num(l.treadDepth32)) || 0, // this tire's original tread; 0 = use the shop default
       dots: Array.isArray(l.dots) ? l.dots.slice() : [],
     }));
     out.push({

@@ -93,6 +93,7 @@ export function tireQuoteLines({ tire, size, count, picked, cfg, id, dots }) {
        warranty claim years later doesn't depend on the part still existing;
        DOT codes recorded for recall registration */
     const treadlifeMiles = Math.round(num(tire.warrantyMiles)) || 0;
+    const treadDepth32 = Math.round(num(tire.treadDepth32)) || 0; // original tread, for road-hazard proration later
     const dotList = (dots || []).map((s) => String(s || "").trim().toUpperCase()).filter(Boolean);
     lines.push({
       id: id(),
@@ -108,6 +109,7 @@ export function tireQuoteLines({ tire, size, count, picked, cfg, id, dots }) {
       condition: "new",
       taxable: null,
       ...(treadlifeMiles ? { treadlifeMiles } : {}),
+      ...(treadDepth32 ? { treadDepth32 } : {}),
       ...(dotList.length ? { dots: dotList } : {}),
     });
   }

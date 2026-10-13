@@ -154,7 +154,12 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
   const [kind, setKind] = useState(canHazard ? "hazard" : canTread ? "treadlife" : "hazard");
 
   const [tread, setTread] = useState(""); // remaining tread, 32nds (road hazard, tread basis)
+  const [newTread, setNewTread] = useState(""); // original tread, 32nds — overrides the tire's stored value
   const [miles, setMiles] = useState(v && v.mileage ? String(v.mileage) : ""); // current odometer (tread-life)
+
+  // the tire's own original tread if it was recorded, else the shop default
+  const defaultNewTread = (tire && tire.newTread32) || toNum(terms.newTread32) || 10;
+  const effNewTread = toNum(newTread) || defaultNewTread;
 
   const credit = useMemo(() => {
     if (kind === "treadlife") {
@@ -162,8 +167,8 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
       const used = Math.max(0, toNum(miles) - record.mileage);
       return treadlifeCredit({ tirePrice: tire.price, warrantyMiles: tire.treadlifeMiles, milesUsed: used });
     }
-    return roadHazardCredit({ tirePrice, soldAt: record.at, now, cfg, remainingTread32: toNum(tread) });
-  }, [tire, tirePrice, kind, tread, miles, record, cfg, now]);
+    return roadHazardCredit({ tirePrice, soldAt: record.at, now, cfg, newTread32: effNewTread, remainingTread32: toNum(tread) });
+  }, [tire, tirePrice, kind, tread, effNewTread, miles, record, cfg, now]);
 
   const start = () => {
     const line = {
@@ -211,9 +216,14 @@ function ClaimModal({ record, shop, cfg, onClose, onNew }) {
       {kind === "treadlife" && !canTread && <p className="fldErr">This tire has no tread-life (mileage) warranty on file.</p>}
 
       {kind === "hazard" && canHazard && terms.roadHazardBasis === "tread" && (
-        <Field label={`Tread left (32nds, new ≈ ${terms.newTread32})`}>
-          <Num value={tread} onChange={setTread} placeholder={String(terms.newTread32)} />
-        </Field>
+        <div className="fldRow">
+          <Field label="Original tread (32nds)">
+            <Num value={newTread} onChange={setNewTread} placeholder={String(defaultNewTread)} />
+          </Field>
+          <Field label={`Tread left (32nds, new ≈ ${effNewTread})`}>
+            <Num value={tread} onChange={setTread} placeholder="0" />
+          </Field>
+        </div>
       )}
       {kind === "hazard" && canHazard && terms.roadHazardBasis === "time" && (
         <p className="legalNote" style={{ marginTop: 0 }}>Prorated by time left: {st.roadHazard.daysLeft} of {terms.roadHazardMonths * 30} days remaining.</p>

@@ -94,6 +94,22 @@ test("roadHazardCredit: time basis prorates by remaining months", () => {
   assert.ok(full > 99.9 && full <= 100);
 });
 
+test("roadHazardCredit: honors a per-tire original tread depth", () => {
+  const cfg = { warranty: { roadHazardMonths: 36, roadHazardBasis: "tread", newTread32: 10, freeWearPct: 25, floorTread32: 2 } };
+  const soldAt = now - 30 * DAY;
+  // a 14/32 truck tire: usable 12, free until 14 - 0.25*12 = 11/32 remaining
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, newTread32: 14, remainingTread32: 11 }), 200); // still free
+  // at 8/32: (8-2)/(11-2) = 6/9 = 66.7% → $133.33
+  assert.equal(roadHazardCredit({ tirePrice: 200, soldAt, now, cfg, newTread32: 14, remainingTread32: 8 }), 133.33);
+});
+
+test("tireWarranties: captures the tire's original tread depth", () => {
+  const o = order();
+  o.lines[0].treadDepth32 = 12;
+  const rec = tireWarranties({ orders: { o1: o } })[0];
+  assert.equal(rec.tires[0].newTread32, 12);
+});
+
 test("treadlifeCredit: share of rated miles not yet driven", () => {
   // 60k warranty, 15k driven → 75% of price left
   assert.equal(treadlifeCredit({ tirePrice: 200, warrantyMiles: 60000, milesUsed: 15000 }), 150);
