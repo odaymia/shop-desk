@@ -19,6 +19,59 @@ export function isTireServiceLine(l) {
 }
 export const isTireServiceOrder = (o) => !!o && (o.lines || []).some(isTireServiceLine);
 
+/* a line that is specifically a tire rotation */
+export const isRotationLine = (l) => !!l && ["labor", "part", "sublet", "fee"].includes(l.kind) && /rotat/i.test(`${l.job || ""} ${l.description || ""}`);
+export const isRotationOrder = (o) => !!o && (o.lines || []).some(isRotationLine);
+
+/* Every invoiced rotation for one car, oldest first: { at, mileage, number }. */
+export function rotationsForVehicle(orders, vehicleId) {
+  const out = [];
+  for (const o of Object.values(orders || {})) {
+    if (!o || o.status !== "invoiced" || o.mergedInto || o.vehicleId !== vehicleId) continue;
+    if (!isRotationOrder(o)) continue;
+    out.push({ at: o.invoicedAt || o.createdAt || 0, mileage: num(o.mileageOut) || num(o.mileageIn) || 0, number: o.number });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
+/* A car's rotation record for the builder: how many done, the cadence, when
+   the next one is due (by miles or months), and whether it's on track —
+   staying current is what keeps a road-hazard warranty valid. */
+export function rotationCompliance({ orders, vehicleId, cfg, now = Date.now(), currentMileage = 0 }) {
+  const months = num(cfg && cfg.tireRotationMonths) || 6;
+  const miles = num(cfg && cfg.tireRotationMiles) || 5000;
+  const cur = num(currentMileage);
+  const history = rotationsForVehicle(orders, vehicleId);
+  const count = history.length;
+  const last = count ? history[count - 1] : null;
+  const lastAt = last ? last.at : 0;
+  const lastMileage = last ? last.mileage : 0;
+
+  let avgDays = 0, avgMiles = 0;
+  if (count >= 2) {
+    const first = history[0];
+    avgDays = Math.round((last.at - first.at) / DAY / (count - 1)) || 0;
+    if (last.mileage && first.mileage) avgMiles = Math.round((last.mileage - first.mileage) / (count - 1)) || 0;
+  }
+
+  const nextDueAt = lastAt ? lastAt + months * MONTH : 0;
+  const nextDueMileage = lastMileage ? lastMileage + miles : 0;
+  const daysSince = lastAt ? Math.round((now - lastAt) / DAY) : null;
+  const milesSince = lastMileage && cur ? Math.max(0, cur - lastMileage) : null;
+  const dueByDays = nextDueAt ? Math.round((nextDueAt - now) / DAY) : null; // <0 = overdue
+  const dueByMiles = nextDueMileage && cur ? nextDueMileage - cur : null; // <0 = overdue
+  const overTime = lastAt ? now > nextDueAt : false;
+  const overMiles = nextDueMileage && cur ? cur > nextDueMileage : false;
+
+  let status;
+  if (!count) status = "none"; // never rotated here
+  else if (overTime || overMiles) status = "overdue";
+  else if ((dueByDays !== null && dueByDays <= 30) || (dueByMiles !== null && dueByMiles <= 500)) status = "soon";
+  else status = "ok";
+
+  return { count, history, lastAt, lastMileage, avgDays, avgMiles, nextDueAt, nextDueMileage, daysSince, milesSince, dueByDays, dueByMiles, status, intervalMonths: months, intervalMiles: miles };
+}
+
 export function tireRotationsDue({ orders, vehicles, customers, cfg, now = Date.now(), lapseDays = 540 }) {
   const months = num(cfg && cfg.tireRotationMonths) || 6;
   const miles = num(cfg && cfg.tireRotationMiles) || 5000;

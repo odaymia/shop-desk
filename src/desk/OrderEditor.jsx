@@ -61,6 +61,7 @@ import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, s
 import { composeConcern } from "../lib/symptoms.js";
 import { OrderSign } from "./Signing.jsx";
 import { TireQuote } from "./TireQuote.jsx";
+import { RotationBuilder } from "./RotationBuilder.jsx";
 import { MotorLink } from "./MotorLink.jsx";
 import { PortalQR } from "./QR.jsx";
 import { tireName } from "../lib/tires.js";
@@ -1031,6 +1032,11 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
                     🛞 Tire quote
                   </button>
                 )}
+                {!quick && cfg.tireQuote !== false && (
+                  <button className="btn tiny" onClick={() => setPick("rotation")} title="Add a tire rotation and see rotation history, next-due, and road-hazard compliance">
+                    🔄 Rotation
+                  </button>
+                )}
               </div>
             )}
             {!locked && (
@@ -1587,6 +1593,18 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               await flushNow();
               setSigning(true);
             }
+          }}
+        />
+      )}
+      {pick === "rotation" && (
+        <RotationBuilder
+          shop={shop}
+          cfg={cfg}
+          order={o}
+          onClose={() => setPick(null)}
+          onAdd={(line) => {
+            addLines([{ ...line, techId: o.topTechId || o.techId || null }]);
+            flash("Tire rotation added");
           }}
         />
       )}

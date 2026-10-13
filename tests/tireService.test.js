@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { tireRotationsDue, isTireServiceOrder, isTireServiceLine } from "../src/lib/tireService.js";
+import { tireRotationsDue, isTireServiceOrder, isTireServiceLine, rotationsForVehicle, rotationCompliance } from "../src/lib/tireService.js";
 
 const DAY = 86400000;
 const now = Date.UTC(2026, 9, 1);
@@ -51,4 +51,32 @@ test("tireRotationsDue: keeps only the latest tire service per car", () => {
   const r = tireRotationsDue({ orders, vehicles: { v1: { id: "v1", customerId: "c1", active: true } }, customers: { c1: {} }, cfg: { tireRotationMonths: 6 }, now });
   assert.equal(r.rows.length, 1);
   assert.equal(r.rows[0].status, "ok"); // 20 days ago → not due
+});
+
+const rot = (vid, daysAgo, mileage) => ({ id: `r-${vid}-${daysAgo}`, status: "invoiced", vehicleId: vid, invoicedAt: now - daysAgo * DAY, mileageIn: mileage, lines: [{ kind: "labor", description: "Tire rotation and balance", hours: 1, rate: 29.99 }] });
+
+test("rotationsForVehicle: invoiced rotations for one car, oldest first", () => {
+  const orders = { a: rot("v1", 200, 30000), b: rot("v1", 20, 35000), c: rot("v2", 10, 5000) };
+  const hist = rotationsForVehicle(orders, "v1");
+  assert.equal(hist.length, 2);
+  assert.ok(hist[0].at < hist[1].at); // oldest first
+  assert.equal(hist[1].mileage, 35000);
+});
+
+test("rotationCompliance: counts, cadence, next-due and status", () => {
+  // rotated at 30k (200d ago) and 35k (20d ago); interval 5000 mi / 6 mo; now at 41k
+  const orders = { a: rot("v1", 200, 30000), b: rot("v1", 20, 35000) };
+  const c = rotationCompliance({ orders, vehicleId: "v1", cfg: { tireRotationMiles: 5000, tireRotationMonths: 6 }, now, currentMileage: 41000 });
+  assert.equal(c.count, 2);
+  assert.equal(c.lastMileage, 35000);
+  assert.equal(c.nextDueMileage, 40000); // 35000 + 5000
+  assert.equal(c.avgMiles, 5000); // (35000-30000)/1
+  assert.equal(c.status, "overdue"); // 41k is past the 40k next-due mileage
+  assert.equal(c.dueByMiles, -1000); // 1000 miles over
+});
+
+test("rotationCompliance: no history → 'none'", () => {
+  const c = rotationCompliance({ orders: {}, vehicleId: "v9", cfg: {}, now, currentMileage: 10000 });
+  assert.equal(c.count, 0);
+  assert.equal(c.status, "none");
 });
