@@ -106,8 +106,9 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
     });
   }
   /* a pricier oil (bottled, boxed) or filter (canister/cartridge) can
-     carry a surcharge added on top of the package price — its own taxable
-     line, not folded in */
+     carry a surcharge added on top of the package price — its own line, not
+     folded in. A filter surcharge is a handling charge, not part of the
+     filter's goods price, so it isn't taxed; only the filter's price is. */
   const surchargeLine = (part, kind) => {
     const amt = part ? round2(Number(part.surcharge) || 0) : 0;
     if (amt <= 0) return;
@@ -121,7 +122,7 @@ export function oilPackageLines(pkg, quarts, oilPart, filterPart, mkId) {
       price: amt,
       cost: 0,
       condition: "new",
-      taxable: true,
+      taxable: kind.toLowerCase() === "filter" ? false : true, // filter surcharge isn't taxed — only the filter's price is
       surchargeForId: part.id || null, // the package part this charge belongs to
       surchargeKind: kind.toLowerCase(), // "oil" | "filter"
       job,

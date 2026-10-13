@@ -148,7 +148,7 @@ test("an oil's explicit package list wins over type matching", () => {
   assert.deepEqual(oilsForPackage(oils, generic).map((o) => o.id), ["b"]); // only "b" (no list); "a" listed for conv only
 });
 
-test("a filter with a surcharge adds its own taxable line on top of the package", () => {
+test("a filter surcharge adds its own line but is NOT taxed — only the filter's price is", () => {
   const oil = { id: "o1", description: "conventional qt", price: 6.99, cost: 3.1 };
   const canister = { id: "f9", number: "CANISTER1", description: "Canister oil filter", price: 12.99, cost: 6, surcharge: 15, surchargeLabel: "Canister filter charge" };
   let n = 0;
@@ -156,12 +156,12 @@ test("a filter with a surcharge adds its own taxable line on top of the package"
   const charge = lines.find((l) => l.description === "Canister filter charge");
   assert.ok(charge, "surcharge line is added");
   assert.equal(charge.price, 15);
-  assert.equal(charge.taxable, true);
+  assert.equal(charge.taxable, false); // the filter's extra charge isn't taxed
   assert.equal(charge.packaged, undefined); // shows on its own, not folded into the package
   const t = orderTotals({ lines, noSupplies: true }, cfg);
   assert.equal(t.subtotal, 69.99); // 54.99 package + 15 surcharge
-  // tax is on the parts: oil 5×6.99=34.95 + filter 12.99 (within the package) + 15 surcharge = 62.94
-  assert.equal(t.taxable, 62.94);
+  // tax is on the parts only, surcharge excluded: oil 5×6.99=34.95 + filter 12.99 = 47.94
+  assert.equal(t.taxable, 47.94);
 });
 
 test("no surcharge line when the filter has none", () => {
