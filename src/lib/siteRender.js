@@ -863,6 +863,7 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
 }
 @media (max-width:520px){.brandmark img{height:40px}.callTop{display:none}.menuBtn{margin-left:auto}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.status.open i{animation:none}}
+.tireConnect [data-tctid="tc_logo"]{display:none !important}
 </style>
 </head>
 <body>
