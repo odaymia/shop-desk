@@ -407,7 +407,7 @@ export function renderSite(p, opts = {}) {
      search bar is on, show a search-styled bar at the top that jumps to it. */
   const tcBar =
     p.tireSearchBar && p.tireConnect
-      ? `<div class="tcbar"><a class="wrap" href="#tires"><span class="tcbarLabel">🛞 Shop tires</span><span class="tcbarFake">Search by vehicle or tire size…</span><span class="tcbarGo">Search →</span></a></div>`
+      ? `<div class="tcbar"><a class="wrap" href="#tires"><span class="tcbarLabel">🛞 Shop tires</span><span class="tcbarFake"><svg class="tcbarMag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg><span class="tcbarPh">Search by vehicle or tire size</span></span><span class="tcbarGo">Search</span></a></div>`
       : "";
   const nav = [
     ["services", "Services"],
@@ -880,11 +880,13 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.status.open i{animation:none}}
 .tireConnect [data-tctid="tc_logo"]{display:none !important}
 .tcbar{background:var(--dark2);color:#fff}
-.tcbar .wrap{display:flex;align-items:center;gap:16px;padding:8px 24px;flex-wrap:wrap;text-decoration:none;color:inherit}
-.tcbarLabel{font:800 14px/1 var(--display);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
-.tcbarFake{flex:1 1 200px;min-width:0;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 16px;color:rgba(255,255,255,.6);font-size:14px}
-.tcbarGo{background:var(--accent);color:#fff;font-weight:700;padding:7px 16px;border-radius:999px;font-size:14px;white-space:nowrap}
-@media(max-width:600px){.tcbar .wrap{padding:8px 16px;gap:8px}.tcbarLabel{display:none}.tcbarGo{margin-left:auto}}
+.tcbar .wrap{display:flex;align-items:center;gap:12px;padding:9px 24px;text-decoration:none;color:inherit}
+.tcbarLabel{font:800 14px/1 var(--display);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;flex:none}
+.tcbarFake{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:9px 16px;color:rgba(255,255,255,.65);font-size:14px}
+.tcbarMag{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;opacity:.8}
+.tcbarPh{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tcbarGo{background:var(--accent);color:#fff;font-weight:700;padding:9px 18px;border-radius:999px;font-size:14px;white-space:nowrap;flex:none}
+@media(max-width:600px){.tcbar .wrap{padding:8px 14px;gap:8px}.tcbarLabel{display:none}.tcbarGo{padding:9px 14px}}
 </style>
 </head>
 <body>
