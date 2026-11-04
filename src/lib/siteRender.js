@@ -879,12 +879,11 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
 @media (max-width:520px){.brandmark img{height:40px}.callTop{display:none}.menuBtn{margin-left:auto}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.status.open i{animation:none}}
 .tireConnect [data-tctid="tc_logo"]{display:none !important}
-.tcbar{background:var(--dark2);color:#fff;border-bottom:1px solid rgba(255,255,255,.08)}
-.tcbar .wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 24px;text-decoration:none;color:inherit;font:700 15px/1.2 var(--display);letter-spacing:.01em;transition:color .15s ease}
-.tcbarArrow{color:var(--accent);font-weight:800;transition:transform .15s ease}
-.tcbar .wrap:hover{color:var(--accent)}
-.tcbar .wrap:hover .tcbarArrow{transform:translateX(4px)}
-@media(max-width:600px){.tcbar .wrap{padding:10px 16px;font-size:14px}}
+.tcbar{background:var(--brand);color:#fff;box-shadow:0 3px 14px color-mix(in srgb,var(--brand) 30%,transparent)}
+.tcbar .wrap{display:flex;align-items:center;justify-content:center;gap:14px;padding:18px 24px;text-decoration:none;color:inherit;font:800 22px/1.15 var(--display);letter-spacing:.01em}
+.tcbarArrow{font-weight:900;font-size:1.1em;transition:transform .15s ease}
+.tcbar .wrap:hover .tcbarArrow{transform:translateX(6px)}
+@media(max-width:600px){.tcbar .wrap{padding:15px 16px;font-size:18px;gap:10px}}
 </style>
 </head>
 <body>
