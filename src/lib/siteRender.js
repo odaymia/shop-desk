@@ -20,6 +20,17 @@ const esc = (s) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 const money = (n) => "$" + (Number(n) || 0).toFixed(2).replace(/\.00$/, "");
+
+/* Pull the API key and widget-script URL out of the shop's pasted TireConnect
+   embed, so the same key can drive both the full widget and the compact search
+   bar (each needs its own container, and the script loads once). Null when the
+   snippet isn't the expected shape — then the raw embed is used as-is. */
+function tcConfig(embed) {
+  const s = String(embed || "");
+  const apikey = (s.match(/apikey\s*:\s*['"]?([A-Za-z0-9_-]{8,})['"]?/) || [])[1] || "";
+  const src = (s.match(/<script[^>]+src=["']([^"']+(?:tireconnect|widget)[^"']*)["']/i) || [])[1] || "";
+  return apikey && src ? { apikey, src } : null;
+}
 const telHref = (p) => "tel:" + String(p || "").replace(/[^\d+]/g, "");
 /* JSON inside <script>: never let a value close the tag */
 const jsonForScript = (v) => JSON.stringify(v).replace(/</g, "\\u003c").replace(/[\u2028\u2029]/g, " ");
@@ -399,6 +410,15 @@ export function renderSite(p, opts = {}) {
     .map((t) => `<li><span><b>${esc(t.name)}</b> ${esc(t.size)}${t.loadSpeed ? ` ${esc(t.loadSpeed)}` : ""}</span><span class="num">${t.price != null ? esc(money(t.price)) : "In stock"}</span></li>`)
     .join("");
   const hasTires = (p.inStockTires || []).length > 0 || !!(p.tireConnect && String(p.tireConnect).trim());
+  /* TireConnect: load the widget script once, then render the full widget
+     (Tires section) and, if turned on, a compact search bar at the top —
+     each needs its own container id. Unparseable embed → use it raw. */
+  const tc = tcConfig(p.tireConnect);
+  const tcFull = p.tireConnect ? (tc ? `<div id="tireconnect"></div><script>TCWidget.init({apikey:'${tc.apikey}',container:'tireconnect'});</script>` : p.tireConnect) : "";
+  const tcBar =
+    p.tireSearchBar && tc
+      ? `<div class="tcbar"><div class="wrap"><span class="tcbarLabel">🛞 Find your tires</span><div id="tc-topsearch" class="tcbarWidget"></div></div><script>TCWidget.initSearch({apikey:'${tc.apikey}',container:'tc-topsearch'});</script></div>`
+      : "";
   const nav = [
     ["services", "Services"],
     hasTires && ["tires", "Tires"],
@@ -869,9 +889,16 @@ footer .legal{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-
 @media (max-width:520px){.brandmark img{height:40px}.callTop{display:none}.menuBtn{margin-left:auto}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.status.open i{animation:none}}
 .tireConnect [data-tctid="tc_logo"]{display:none !important}
+.tcbar{background:var(--dark2);color:#fff}
+.tcbar .wrap{display:flex;align-items:center;gap:16px;padding:8px 24px;flex-wrap:wrap}
+.tcbarLabel{font:800 14px/1 var(--display);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.tcbarWidget{flex:1 1 260px;min-width:0}
+@media(max-width:600px){.tcbar .wrap{padding:8px 16px;gap:8px}.tcbarLabel{font-size:12px}}
 </style>
+${tc ? `<script src="${esc(tc.src)}"></script>` : ""}
 </head>
 <body>
+${tcBar}
 <header class="top"><div class="wrap">
   <a class="brandmark" href="#top">${logo ? `<img src="${esc(logo)}" alt="${esc(p.name)}">` : esc(p.name)}</a>
   <nav>${nav.map(([id, l]) => `<a href="#${id}">${esc(l)}</a>`).join("")}${garage ? `<a href="${garage}">My Garage</a>` : ""}</nav>
@@ -930,7 +957,7 @@ ${hasTires ? `<section id="tires"><div class="wrap">
   <span class="eyebrow">Tires</span>
   <h2>Tires</h2>
   ${inStockRows ? `<p class="sub">In stock now at our shop — call or stop in:</p><ul class="list tireList">${inStockRows}</ul>` : ""}
-  ${p.tireConnect ? `${inStockRows ? `<h3 class="listHead">Don't see your size? Shop our full catalog &amp; get a quote</h3>` : `<p class="sub">Find the right tires for your vehicle and get an instant quote.</p>`}<div class="tireConnect">${p.tireConnect}</div>` : ""}
+  ${p.tireConnect ? `${inStockRows ? `<h3 class="listHead">Don't see your size? Shop our full catalog &amp; get a quote</h3>` : `<p class="sub">Find the right tires for your vehicle and get an instant quote.</p>`}<div class="tireConnect">${tcFull}</div>` : ""}
 </div></section>` : ""}
 
 ${hasPrices ? `<section id="prices"><div class="wrap">

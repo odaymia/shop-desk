@@ -37,6 +37,7 @@ export const DEFAULT_WEBSITE = {
   quoteTool: true, // the pick-your-car oil change quote, from the shop's own specs
   showTires: false, // list the shop's own in-stock tires (from Tire inventory) on the site
   tireConnect: "", // paste the shop's TireConnect widget embed; shows a "Shop for tires" section when set
+  tireSearchBar: false, // a compact TireConnect search bar across the top of every page
   booking: true, // appointment request form
   signup: true, // "Get specials by email" box above the footer; signups land on the Email list page
   walkIn: [], // service-menu ids that are first come, first served (no appointments), e.g. ["oil"]
@@ -445,6 +446,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     vehicles: w.quoteTool && w.showPrices && pkgs.length ? quoteVehicles(specs) : [],
     booking: !!w.booking,
     tireConnect: str(w.tireConnect), // the shop's TireConnect embed snippet, injected raw into the "Shop for tires" section
+    tireSearchBar: !!w.tireSearchBar, // compact TireConnect search bar at the top of the site
     inStockTires: w.showTires ? inStockTires(parts, w.showPrices) : [], // the shop's own on-hand tires
     signup: w.signup !== false,
     links: { ...DEFAULT_WEBSITE.links, ...(w.links || {}) },
