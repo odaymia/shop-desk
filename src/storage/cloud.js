@@ -726,8 +726,8 @@ export const cloud = {
   listMailSends,
   uploadPublicImage,
   /* Call a Supabase Edge Function as the signed-in shop user. Used for
-     distributor lookups (tire search/order) that must run server-side so
-     the wholesale credentials never reach the browser. */
+     MOTOR, payments and other lookups that must run server-side so the
+     credentials never reach the browser. */
   async invoke(name, body) {
     if (!supabase) throw new Error("offline");
     const { data, error } = await supabase.functions.invoke(name, { body });

@@ -16,8 +16,8 @@
    Everything goes through the "pay" Edge Function, which holds the secret key;
    the browser never sees it. When Stripe isn't set up yet (demo, or before the
    platform account is wired) the function SIMULATES success so the whole flow
-   can be built, demoed, and trained on — the same convention as tire-search
-   and sign. `simulated: true` comes back so the UI can say so.
+   can be built, demoed, and trained on — the same convention as the motor
+   and sign functions. `simulated: true` comes back so the UI can say so.
 
    The fee math below is pure and tested (tests/payments.test.js). Keep it that
    way — this module must stay import-safe outside the browser, so the network

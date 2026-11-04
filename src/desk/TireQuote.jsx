@@ -5,7 +5,6 @@ import { normalizeTireSize, isTireSize, tireName } from "../lib/tires.js";
 import { sizeForVehicle, tiresForSize, stockedSizes, tireAddOns, tireQuoteLines, quoteSubtotal, addOnCharge } from "../lib/tireQuote.js";
 import { orderTotals, fmtMoney } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
-import { DistributorTires } from "./Tires.jsx";
 
 /* The tire estimate builder: the car's size (or pick one) → the tires in
    stock in that size → how many → add-ons → the estimate, ready for the
@@ -32,7 +31,6 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
   const addOnList = tireAddOns(cfg).filter((a) => String(a.label || "").trim());
   const [picked, setPicked] = useState(() => Object.fromEntries(addOnList.map((a) => [a.id, { on: !!a.on, price: String(a.price ?? "") }])));
   const [saveSize, setSaveSize] = useState(true);
-  const [dist, setDist] = useState(false);
 
   const tires = useMemo(() => tiresForSize(shop.parts, size), [shop.parts, size]);
   const sizes = useMemo(() => stockedSizes(shop.parts), [shop.parts]);
@@ -128,9 +126,6 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
               Different size
             </button>
             <div className="grow" />
-            <button className="btn tiny" onClick={() => setDist(true)}>
-              Search US AutoForce
-            </button>
             <button className="btn tiny" onClick={() => setTyping(true)}>
               Type a tire we'll order
             </button>
@@ -145,7 +140,7 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
             </div>
           )}
           {tires.length === 0 ? (
-            <p className="emptyNote">No {size} tires in inventory. Search US AutoForce to add one, or type the tire you'll order.</p>
+            <p className="emptyNote">No {size} tires in inventory. Type the tire you'll order.</p>
           ) : (
             <div className="tqTires">
               {tires.map((p) => {
@@ -288,7 +283,6 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
         </div>
       )}
 
-      {dist && <DistributorTires shop={shop} cfg={cfg} flash={flash} initialSize={size} onClose={() => setDist(false)} />}
     </Modal>
   );
 }
