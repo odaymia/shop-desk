@@ -9,6 +9,7 @@
 import { jobLines, orderTotals } from "./invoice.js";
 import { serviceContent } from "./serviceContent.js";
 import { DEFAULT_SERVICE_INTERVALS } from "./serviceReview.js";
+import { tireName, tireSizeKey } from "./tires.js";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -34,6 +35,7 @@ export const DEFAULT_WEBSITE = {
   sinceYear: "", // the year the shop opened, when it's older than the records here
   carsServiced: "", // cars done in all, counting earlier locations; wins over the invoice count when bigger
   quoteTool: true, // the pick-your-car oil change quote, from the shop's own specs
+  showTires: false, // list the shop's own in-stock tires (from Tire inventory) on the site
   tireConnect: "", // paste the shop's TireConnect widget embed; shows a "Shop for tires" section when set
   booking: true, // appointment request form
   signup: true, // "Get specials by email" box above the footer; signups land on the Email list page
@@ -327,6 +329,19 @@ export const offerSlug = (c) => slugify(c.code) || slugify(c.name) || String(c.i
 
 /* Everything the public page shows. `today` is "YYYY-MM-DD" so expired
    coupons drop off at publish time (the page also hides them by date). */
+/* The shop's own tires that are on hand right now, for the "In stock" list on
+   the site — reflects the inventory as of the last publish. Prices show only
+   when the shop is publishing prices. */
+function inStockTires(parts, showPrices) {
+  return Object.values(parts || {})
+    .filter((p) => p && p.tire && p.active !== false && Number(p.onHand) > 0)
+    .map((p) => ({ name: tireName(p), size: str(p.size), loadSpeed: str(p.loadSpeed), price: showPrices && Number(p.price) > 0 ? round2(p.price) : null }))
+    .sort((a, b) => {
+      const x = tireSizeKey(a.size), y = tireSizeKey(b.size);
+      return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] || a.name.localeCompare(b.name);
+    });
+}
+
 export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today }) {
   const w = { ...DEFAULT_WEBSITE, ...(cfg.website || {}) };
   const week = normalizeHoursWeek(w.hoursWeek || parseHoursText(cfg.hours));
@@ -430,6 +445,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     vehicles: w.quoteTool && w.showPrices && pkgs.length ? quoteVehicles(specs) : [],
     booking: !!w.booking,
     tireConnect: str(w.tireConnect), // the shop's TireConnect embed snippet, injected raw into the "Shop for tires" section
+    inStockTires: w.showTires ? inStockTires(parts, w.showPrices) : [], // the shop's own on-hand tires
     signup: w.signup !== false,
     links: { ...DEFAULT_WEBSITE.links, ...(w.links || {}) },
     taxNote: cfg.partsTaxable ? "Plus tax on parts." : "",

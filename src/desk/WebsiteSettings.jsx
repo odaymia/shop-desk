@@ -208,6 +208,7 @@ export function WebsiteSettings({ d, set, shop, flash }) {
       {[
         ["showPrices", "Prices: oil change packages and canned jobs ticked \"Show on the customer portal\""],
         ["quoteTool", "Oil change price finder: customers pick their car, see the oil it takes and their price (from your service specs)"],
+        ["showTires", "Our in-stock tires: list the tires you have on hand right now (from Tire inventory)"],
         ["showStats", "Your history: the year you started and how many services you've done"],
         ["booking", "Appointment request form (requests show up on the Requests tab)"],
         ["signup", "\"Get specials by email\" signup box (signups show up on the Email list page)"],

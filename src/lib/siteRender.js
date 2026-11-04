@@ -390,7 +390,10 @@ export function renderSite(p, opts = {}) {
   /* returning customers' quickest way to their receipts: the portal */
   const garage = opts.portalUrl ? esc(opts.portalUrl) : "";
 
-  const hasTires = !!(p.tireConnect && String(p.tireConnect).trim());
+  const inStockRows = (p.inStockTires || [])
+    .map((t) => `<li><span><b>${esc(t.name)}</b> ${esc(t.size)}${t.loadSpeed ? ` ${esc(t.loadSpeed)}` : ""}</span><span class="num">${t.price != null ? esc(money(t.price)) : "In stock"}</span></li>`)
+    .join("");
+  const hasTires = (p.inStockTires || []).length > 0 || !!(p.tireConnect && String(p.tireConnect).trim());
   const nav = [
     ["services", "Services"],
     hasTires && ["tires", "Tires"],
@@ -919,9 +922,9 @@ ${hasQuote ? `<section id="quote" class="dark"><div class="wrap">
 
 ${hasTires ? `<section id="tires"><div class="wrap">
   <span class="eyebrow">Tires</span>
-  <h2>Shop for tires</h2>
-  <p class="sub">Find the right tires for your vehicle and get an instant quote.</p>
-  <div class="tireConnect">${p.tireConnect}</div>
+  <h2>Tires</h2>
+  ${inStockRows ? `<p class="sub">In stock now at our shop — call or stop in:</p><ul class="list tireList">${inStockRows}</ul>` : ""}
+  ${p.tireConnect ? `${inStockRows ? `<h3 class="listHead">Don't see your size? Shop our full catalog &amp; get a quote</h3>` : `<p class="sub">Find the right tires for your vehicle and get an instant quote.</p>`}<div class="tireConnect">${p.tireConnect}</div>` : ""}
 </div></section>` : ""}
 
 ${hasPrices ? `<section id="prices"><div class="wrap">
