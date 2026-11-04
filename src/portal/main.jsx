@@ -1,6 +1,3 @@
-import { createRoot } from "react-dom/client";
-import "../base.css";
-import "./portal.css";
-import Portal from "./Portal.jsx";
+import { mountPortal } from "./mount.jsx";
 
-createRoot(document.getElementById("root")).render(<Portal />);
+mountPortal(document.getElementById("root"));

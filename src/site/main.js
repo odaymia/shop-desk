@@ -23,7 +23,21 @@ const say = (text) => {
   if (el) el.textContent = text;
 };
 
+/* On a shop's own domain the host serves this bootstrap for every path, so
+   /portal/ lands here too — detect it and mount the customer portal instead
+   of the shop site, keeping customers on the shop's own domain. */
+const isPortalPath = /(?:^|\/)portal\/?$/i.test(location.pathname);
+
+async function loadPortal() {
+  document.open();
+  document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>My Garage</title></head><body><div id="root"></div></body></html>');
+  document.close();
+  const { mountPortal } = await import("../portal/mount.jsx");
+  mountPortal(document.getElementById("root"));
+}
+
 async function load() {
+  if (onOwnDomain && isPortalPath) return loadPortal();
   const q = new URLSearchParams(location.search);
   const slug = String((meta && meta.content) || q.get("s") || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
   if (!slug) return say("No shop in this address.");
@@ -49,7 +63,10 @@ async function load() {
   if (onOwnDomain && window.SITE && window.SITE.updatedAt === row.data.updatedAt) return;
   const html = renderSite(row.data, {
     api: { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, shopId: row.shop_id },
-    portalUrl: row.data.portal === false ? "" : new URL("../portal/", here).href,
+    /* on the shop's own domain, keep the portal link on that domain
+       (/portal/ is served by this same bootstrap); on the app host, use the
+       app's own portal build */
+    portalUrl: row.data.portal === false ? "" : (onOwnDomain ? new URL("/portal/", location.origin).href : new URL("../portal/", here).href),
     live: onOwnDomain ? { src: here, slug, canonical: (document.querySelector('link[rel="canonical"]') || {}).href || "" } : null,
   });
   document.open();
