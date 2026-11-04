@@ -285,6 +285,9 @@ function servicePage(p, s, i, { tel, garage, dirUrl }) {
     ? (p.oilPackages || []).map((k) => `<li><span>${esc(tierName(k.name))}</span><b>${esc(money(k.price))}</b></li>`).join("")
     : (s.prices || []).map((x) => `<li><span>${esc(x.name)}</span><b>${esc(money(x.price))}</b></li>`).join("");
   const others = (p.services || []).filter((o) => o !== s).map((o) => `<a href="#service-${esc(o.slug || slugify(o.name))}">${iconFor(o.oil ? "oil" : o.name)}${esc(o.name)}</a>`).join("");
+  /* on a tire-related service page, send customers to the tire-shopping
+     widget (one widget per site, on the Tires section) */
+  const shopTires = p.tireConnect && /tire/i.test(s.name || "") ? `<a class="btn primary" href="#tires">Shop tires &amp; get a quote</a>` : "";
   return `<section class="svcPage" id="service-${esc(pageId)}" data-title="${esc(s.name)} · ${esc(p.name)}">
   <div class="spHero" style="background-image:url('${esc(photoUrl(photo.id))}')">
     <div class="wrap">
@@ -293,11 +296,12 @@ function servicePage(p, s, i, { tel, garage, dirUrl }) {
       <h1>${esc(s.name)}</h1>
       <p class="lead">${esc(content.headline)}</p>
       <div class="ctas">
+        ${shopTires}
         ${
           s.walkIn
-            ? `<a class="btn primary" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} Get directions</a><span class="chip wiChip">No appointment needed</span>`
+            ? `<a class="btn ${shopTires ? "ghost" : "primary"}" href="${dirUrl}" target="_blank" rel="noopener">${icon("pin", "ic sm")} Get directions</a><span class="chip wiChip">No appointment needed</span>`
             : p.booking
-              ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>`
+              ? `<a class="btn ${shopTires ? "ghost" : "primary"}" href="#book" data-svc="${esc(s.name)}">Book this service</a>`
               : ""
         }
         ${p.phone ? `<a class="btn ghost" href="${tel}">${icon("phone", "ic sm")} ${esc(p.phone)}</a>` : ""}
@@ -345,6 +349,7 @@ function servicePage(p, s, i, { tel, garage, dirUrl }) {
             ? `<a class="btn primary" href="#book" data-svc="${esc(s.name)}">Book this service</a>`
             : ""
       }
+      ${shopTires ? `<a class="btn outline" href="#tires">Shop tires &amp; get a quote</a>` : ""}
       ${p.phone ? `<a class="btn outline" href="${tel}">${icon("phone", "ic sm")} Call ${esc(p.phone)}</a>` : ""}
       ${garage ? `<a class="btn outline" href="${esc(garage)}">My Garage</a>` : ""}
     </aside>
