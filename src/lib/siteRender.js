@@ -390,8 +390,10 @@ export function renderSite(p, opts = {}) {
   /* returning customers' quickest way to their receipts: the portal */
   const garage = opts.portalUrl ? esc(opts.portalUrl) : "";
 
+  const hasTires = !!(p.tireConnect && String(p.tireConnect).trim());
   const nav = [
     ["services", "Services"],
+    hasTires && ["tires", "Tires"],
     hasPrices && ["prices", "Prices"],
     (p.deals || []).length && ["specials", "Specials"],
     p.booking && ["book", "Book"],
@@ -913,6 +915,13 @@ ${hasQuote ? `<section id="quote" class="dark"><div class="wrap">
     </div>
     <div class="result" id="qr"><div class="empty">${icon("oil")}<span>Pick your year, make and model<br>to see your price.</span></div></div>
   </div>
+</div></section>` : ""}
+
+${hasTires ? `<section id="tires"><div class="wrap">
+  <span class="eyebrow">Tires</span>
+  <h2>Shop for tires</h2>
+  <p class="sub">Find the right tires for your vehicle and get an instant quote.</p>
+  <div class="tireConnect">${p.tireConnect}</div>
 </div></section>` : ""}
 
 ${hasPrices ? `<section id="prices"><div class="wrap">

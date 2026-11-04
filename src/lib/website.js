@@ -34,6 +34,7 @@ export const DEFAULT_WEBSITE = {
   sinceYear: "", // the year the shop opened, when it's older than the records here
   carsServiced: "", // cars done in all, counting earlier locations; wins over the invoice count when bigger
   quoteTool: true, // the pick-your-car oil change quote, from the shop's own specs
+  tireConnect: "", // paste the shop's TireConnect widget embed; shows a "Shop for tires" section when set
   booking: true, // appointment request form
   signup: true, // "Get specials by email" box above the footer; signups land on the Email list page
   walkIn: [], // service-menu ids that are first come, first served (no appointments), e.g. ["oil"]
@@ -428,6 +429,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     stats: w.showStats ? sinceBefore(historyStats(w, orders), today) : null,
     vehicles: w.quoteTool && w.showPrices && pkgs.length ? quoteVehicles(specs) : [],
     booking: !!w.booking,
+    tireConnect: str(w.tireConnect), // the shop's TireConnect embed snippet, injected raw into the "Shop for tires" section
     signup: w.signup !== false,
     links: { ...DEFAULT_WEBSITE.links, ...(w.links || {}) },
     taxNote: cfg.partsTaxable ? "Plus tax on parts." : "",
@@ -461,6 +463,7 @@ export function normalizeWebsite(w, shopName) {
     tagline: str(x.tagline),
     about: str(x.about),
     cityLine: str(x.cityLine),
+    tireConnect: str(x.tireConnect),
     brandColor: color(x.brandColor, DEFAULT_WEBSITE.brandColor),
     accentColor: color(x.accentColor, DEFAULT_WEBSITE.accentColor),
     highlights: (x.highlights || []).map(str).filter(Boolean).slice(0, 8),

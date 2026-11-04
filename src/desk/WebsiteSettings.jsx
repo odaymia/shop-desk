@@ -217,6 +217,24 @@ export function WebsiteSettings({ d, set, shop, flash }) {
           <span>{label}</span>
         </label>
       ))}
+
+      <h3 className="subhead" style={{ marginTop: 28 }}>Tire shopping (TireConnect)</h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Paste your TireConnect website widget here — get it from your TireConnect dashboard under Integrations → Website (it's a small snippet, usually a
+        &lt;div&gt; plus a &lt;script&gt;). When it's filled in, your site gets a <strong>&ldquo;Shop for tires&rdquo;</strong> section with the widget so
+        customers can search tires and get a quote. Leave it blank to hide the section.
+      </p>
+      <Field label="TireConnect embed code">
+        <textarea
+          rows={5}
+          value={w.tireConnect || ""}
+          onChange={(e) => setW({ tireConnect: e.target.value })}
+          placeholder={'<div id="tireconnect"></div>\n<script src="https://…tireconnect…/widget.js" data-id="YOUR-ID"></script>'}
+          spellCheck={false}
+          style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}
+        />
+      </Field>
+
       {w.showStats && (
         <div className="fldRow">
           <Field label="Year you opened (blank uses your records)">
