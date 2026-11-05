@@ -5,6 +5,8 @@ import { normalizeTireSize, isTireSize, tireName } from "../lib/tires.js";
 import { sizeForVehicle, tiresForSize, stockedSizes, tireAddOns, tireQuoteLines, quoteSubtotal, addOnCharge } from "../lib/tireQuote.js";
 import { orderTotals, fmtMoney } from "../lib/invoice.js";
 import { uid } from "../lib/ids.js";
+import { TireConnectEmbed } from "./TireConnectEmbed.jsx";
+import { tcApiKey, tcScriptSrc } from "../lib/tireconnect.js";
 
 /* The tire estimate builder: the car's size (or pick one) → the tires in
    stock in that size → how many → add-ons → the estimate, ready for the
@@ -28,6 +30,9 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
   const [typing, setTyping] = useState(false); // a tire that isn't in inventory
   const [typed, setTyped] = useState({ description: "", price: "" });
   const [count, setCount] = useState(4);
+  const [showTC, setShowTC] = useState(false); // the embedded TireConnect live catalog
+  const tcKey = tcApiKey(cfg && cfg.website && cfg.website.tireConnect);
+  const tcSrc = tcScriptSrc(cfg && cfg.website && cfg.website.tireConnect);
   const addOnList = tireAddOns(cfg).filter((a) => String(a.label || "").trim());
   const [picked, setPicked] = useState(() => Object.fromEntries(addOnList.map((a) => [a.id, { on: !!a.on, price: String(a.price ?? "") }])));
   const [saveSize, setSaveSize] = useState(true);
@@ -50,6 +55,24 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
     setTire(t);
     setTyping(false);
     setStep("count");
+  };
+  /* a tire chosen in the embedded TireConnect catalog: take its size and
+     price into the normal count -> add-ons -> review flow */
+  const pickFromTC = (t) => {
+    const sz = normalizeTireSize(t.size) || size;
+    if (sz) {
+      setSize(sz);
+      setTypedSize(sz);
+    }
+    setShowTC(false);
+    pickTire({ description: t.description, price: t.price, cost: t.cost, size: sz, number: t.number, loadSpeed: t.loadSpeed });
+  };
+  /* the advisor built a whole cart in TireConnect and hit Order/quote:
+     add every line (tires + the shop services they picked) at once */
+  const importFromTC = (res) => {
+    if (!res || !res.lines || !res.lines.length) return flash("Nothing to import from that quote yet.", "out");
+    setShowTC(false);
+    onAdd(res.lines, { size: "", sign: false });
   };
   const add = (sign) => {
     onAdd(quote.lines, { size: saveSize ? size : "", sign });
@@ -78,6 +101,25 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
 
       {step === "size" && (
         <div className="tqBody">
+          {showTC ? (
+            <div>
+              <div className="rowBtns" style={{ marginBottom: 10 }}>
+                <button className="btn tiny ghost" onClick={() => setShowTC(false)}>
+                  ← Back to in-stock
+                </button>
+                <strong style={{ fontSize: 16 }}>Live tire catalog</strong>
+              </div>
+              <TireConnectEmbed apikey={tcKey} scriptSrc={tcSrc} idMaker={uid} flash={flash} onPickTire={pickFromTC} onImportQuote={importFromTC} />
+              <p className="muted" style={{ marginTop: 10 }}>Pick a tire to drop it into this quote (you'll still choose how many and the add-ons), or build a full cart in the widget and hit Order to import the whole thing.</p>
+            </div>
+          ) : (
+          <>
+          {tcKey && (
+            <button type="button" className="tqKnown tqTcEntry" onClick={() => setShowTC(true)} style={{ marginBottom: 12 }}>
+              <strong>🛞 Search the live tire catalog</strong>
+              <span>Any brand and size from your TireConnect suppliers — even what's not on the rack</span>
+            </button>
+          )}
           {known.size ? (
             <button type="button" className="tqKnown" onClick={() => goSize(known.size)}>
               <strong>{known.size}</strong>
@@ -115,6 +157,8 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
               </div>
             </>
           )}
+          </>
+          )}
         </div>
       )}
 
@@ -126,6 +170,11 @@ export function TireQuote({ shop, cfg, order, customer, vehicle, flash, onClose,
               Different size
             </button>
             <div className="grow" />
+            {tcKey && (
+              <button className="btn tiny" onClick={() => { setStep("size"); setShowTC(true); }}>
+                Live catalog
+              </button>
+            )}
             <button className="btn tiny" onClick={() => setTyping(true)}>
               Type a tire we'll order
             </button>

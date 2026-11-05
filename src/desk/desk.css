@@ -804,6 +804,11 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .tqKnown strong { font-size:26px; font-variant-numeric:tabular-nums; letter-spacing:.02em; }
 .tqKnown span { color:var(--muted); font-size:13px; }
 .tqSize { flex:1; font-size:22px !important; font-weight:600; letter-spacing:.04em; }
+.tqTcEntry { border-style:dashed; border-color:var(--line); background:var(--panel,#fafafa); }
+.tqTcEntry strong { font-size:17px; }
+.tcEmbed { min-height:360px; }
+.tcEmbedWidget { min-height:340px; }
+.tcEmbedWidget [data-tctid="tc_logo"] { display:none !important; }
 .tqTires { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:10px; }
 .tqTire { display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#fff; cursor:pointer; }
 .tqTire:hover, .tqTire.on { border-color:var(--signal); box-shadow:0 0 0 2px rgba(142,47,47,.12); }
