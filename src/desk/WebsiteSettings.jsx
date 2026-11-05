@@ -5,6 +5,77 @@ import { renderSite } from "../lib/siteRender.js";
 import { offerSlug } from "../lib/website.js";
 import { QR } from "./QR.jsx";
 import qrcode from "qrcode-generator";
+import { cloud } from "../storage/index.js";
+
+/* Connect TireConnect's webhooks so online tire orders and quotes land in
+   the desk's "Tire orders" inbox. The shop pastes the signing secret
+   TireConnect shows when adding the webhook; it's kept per shop and read
+   only by the webhook function to verify each call. */
+function TireConnectSync({ flash }) {
+  const [url, setUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [saved, setSaved] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const linked = cloud.getState().linked;
+  useEffect(() => {
+    if (!linked) return;
+    setUrl(cloud.tireConnectWebhookUrl());
+    cloud
+      .getTireConnectSecret()
+      .then((s) => {
+        setSecret(s || "");
+        setSaved(s || "");
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [linked]);
+  const copy = () => navigator.clipboard.writeText(url).then(() => flash("Webhook URL copied"), () => flash("Couldn't copy — select it and copy.", "out"));
+  const save = async () => {
+    try {
+      await cloud.saveTireConnectSecret(secret);
+      setSaved(secret.trim());
+      flash("TireConnect signing secret saved");
+    } catch (e) {
+      flash(e.message || "Couldn't save the secret", "out");
+    }
+  };
+  return (
+    <>
+      <h3 className="subhead" style={{ marginTop: 28 }}>Online tire orders (two-way sync)</h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Have tire orders and quotes from your widget land in the desk as tickets. In <strong>TireConnect Admin → Settings → Webhooks</strong>, add a webhook
+        with the URL below, turn it on for the order and quote events, then copy the <strong>Secret</strong> it shows and paste it here so each order can be
+        verified. New ones appear under <strong>Tire orders</strong> in the menu.
+      </p>
+      {!linked ? (
+        <p className="emptyNote">Sign this computer in to your shop (Settings → Data) to set this up.</p>
+      ) : (
+        <>
+          <Field label="Your webhook URL (paste into TireConnect)">
+            <div className="rowBtns">
+              <input readOnly value={url} onFocus={(e) => e.target.select()} style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }} />
+              <button type="button" className="btn" onClick={copy} disabled={!url}>
+                Copy
+              </button>
+            </div>
+          </Field>
+          <Field label="Signing secret (from TireConnect)">
+            <div className="rowBtns">
+              <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Paste the webhook Secret" spellCheck={false} style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }} />
+              <button type="button" className="btn primary" onClick={save} disabled={!loaded || secret.trim() === saved.trim()}>
+                Save
+              </button>
+            </div>
+          </Field>
+          <p className="legalNote" style={{ marginTop: 0 }}>
+            {saved ? "A signing secret is set — orders are verified before they're accepted." : "No secret yet — TireConnect orders won't be accepted until you paste the Secret and save."} Needs the webhook function deployed and{" "}
+            <code>supabase/tireconnect.sql</code> run once.
+          </p>
+        </>
+      )}
+    </>
+  );
+}
 
 /* Settings → Website. The shop's public site is built from what's already
    in the desk (name, phone, address, service menu, oil packages, published
@@ -236,6 +307,8 @@ export function WebsiteSettings({ d, set, shop, flash }) {
           style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}
         />
       </Field>
+
+      <TireConnectSync flash={flash} />
 
       {w.showStats && (
         <div className="fldRow">

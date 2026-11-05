@@ -541,6 +541,42 @@ async function handleSiteRequest(id) {
   if (error) throw error;
 }
 
+/* TireConnect online orders/quotes delivered by webhook. Read live; staff
+   turn each into a ticket, then it drops off the list. */
+async function listTireOrders() {
+  if (!state.linked) return [];
+  const { data, error } = await supabase
+    .from("tire_orders")
+    .select("id, event, tc_uuid, customer_name, customer_phone, customer_email, vehicle, summary, total, quote, created_at")
+    .eq("shop_id", state.shopId)
+    .is("handled_at", null)
+    .order("created_at");
+  if (error) throw error;
+  return data || [];
+}
+async function handleTireOrder(id, orderId) {
+  if (!state.linked) return;
+  const { error } = await supabase.from("tire_orders").update({ handled_at: new Date().toISOString(), order_id: orderId || null }).eq("id", id);
+  if (error) throw error;
+}
+/* The shop's own webhook URL to paste into TireConnect Admin. */
+function tireConnectWebhookUrl() {
+  return state.linked && SUPABASE_URL && state.shopId ? `${SUPABASE_URL}/functions/v1/tireconnect?shop=${state.shopId}` : "";
+}
+/* The signing secret TireConnect shows when you add the webhook; kept per
+   shop, members only, read by the Edge Function to verify each call. */
+async function getTireConnectSecret() {
+  if (!state.linked) return "";
+  const { data, error } = await supabase.from("tire_connect").select("webhook_secret").eq("shop_id", state.shopId).maybeSingle();
+  if (error) throw error;
+  return (data && data.webhook_secret) || "";
+}
+async function saveTireConnectSecret(secret) {
+  if (!state.linked) throw new Error("Sign this computer in to your shop (Settings → Data) first.");
+  const { error } = await supabase.from("tire_connect").upsert({ shop_id: state.shopId, webhook_secret: String(secret || "").trim(), updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
 /* Email signups from the website, every one (the list is small next to
    the customer records, but page through anyway: the API caps a read). */
 async function listSiteSignups() {
@@ -715,6 +751,11 @@ export const cloud = {
   siteSlugTaken,
   listSiteRequests,
   handleSiteRequest,
+  listTireOrders,
+  handleTireOrder,
+  tireConnectWebhookUrl,
+  getTireConnectSecret,
+  saveTireConnectSecret,
   listSiteSignups,
   setSignupUnsubscribed,
   addSiteSignups,

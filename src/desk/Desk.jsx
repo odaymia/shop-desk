@@ -23,8 +23,11 @@ import { BayDisplay } from "./BayDisplay.jsx";
 import { Fleet } from "./Fleet.jsx";
 import { Cashier, dueOrders } from "./Cashier.jsx";
 import { AppointmentRequests } from "./AppointmentRequests.jsx";
+import { TireOrders } from "./TireOrders.jsx";
 import { cloud } from "../storage/index.js";
 import { DEMO } from "../lib/demo.js";
+import { quoteToLines } from "../lib/tireconnect.js";
+import { uid } from "../lib/ids.js";
 import { activeDepts, DEPTS, startStatus } from "../lib/departments.js";
 import { editionOf } from "../lib/edition.js";
 import defaultLogo from "../assets/genie-logo.png";
@@ -35,6 +38,7 @@ const PAGES = [
   ["orders", "Tickets"],
   ["cashier", "Cashier"],
   ["requests", "Requests"],
+  ["tireorders", "Tire orders"],
   ["customers", "Customers"],
   ["fleet", "Fleet"],
   ["inventory", "Inventory"],
@@ -157,10 +161,22 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       .listSiteRequests()
       .then((r) => setReqCount((r || []).length))
       .catch(() => {});
+  /* TireConnect online orders waiting to be built into tickets */
+  const [tireOrderCount, setTireOrderCount] = useState(0);
+  const checkTireOrders = () =>
+    cloud
+      .listTireOrders()
+      .then((r) => setTireOrderCount((r || []).length))
+      .catch(() => {});
+  const sellsTires = activeDepts(cfg).some((d) => d.id === "tires");
   useEffect(() => {
     if (!shop.loaded) return;
     let live = true;
-    const check = () => live && checkRequests();
+    const check = () => {
+      if (!live) return;
+      checkRequests();
+      if (sellsTires) checkTireOrders();
+    };
     const first = setTimeout(check, 5000);
     const every = setInterval(check, 3 * 60000);
     return () => {
@@ -168,7 +184,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
       clearTimeout(first);
       clearInterval(every);
     };
-  }, [shop.loaded]);
+  }, [shop.loaded, sellsTires]);
 
   const [orderId, setOrderId] = useState(null);
   const [autoPay, setAutoPay] = useState(false); // open the ticket straight to Take payment (from Cashier)
@@ -245,6 +261,33 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
     nav.openOrder(o.id);
   };
 
+  /* Turn a TireConnect online order/quote into a tires ticket: match or
+     create the customer and vehicle, carry the tires and services onto the
+     ticket, mark the order handled, then open the ticket. */
+  const buildTireTicket = async (tireOrder) => {
+    const { lines, vehicle } = quoteToLines(tireOrder.quote || {}, { id: uid });
+    const digits = (s) => String(s || "").replace(/\D/g, "");
+    const phone = digits(tireOrder.customer_phone);
+    const email = String(tireOrder.customer_email || "").trim().toLowerCase();
+    let customer = Object.values(shop.customers || {}).find(
+      (c) => (phone && digits(c.phone) === phone) || (email && String(c.email || "").trim().toLowerCase() === email)
+    );
+    if (!customer && (tireOrder.customer_name || phone || email)) {
+      const parts = String(tireOrder.customer_name || "").trim().split(/\s+/);
+      customer = await shop.saveCustomer({ first: parts[0] || "Online", last: parts.slice(1).join(" "), phone: tireOrder.customer_phone || "", email: tireOrder.customer_email || "" });
+    }
+    let vehicleId = null;
+    if (vehicle && vehicle.make && customer) {
+      const veh = await shop.saveVehicle({ customerId: customer.id, year: vehicle.year || "", make: vehicle.make, model: vehicle.model || "", submodel: vehicle.submodel || "" });
+      vehicleId = veh.id;
+    }
+    const o = await shop.createOrder({ customerId: customer ? customer.id : null, vehicleId, dept: "tires", status: startStatus("tires", cfg), lines });
+    await cloud.handleTireOrder(tireOrder.id, o.id);
+    checkTireOrders();
+    nav.openOrder(o.id);
+    flash("Ticket built from the TireConnect order");
+  };
+
   if (!shop.loaded) {
     return (
       <div className="bootWrap">
@@ -274,7 +317,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
   const deptIds = new Set(depts.map((d) => d.id));
   const navPages = PAGES
     /* Tire inventory is only for shops that sell tires */
-    .filter((pg) => !((pg[0] === "tires" || pg[0] === "warranties") && !deptIds.has("tires")))
+    .filter((pg) => !((pg[0] === "tires" || pg[0] === "warranties" || pg[0] === "tireorders") && !deptIds.has("tires")))
     .flatMap((pg) => (pg[0] === "orders" && depts.length > 1 ? [["orders", "All tickets"], ...depts.map((d) => [`dept:${d.id}`, d.label, true])] : [pg]));
   const ticketPage = page === "orders" || page === "cashier" || page.startsWith("dept:");
 
@@ -295,6 +338,11 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
               {k === "requests" && reqCount > 0 && (
                 <span className="navCount" title={`${reqCount} appointment request${reqCount === 1 ? "" : "s"} waiting`}>
                   {reqCount}
+                </span>
+              )}
+              {k === "tireorders" && tireOrderCount > 0 && (
+                <span className="navCount" title={`${tireOrderCount} tire order${tireOrderCount === 1 ? "" : "s"} waiting`}>
+                  {tireOrderCount}
                 </span>
               )}
               {k === "email" && cardsDue > 0 && (
@@ -337,6 +385,7 @@ export function Desk({ cfg, saveCfg, roster, saveRoster, flash }) {
             <Customers shop={shop} cfg={cfg} nav={nav} flash={flash} customerId={customerId} onNew={newTicket} />
           )}
           {page === "requests" && <AppointmentRequests cfg={cfg} flash={flash} onChange={checkRequests} />}
+          {page === "tireorders" && <TireOrders flash={flash} onBuild={buildTireTicket} onChange={checkTireOrders} />}
           {page === "fleet" && <Fleet shop={shop} cfg={cfg} nav={nav} flash={flash} onNew={newTicket} />}
           {page === "inventory" && <Inventory shop={shop} cfg={cfg} flash={flash} />}
           {page === "tires" && <Tires shop={shop} cfg={cfg} flash={flash} />}
