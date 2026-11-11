@@ -485,6 +485,31 @@ export function WebsiteSettings({ d, set, shop, flash }) {
       </div>
 
       <h3 className="subhead" style={{ marginTop: 28 }}>
+        Marketing &amp; analytics
+      </h3>
+      <p className="legalNote" style={{ marginTop: 0 }}>
+        Connect your ad and analytics accounts so you can measure traffic and track leads. Paste just the <strong>ID</strong> for each — we add the rest.
+        Leave any blank to skip it. These load on every page of your site.
+      </p>
+      <div className="fldRow">
+        {[
+          ["ga4", "Google Analytics 4", "G-XXXXXXXXXX", "Admin → Data streams → your stream"],
+          ["googleAds", "Google Ads (conversions)", "AW-XXXXXXXXXX", "Google Ads → Goals → your conversion tag"],
+          ["gtm", "Google Tag Manager", "GTM-XXXXXXX", "Your GTM container ID"],
+          ["metaPixel", "Meta (Facebook) Pixel", "1234567890123456", "Events Manager → your pixel’s ID"],
+          ["tiktokPixel", "TikTok Pixel", "C1A2B3…", "TikTok Ads → Events → Web → pixel code"],
+          ["clarity", "Microsoft Clarity", "abcd1234ef", "Free heatmaps & recordings — Clarity project ID"],
+          ["googleVerify", "Google site verification", "token", "Search Console → HTML tag method (the content value)"],
+          ["bingVerify", "Bing site verification", "token", "Bing Webmaster → meta tag (the content value)"],
+        ].map(([k, label, ph, help]) => (
+          <Field key={k} label={label}>
+            <Text value={(w.tracking || {})[k] || ""} onChange={(v) => setW({ tracking: { ...(w.tracking || {}), [k]: v } })} placeholder={ph} />
+            <span className="fldHint">{help}</span>
+          </Field>
+        ))}
+      </div>
+
+      <h3 className="subhead" style={{ marginTop: 28 }}>
         Preview
       </h3>
       <div className="rowBtns" style={{ marginBottom: 8 }}>

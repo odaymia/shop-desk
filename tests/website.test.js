@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { intervalText, autoHighlights, splitHighlight, parseHoursText, hoursRows, hoursText, openStatus, siteStats, quoteVehicles, packagePrice, packageKind, carKind, packagesFor, sitePayload, normalizeWebsite, slugify, validateRequest } from "../src/lib/website.js";
+import { intervalText, autoHighlights, splitHighlight, parseHoursText, hoursRows, hoursText, openStatus, siteStats, quoteVehicles, packagePrice, packageKind, carKind, packagesFor, sitePayload, normalizeWebsite, slugify, validateRequest, trackingIds } from "../src/lib/website.js";
 import { renderSite, defaultTagline } from "../src/lib/siteRender.js";
 import { serviceContent } from "../src/lib/serviceContent.js";
 
@@ -270,4 +270,60 @@ test("the owner's own year and car count beat the invoice history", () => {
   assert.ok(s.cars && s.plus);
   // a later year or a smaller count doesn't hide the real history
   assert.equal(historyStats({ sinceYear: "2025", carsServiced: "0" }, orders).sinceYear, 2024);
+});
+
+test("trackingIds keeps well-formed tag IDs and rejects junk", () => {
+  const t = trackingIds({
+    ga4: "g-abc12345",
+    googleAds: "AW-99887766",
+    gtm: "gtm-abcd123",
+    metaPixel: "1234567890123456",
+    tiktokPixel: "C1A2B3D4E5",
+    clarity: "abcd1234ef",
+    googleVerify: "tok_en-123",
+    bingVerify: "ABCdef0099",
+  });
+  assert.equal(t.ga4, "G-ABC12345"); // normalized to upper
+  assert.equal(t.googleAds, "AW-99887766");
+  assert.equal(t.gtm, "GTM-ABCD123");
+  assert.equal(t.metaPixel, "1234567890123456");
+  assert.equal(t.tiktokPixel, "C1A2B3D4E5");
+  assert.equal(t.clarity, "abcd1234ef");
+  assert.equal(t.googleVerify, "tok_en-123");
+  assert.equal(t.bingVerify, "ABCdef0099");
+});
+
+test("trackingIds drops malformed or injection-y values", () => {
+  const t = trackingIds({
+    ga4: "G-abc\"></script><script>evil()", // stray chars -> rejected
+    metaPixel: "12ab", // not all digits -> rejected
+    gtm: "notacontainer",
+    clarity: "<img onerror=1>",
+  });
+  assert.equal(t.ga4, "");
+  assert.equal(t.metaPixel, "");
+  assert.equal(t.gtm, "");
+  // clarity is reduced to safe alphanumerics — never anything that can break
+  // out of the URL it's dropped into
+  assert.ok(!/[<>"'=\s]/.test(t.clarity));
+});
+
+test("sitePayload carries cleaned tracking IDs", () => {
+  const p = sitePayload({ cfg: { shopName: "X", website: { tracking: { ga4: "G-TEST1234", metaPixel: "oops" } } }, jobs: [], parts: [], coupons: [], orders: [], specs: [], today: Date.now() });
+  assert.equal(p.tracking.ga4, "G-TEST1234");
+  assert.equal(p.tracking.metaPixel, "");
+});
+
+test("renderSite injects the GA4 and Meta Pixel snippets when set", () => {
+  const html = renderSite({ name: "X", services: [], oilPackages: [], tracking: { ga4: "G-TEST1234", metaPixel: "1234567890" } }, {});
+  assert.ok(html.includes("googletagmanager.com/gtag/js?id=G-TEST1234"));
+  assert.ok(html.includes("gtag('config','G-TEST1234')"));
+  assert.ok(html.includes("fbq('init','1234567890')"));
+  assert.ok(html.includes("facebook.com/tr?id=1234567890")); // noscript fallback
+});
+
+test("renderSite adds nothing when no tracking is set", () => {
+  const html = renderSite({ name: "X", services: [], oilPackages: [] }, {});
+  assert.ok(!html.includes("gtag/js"));
+  assert.ok(!html.includes("fbevents.js"));
 });

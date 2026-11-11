@@ -170,6 +170,7 @@ textarea.ta:focus { outline:2px solid var(--signal); outline-offset:1px; }
 .desk .fld input:not([type=checkbox]), .desk .fld select, .desk .fld textarea { width:100%; min-width:0; }
 .desk .fldRow .fld { min-width:0; }
 .fld.inline { flex-direction:row; align-items:center; gap:10px; }
+.fldHint { display:block; margin-top:4px; color:var(--muted); font-size:12px; }
 .fld.inline > span { color:var(--ink); }
 .subhead { margin:18px 0 10px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
 .subhead:first-child { margin-top:0; }

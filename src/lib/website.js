@@ -15,6 +15,29 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const str = (s) => String(s == null ? "" : s).trim();
+
+/* Marketing/analytics tag IDs, cleaned to safe characters so only a
+   well-formed ID ever reaches the rendered page (never arbitrary script).
+   Anything that doesn't match its provider's shape becomes "". */
+export function trackingIds(t) {
+  t = t || {};
+  const alnum = (s, n) => String(s || "").trim().replace(/[^A-Za-z0-9]/g, "").slice(0, n);
+  const token = (s, n) => String(s || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, n);
+  const tagged = (s, prefix) => {
+    const v = String(s || "").trim().toUpperCase();
+    return new RegExp(`^${prefix}-[A-Z0-9]{4,}$`).test(v) ? v : "";
+  };
+  return {
+    ga4: tagged(t.ga4, "G"),
+    googleAds: tagged(t.googleAds, "AW"),
+    gtm: tagged(t.gtm, "GTM"),
+    metaPixel: /^\d{5,20}$/.test(String(t.metaPixel || "").trim()) ? String(t.metaPixel).trim() : "",
+    tiktokPixel: alnum(t.tiktokPixel, 40),
+    clarity: alnum(t.clarity, 24),
+    googleVerify: token(t.googleVerify, 128),
+    bingVerify: token(t.bingVerify, 128),
+  };
+}
 const uidOf = () => "w" + Math.random().toString(36).slice(2, 8);
 
 export const DEFAULT_WEBSITE = {
@@ -48,6 +71,18 @@ export const DEFAULT_WEBSITE = {
   serviceBlurbs: {}, // { "Brakes": "custom text" } overrides
   faq: [], // [{ q, a }]; blank uses defaults
   links: { google: "", yelp: "", facebook: "", instagram: "" },
+  // Marketing/analytics tags. The owner enters just the ID for each; we
+  // emit the correct, safe snippet. Blank = that tag isn't added.
+  tracking: {
+    ga4: "", // Google Analytics 4 measurement ID, "G-XXXXXXXXXX"
+    googleAds: "", // Google Ads tag ID, "AW-XXXXXXXXXX" (for conversion tracking)
+    gtm: "", // Google Tag Manager container, "GTM-XXXXXXX"
+    metaPixel: "", // Meta/Facebook Pixel ID (digits)
+    tiktokPixel: "", // TikTok Pixel ID
+    clarity: "", // Microsoft Clarity project ID (free heatmaps/recordings)
+    googleVerify: "", // Google Search Console verification token (meta tag)
+    bingVerify: "", // Bing Webmaster verification token (meta tag)
+  },
 };
 
 /* Selling points under the headline. Written as "Headline — supporting
@@ -450,6 +485,7 @@ export function sitePayload({ cfg, jobs, parts, coupons, orders, specs, today })
     inStockTires: w.showTires ? inStockTires(parts, w.showPrices) : [], // the shop's own on-hand tires
     signup: w.signup !== false,
     links: { ...DEFAULT_WEBSITE.links, ...(w.links || {}) },
+    tracking: trackingIds(w.tracking), // analytics/marketing tags, cleaned to safe IDs
     taxNote: cfg.partsTaxable ? "Plus tax on parts." : "",
     updatedAt: Date.now(),
   };
@@ -492,6 +528,7 @@ export function normalizeWebsite(w, shopName) {
     offers: Object.fromEntries(Object.entries(x.offers || {}).map(([id, o]) => [id, { headline: str(o && o.headline), blurb: str(o && o.blurb) }])),
     faq: (x.faq || []).map((f) => ({ q: str(f && f.q), a: str(f && f.a) })).filter((f) => f.q && f.a),
     links: Object.fromEntries(Object.entries({ ...DEFAULT_WEBSITE.links, ...(x.links || {}) }).map(([k, v]) => [k, /^https?:\/\//i.test(str(v)) ? str(v) : str(v) ? "https://" + str(v) : ""])),
+    tracking: trackingIds(x.tracking),
   };
 }
 
