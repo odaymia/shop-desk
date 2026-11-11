@@ -329,12 +329,18 @@ test("renderSite adds nothing when no tracking is set", () => {
 });
 
 test("renderSite wires engagement events (service, tires, forms)", () => {
-  const html = renderSite({ name: "X", services: [{ name: "Brakes" }], oilPackages: [], booking: true, tracking: { ga4: "G-AAA11111" } }, {});
+  const html = renderSite({ name: "X", services: [{ name: "Brakes" }], oilPackages: [], booking: true, tracking: { ga4: "G-AAA11111", metaPixel: "1234567890" } }, {});
   // the dispatcher and the key event names are present in the page script
   assert.ok(/function track\(/.test(html));
-  for (const ev of ["service_view", "shop_tires", "tire_search", "tire_select", "tire_lead", "call_click", "directions_click", "book_submit", "signup_submit", "oil_quote"]) {
+  for (const ev of ["shop_tires", "tire_search", "call_click", "directions_click", "book_submit", "signup_submit", "oil_quote"]) {
     assert.ok(html.includes(ev), `missing event wiring: ${ev}`);
   }
-  // it registers TireConnect callbacks for widget usage
-  assert.ok(html.includes("TCWidget.on"));
+  // each service page becomes its own event (service_<slug>)
+  assert.ok(html.includes('"service_"+id'));
+  // every event is a Meta custom event (so each is its own Custom Conversion), never a shared standard one
+  assert.ok(html.includes('fbq("trackCustom",name,params)'));
+  // we must NOT gate the TireConnect widget by registering its callbacks
+  assert.ok(!html.includes("TCWidget.on"), "must not register TireConnect callbacks — they stall the widget");
+  // and Meta's auto button-detection is off (no phantom Subscribe/Contact events)
+  assert.ok(html.includes("'autoConfig',false"));
 });

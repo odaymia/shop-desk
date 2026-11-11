@@ -49,7 +49,7 @@ function trackingTags(t) {
     body.push(`<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${t.gtm}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`);
   }
   if (t.metaPixel) {
-    head.push(`<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${t.metaPixel}');fbq('track','PageView');</script>`);
+    head.push(`<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('set','autoConfig',false,'${t.metaPixel}');fbq('init','${t.metaPixel}');fbq('track','PageView');</script>`);
     body.push(`<noscript><img height="1" width="1" style="display:none" alt="" src="https://www.facebook.com/tr?id=${t.metaPixel}&ev=PageView&noscript=1"/></noscript>`);
   }
   if (t.tiktokPixel) {
@@ -1179,27 +1179,27 @@ document.querySelectorAll("form.book").forEach(function(form){var msg=form.query
 
 // ---- Engagement & conversion events ----
 // One dispatcher fans every event out to whatever tags the shop connected
-// (Meta Pixel, GA4/Ads, GTM dataLayer, TikTok, Clarity). Meta gets a
-// matching standard event name where one fits, else a custom event.
-var FB_STD={shop_tires:"Search",tire_search:"Search",tire_select:"ViewContent",tire_lead:"Lead",service_view:"ViewContent",oil_quote:"ViewContent",call_click:"Contact",directions_click:"FindLocation",book_submit:"Schedule",signup_submit:"Lead"};
+// (Meta Pixel, GA4/Ads, GTM dataLayer, TikTok, Clarity). Every action is
+// its own named event — on Meta they're all custom events, so each can be
+// turned into its own Custom Conversion. We never call Meta's auto button
+// tracking (set off in the init) and never register TireConnect widget
+// callbacks (those gate the widget's own flow), so nothing here can break
+// the widget or invent phantom events.
 function track(name,params){params=params||{};
   try{if(window.gtag)gtag("event",name,params)}catch(e){}
   try{if(window.dataLayer)dataLayer.push(Object.assign({event:name},params))}catch(e){}
   try{if(window.ttq)ttq.track(name,params)}catch(e){}
   try{if(window.clarity)clarity("event",name)}catch(e){}
-  try{if(window.fbq){var s=FB_STD[name];if(s)fbq("track",s,params);else fbq("trackCustom",name,params)}}catch(e){}}
+  try{if(window.fbq)fbq("trackCustom",name,params)}catch(e){}}
 window.sbTrack=track;
 // calls, directions, and any "shop for tires" link
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a");if(!a)return;var href=a.getAttribute("href")||"";
   if(href.indexOf("tel:")===0)track("call_click",{});
   else if(href.indexOf("/maps/dir/")>-1)track("directions_click",{});
   else if(href==="#tires"||(a.closest&&a.closest(".tcbar")))track("shop_tires",{content_name:"Tires"});});
-// viewing a service page (brakes, A/C, etc.) — fired by the hash router
-var lastSvc="";function svcView(){var h=location.hash;if(h.indexOf("#service-")!==0)return;var el=document.getElementById(h.slice(1));var t=(el&&el.getAttribute("data-title"))||"";var nm=t.split(" \\u00b7 ")[0];if(nm&&nm!==lastSvc){lastSvc=nm;track("service_view",{content_name:nm,content_category:"service",content_type:"product"})}}
+// each service page is its own conversion: service_brakes, service_ac, …
+var lastSvc="";function svcView(){var h=location.hash;if(h.indexOf("#service-")!==0)return;var id=h.slice(1);var el=document.getElementById(id);var t=(el&&el.getAttribute("data-title"))||"";var nm=t.split(" \\u00b7 ")[0];var ev=("service_"+id.replace(/^service-/,"").replace(/[^a-z0-9]+/gi,"_").replace(/^_+|_+$/g,"")).toLowerCase().slice(0,40);if(ev!=="service_"&&ev!==lastSvc){lastSvc=ev;track(ev,{content_name:nm||id,content_category:"service"})}}
 window.addEventListener("hashchange",svcView);svcView();
-// TireConnect widget use: search, tire picked, quote/lead requested
-(function(){var n=0,iv=setInterval(function(){n++;if(window.TCWidget&&TCWidget.on){clearInterval(iv);
-  var on=function(evt,name){try{TCWidget.on(evt,function(ev){try{track(name,{})}catch(e){}try{if(ev&&ev.resolve)ev.resolve()}catch(e){}})}catch(e){}};
-  on("onTireSearchResults","tire_search");on("onTireSelect","tire_select");on("onLead","tire_lead");on("onEcommerceOrderClick","tire_lead");
-}else if(n>60)clearInterval(iv)},500)})();
+// tire-widget use, read passively from the URL so it NEVER gates the widget
+var tireTs=0,bootTs=Date.now();window.addEventListener("hashchange",function(){if(location.hash.indexOf("#!tires")!==0)return;var now=Date.now();if(now-bootTs<2500)return;if(now-tireTs<4000)return;tireTs=now;track("tire_search",{content_name:"Tires"})});
 })();`;
