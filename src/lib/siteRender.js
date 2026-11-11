@@ -1133,6 +1133,7 @@ if(qy&&C.length){
   var pick=function(){return C.filter(function(c){return(!qy.value||String(c[0])===qy.value)&&(!qm.value||c[1]===qm.value)&&(!qd.value||c[2]===qd.value)})};
   var emptyHTML=qr.innerHTML;
   var show=function(c){if(!c){qr.innerHTML=emptyHTML;return}
+    var _ck=c[0]+" "+c[1]+" "+c[2];if(window.sbTrack&&_ck!==show._l){show._l=_ck;try{sbTrack("oil_quote",{content_name:_ck})}catch(e){}}
     var q=c[5],h='<p class="car">'+esc(c[0]+" "+c[1]+" "+c[2])+'</p><p class="spec">'+(c[3]?esc(c[3])+' · ':'')+'takes <b>'+q+' quarts</b>'+(c[4]?' of <b>'+esc(c[4])+'</b>':'')+'</p>';
     var ks=S.pkgs.map(function(k){return k[4]}),kind=c[6]||"",idx=ks.map(function(k,i){return i}).filter(function(i){return kind==="d"?ks[i]==="d":ks[i]===""||(kind==="e"&&ks[i]==="e")});if(!idx.length)idx=ks.map(function(k,i){return i});
     idx.map(function(i){return S.pkgs[i]}).forEach(function(k){var extra=Math.max(0,Math.round((Math.round(q*10)/10-k[2])*100)/100),p=Math.round((k[1]+extra*k[3])*100)/100;h+='<div class="opt"><span>'+esc(k[0])+(extra?'<br><small>includes '+extra+' extra qt</small>':'')+'</span><b>'+money(p)+'</b></div>'});
@@ -1153,7 +1154,7 @@ window.addEventListener("hashchange",route);route();
 document.querySelectorAll("form.signupForm").forEach(function(form){var msg=form.querySelector(".formMsg");form.onsubmit=function(e){e.preventDefault();var f=form.elements,em=(f.email.value||"").trim();
   if(f.website.value)return;
   if(!/^[^@\\s]+@[^@\\s]+\\.[a-z]{2,}$/i.test(em)){msg.className="formMsg err";msg.textContent="That email doesn't look right.";return}
-  var done=function(){msg.className="formMsg ok";msg.textContent="You're on the list! Watch your inbox for our next special.";form.reset()};
+  var done=function(){msg.className="formMsg ok";msg.textContent="You're on the list! Watch your inbox for our next special.";form.reset();try{sbTrack("signup_submit",{})}catch(e){}};
   if(S.preview||!S.api){msg.className="formMsg ok";msg.textContent=S.preview?"Preview: signups are saved once the site is published.":"Thanks!";return}
   var src=(location.hash.match(/^#offer-(.+)/)||[])[1]||"";var btn=form.querySelector("button");btn.disabled=true;
   fetch(S.api.url+"/rest/v1/site_signups",{method:"POST",headers:{apikey:S.api.key,Authorization:"Bearer "+S.api.key,"Content-Type":"application/json",Prefer:"return=minimal"},
@@ -1172,7 +1173,33 @@ document.querySelectorAll("form.book").forEach(function(form){var msg=form.query
   var note=(v("offer")?"Offer: "+v("offer")+". ":"")+v("note");
   fetch(S.api.url+"/rest/v1/site_requests",{method:"POST",headers:{apikey:S.api.key,Authorization:"Bearer "+S.api.key,"Content-Type":"application/json",Prefer:"return=minimal"},
     body:JSON.stringify({shop_id:S.api.shopId,name:v("name"),phone:v("phone"),email:em,vehicle:v("vehicle"),service:v("service"),preferred_day:v("day")||null,note:note.slice(0,1000)})})
-  .then(function(r){if(!r.ok)throw new Error(r.status);msg.className="formMsg ok";msg.textContent=v("offer")?"You're all set! We'll call or text to confirm. Your coupon is saved with your request.":"Got it! We'll call or text you to confirm your time.";form.reset()})
+  .then(function(r){if(!r.ok)throw new Error(r.status);msg.className="formMsg ok";msg.textContent=v("offer")?"You're all set! We'll call or text to confirm. Your coupon is saved with your request.":"Got it! We'll call or text you to confirm your time.";try{sbTrack("book_submit",{content_name:v("service")||"Appointment"})}catch(e){}form.reset()})
   .catch(function(){msg.className="formMsg err";msg.textContent="That didn't go through. Please call us instead."})
   .then(function(){btn.disabled=false})}});
+
+// ---- Engagement & conversion events ----
+// One dispatcher fans every event out to whatever tags the shop connected
+// (Meta Pixel, GA4/Ads, GTM dataLayer, TikTok, Clarity). Meta gets a
+// matching standard event name where one fits, else a custom event.
+var FB_STD={shop_tires:"Search",tire_search:"Search",tire_select:"ViewContent",tire_lead:"Lead",service_view:"ViewContent",oil_quote:"ViewContent",call_click:"Contact",directions_click:"FindLocation",book_submit:"Schedule",signup_submit:"Lead"};
+function track(name,params){params=params||{};
+  try{if(window.gtag)gtag("event",name,params)}catch(e){}
+  try{if(window.dataLayer)dataLayer.push(Object.assign({event:name},params))}catch(e){}
+  try{if(window.ttq)ttq.track(name,params)}catch(e){}
+  try{if(window.clarity)clarity("event",name)}catch(e){}
+  try{if(window.fbq){var s=FB_STD[name];if(s)fbq("track",s,params);else fbq("trackCustom",name,params)}}catch(e){}}
+window.sbTrack=track;
+// calls, directions, and any "shop for tires" link
+document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a");if(!a)return;var href=a.getAttribute("href")||"";
+  if(href.indexOf("tel:")===0)track("call_click",{});
+  else if(href.indexOf("/maps/dir/")>-1)track("directions_click",{});
+  else if(href==="#tires"||(a.closest&&a.closest(".tcbar")))track("shop_tires",{content_name:"Tires"});});
+// viewing a service page (brakes, A/C, etc.) — fired by the hash router
+var lastSvc="";function svcView(){var h=location.hash;if(h.indexOf("#service-")!==0)return;var el=document.getElementById(h.slice(1));var t=(el&&el.getAttribute("data-title"))||"";var nm=t.split(" \\u00b7 ")[0];if(nm&&nm!==lastSvc){lastSvc=nm;track("service_view",{content_name:nm,content_category:"service",content_type:"product"})}}
+window.addEventListener("hashchange",svcView);svcView();
+// TireConnect widget use: search, tire picked, quote/lead requested
+(function(){var n=0,iv=setInterval(function(){n++;if(window.TCWidget&&TCWidget.on){clearInterval(iv);
+  var on=function(evt,name){try{TCWidget.on(evt,function(ev){try{track(name,{})}catch(e){}try{if(ev&&ev.resolve)ev.resolve()}catch(e){}})}catch(e){}};
+  on("onTireSearchResults","tire_search");on("onTireSelect","tire_select");on("onLead","tire_lead");on("onEcommerceOrderClick","tire_lead");
+}else if(n>60)clearInterval(iv)},500)})();
 })();`;

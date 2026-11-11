@@ -327,3 +327,14 @@ test("renderSite adds nothing when no tracking is set", () => {
   assert.ok(!html.includes("gtag/js"));
   assert.ok(!html.includes("fbevents.js"));
 });
+
+test("renderSite wires engagement events (service, tires, forms)", () => {
+  const html = renderSite({ name: "X", services: [{ name: "Brakes" }], oilPackages: [], booking: true, tracking: { ga4: "G-AAA11111" } }, {});
+  // the dispatcher and the key event names are present in the page script
+  assert.ok(/function track\(/.test(html));
+  for (const ev of ["service_view", "shop_tires", "tire_search", "tire_select", "tire_lead", "call_click", "directions_click", "book_submit", "signup_submit", "oil_quote"]) {
+    assert.ok(html.includes(ev), `missing event wiring: ${ev}`);
+  }
+  // it registers TireConnect callbacks for widget usage
+  assert.ok(html.includes("TCWidget.on"));
+});
