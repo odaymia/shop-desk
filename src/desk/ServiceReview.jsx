@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Modal, fmtDate } from "./ui.jsx";
 import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { motorVehicleFor, motorMaintenance, motorFluids, motorFilters } from "../lib/motor.js";
 import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
 import { reviewReport } from "../lib/serviceReviewReport.js";
@@ -110,12 +110,24 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
   }, [spec, motorFilterSpec]);
 
   /* attach the real inventory part (number + price) to services that install one */
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     return serviceReview(intervals, vehOrders, cur, order.id).map((r) => {
       const part = servicePart(shop.parts, r, partSpec);
       return { ...r, part, effPrice: part ? Number(part.price) || 0 : Number(r.price) || 0 };
     });
   }, [intervals, vehOrders, cur, order.id, shop.parts, partSpec]);
+  /* services checked off for THIS car (it has no rear differential, no power
+     steering fluid…) are saved on the vehicle and stay off on every later
+     visit. They drop out of the tally, "add all due", the printout and the
+     customer link; they sit at the bottom so they can be checked back on. */
+  const canSkip = !!vehicle.id;
+  const skipKey = vehicleSkips(vehicle).join("|");
+  const { on: rows, off: skipped } = useMemo(() => splitBySkip(allRows, skipKey ? skipKey.split("|") : []), [allRows, skipKey]);
+  const setOnCar = (r, onCar) => {
+    if (!canSkip) return;
+    shop.saveVehicle(withServiceSkip(vehicle, r.id, !onCar));
+    if (flash) flash(onCar ? `${r.name}: back on for this car` : `${r.name}: off for this car from now on`);
+  };
   const counts = reviewCounts(rows);
   const [added, setAdded] = useState({});
 
@@ -221,6 +233,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
         <table className="dk">
           <thead>
             <tr>
+              {canSkip && <th title="Uncheck a service this car doesn't have. It stays off for this car until checked back on.">On car</th>}
               <th>Service</th>
               <th>Every</th>
               <th>Last done</th>
@@ -234,6 +247,11 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
               const st = STATUS[r.status] || STATUS.unknown;
               return (
                 <tr key={r.id}>
+                  {canSkip && (
+                    <td className="svcOnCar">
+                      <input type="checkbox" checked onChange={() => setOnCar(r, false)} aria-label={`${r.name} is on this car`} title="Uncheck if this car doesn't have it" />
+                    </td>
+                  )}
                   <td>
                     <strong>{r.name}</strong>
                     {r.part && r.part.number ? (
@@ -290,6 +308,21 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                 </tr>
               );
             })}
+            {skipped.length > 0 && (
+              <tr className="svcOffHead">
+                <td colSpan={7}>Not on this car · left out every visit until checked back on</td>
+              </tr>
+            )}
+            {skipped.map((r) => (
+              <tr key={r.id} className="svcOff">
+                <td className="svcOnCar">
+                  <input type="checkbox" checked={false} onChange={() => setOnCar(r, true)} aria-label={`${r.name} is not on this car`} title="Check to put it back on this car" />
+                </td>
+                <td colSpan={6}>
+                  <span className="svcOffName">{r.name}</span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -301,7 +334,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
               ? `Showing your ${storeLabel.toLowerCase()} recommendations and this vehicle's manufacturer schedule side by side; due/done uses the manufacturer number.`
               : "Manufacturer recommendations where available; the rest use your own (Settings → Service review)."
             : `${storeLabel} recommendations (Settings → Service review) — connect MOTOR for each vehicle's manufacturer schedule.`}{" "}
-        "Done" is detected from this car's past tickets. Which services and source are set in Settings.
+        "Done" is detected from this car's past tickets. Which services and source are set in Settings.{canSkip ? " Uncheck a service this car doesn't have and it stays off for this car only." : ""}
       </p>
     </Modal>
     {target ? createPortal(printNode, target) : printNode}

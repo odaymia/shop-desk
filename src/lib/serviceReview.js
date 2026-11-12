@@ -87,6 +87,29 @@ export function filterApplicable(intervals, motorNames) {
   return (intervals || []).filter((svc) => !svc.requiresFluid || hay.includes(String(svc.requiresFluid).toLowerCase()));
 }
 
+/* "Not on this car": services a writer has checked off for one specific vehicle
+   (no rear differential, electric power steering…). Stored on the vehicle as
+   `serviceSkip`, a list of interval ids, so it sticks for every future visit of
+   that car and touches no other car. Pure. */
+export const vehicleSkips = (vehicle) =>
+  vehicle && Array.isArray(vehicle.serviceSkip) ? [...new Set(vehicle.serviceSkip.filter(Boolean).map(String))] : [];
+
+/* The vehicle with one service checked off (`skip` true) or back on (false). */
+export function withServiceSkip(vehicle, id, skip) {
+  const cur = vehicleSkips(vehicle).filter((x) => x !== String(id));
+  return { ...vehicle, serviceSkip: skip ? [...cur, String(id)] : cur };
+}
+
+/* Split review rows into the ones this car has (`on`) and the ones checked off
+   for it (`off`). Order within each group is kept. */
+export function splitBySkip(rows, skipIds) {
+  const skip = new Set((skipIds || []).map(String));
+  const on = [];
+  const off = [];
+  for (const r of rows || []) (skip.has(String(r.id)) ? off : on).push(r);
+  return { on, off };
+}
+
 /* Only the services the owner has turned on (Settings). */
 export const activeIntervals = (intervals) => (intervals || []).filter((s) => s && s.enabled !== false);
 

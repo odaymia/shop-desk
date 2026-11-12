@@ -164,3 +164,36 @@ test("servicePart: exact vehicle filter number wins over a keyword match", () =>
   // a fluid-only service never matches a part
   assert.equal(servicePart(parts, { id: "coolant" }), null);
 });
+
+import { vehicleSkips, withServiceSkip, splitBySkip } from "../src/lib/serviceReview.js";
+
+test("not on this car: checked off per vehicle, sticks, and comes back when checked on", () => {
+  const car = { id: "v1", make: "Honda", model: "Civic" };
+  assert.deepEqual(vehicleSkips(car), []);
+  assert.deepEqual(vehicleSkips(null), []);
+  const noDiff = withServiceSkip(car, "diff", true);
+  assert.deepEqual(noDiff.serviceSkip, ["diff"]);
+  assert.equal(car.serviceSkip, undefined); // the original record isn't mutated
+  assert.equal(noDiff.make, "Honda"); // the rest of the vehicle is kept
+  const both = withServiceSkip(withServiceSkip(noDiff, "psFluid", true), "diff", true); // twice is still once
+  assert.deepEqual(both.serviceSkip, ["psFluid", "diff"]);
+  assert.deepEqual(withServiceSkip(both, "diff", false).serviceSkip, ["psFluid"]); // checked back on
+  assert.deepEqual(vehicleSkips({ serviceSkip: ["diff", "", null, "diff"] }), ["diff"]); // tolerant of junk
+});
+
+test("not on this car: skipped rows leave the review, the tally and the due list", () => {
+  const orders = {};
+  const intervals = [
+    { id: "oil", name: "Engine oil & filter", miles: 5000, months: 6, match: "oil change" },
+    { id: "diff", name: "Differential fluid service", miles: 45000, months: 48, match: "differential" },
+    { id: "psFluid", name: "Power steering fluid service", miles: 75000, months: 72, match: "power steering" },
+  ];
+  const rows = serviceReview(intervals, orders, 90000, null, now); // all three due on a 90k car with no history
+  assert.equal(reviewCounts(rows).due, 3);
+  const { on, off } = splitBySkip(rows, ["diff", "psFluid", "gone-from-settings"]);
+  assert.deepEqual(on.map((r) => r.id), ["oil"]);
+  assert.deepEqual(off.map((r) => r.id).sort(), ["diff", "psFluid"]);
+  assert.equal(reviewCounts(on).due, 1);
+  // another car with no list keeps everything
+  assert.equal(splitBySkip(rows, vehicleSkips({ id: "v2" })).on.length, 3);
+});
