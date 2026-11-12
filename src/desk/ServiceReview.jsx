@@ -154,7 +154,9 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
   const target = (typeof document !== "undefined" && (document.querySelector(".root") || document.body)) || null;
   const printNode = (
     <div className="printSheet">
-      <style>{`@media print { @page { size: auto; margin: 0.4in; } }`}</style>
+      {/* no page margin: the browser then prints no header or footer of its
+          own (title, time, web address); the report carries its own spacing */}
+      <style>{`@media print { @page { size: auto; margin: 0; } }`}</style>
       <div className="printWrap" dangerouslySetInnerHTML={{ __html: reviewReportHtml(report) }} />
     </div>
   );

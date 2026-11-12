@@ -41,6 +41,16 @@ const STYLE = `
 .srReport .srDone li{color:var(--done);}
 .srReport .srInspect li span,.srReport .srDone li span{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;font-weight:400;}
 .srReport .srFoot{margin-top:22px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.55;}
+@media print{
+  /* No page margin means the browser has nowhere to print its own header and
+     footer (page title, date and time, web address, page numbers). The white
+     space comes from the report instead: side padding, plus a spacer that
+     repeats at the top and bottom of every sheet when it runs past one page. */
+  @page{size:auto;margin:0;}
+  .srReport{display:table;box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 .5in;}
+  .srReport::before,.srReport::after{content:"";display:table-header-group;height:.45in;break-inside:avoid;}
+  .srReport::after{display:table-footer-group;}
+}
 @media (max-width:520px){.srReport{padding:18px 16px;}.srReport header{flex-direction:column;}.srReport .srMeta{text-align:left;}.srReport .srInspect,.srReport .srDone{grid-template-columns:1fr;}.srReport .srCardTop{flex-direction:column;}.srReport .srRight{gap:8px;}}
 `;
 
