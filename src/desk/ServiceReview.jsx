@@ -9,6 +9,7 @@ import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
 import { reviewReport } from "../lib/serviceReviewReport.js";
 import { reviewReportHtml } from "../lib/serviceReviewHtml.js";
 import { QR } from "./QR.jsx";
+import defaultLogo from "../assets/genie-logo.png";
 
 const STATUS = {
   due: { label: "Due now", cls: "due" },
@@ -157,7 +158,9 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
       {/* no page margin: the browser then prints no header or footer of its
           own (title, time, web address); the report carries its own spacing */}
       <style>{`@media print { @page { size: auto; margin: 0; } }`}</style>
-      <div className="printWrap" dangerouslySetInnerHTML={{ __html: reviewReportHtml(report) }} />
+      {/* the shop's logo goes on the paper copy, same as a printed ticket; it is
+          left out of `report` itself so the link texted to a customer stays small */}
+      <div className="printWrap" dangerouslySetInnerHTML={{ __html: reviewReportHtml({ ...report, logo: cfg.logo || defaultLogo }) }} />
     </div>
   );
 

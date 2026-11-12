@@ -9,6 +9,8 @@ const STYLE = `
   color:var(--ink);background:#fff;max-width:760px;margin:0 auto;padding:26px 30px;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .srReport *{box-sizing:border-box;}
 .srReport header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid var(--ink);padding-bottom:12px;}
+.srReport .srBrand{display:flex;align-items:center;gap:14px;min-width:0;}
+.srReport .srLogo{display:block;height:58px;max-width:190px;object-fit:contain;flex:none;}
 .srReport .srShop{font-size:22px;font-weight:800;letter-spacing:-.01em;}
 .srReport .srShopSub{font-size:12px;color:var(--muted);margin-top:3px;}
 .srReport .srMeta{text-align:right;flex:none;}
@@ -65,7 +67,8 @@ function card(s) {
 }
 
 /* The report body as HTML. Includes its own <style>, so it renders the same in
-   the print sheet and the public page. */
+   the print sheet and the public page. `p.logo` (an image URL or data URL), when
+   given, sits beside the shop name. */
 export function reviewReportHtml(p) {
   if (!p) return "";
   const idBits = [p.plate ? `Plate ${esc(p.plate)}` : "", p.vin ? `VIN ${esc(p.vin)}` : ""].filter(Boolean).join(" · ");
@@ -75,9 +78,12 @@ export function reviewReportHtml(p) {
   return `<style>${STYLE}</style>
 <div class="srReport">
   <header>
-    <div>
-      <div class="srShop">${esc(p.shopName || "Service Review")}</div>
-      <div class="srShopSub">${[p.shopAddress, p.shopPhone, p.website].filter(Boolean).map(esc).join(" · ")}</div>
+    <div class="srBrand">
+      ${p.logo ? `<img class="srLogo" src="${esc(p.logo)}" alt="">` : ""}
+      <div>
+        <div class="srShop">${esc(p.shopName || "Service Review")}</div>
+        <div class="srShopSub">${[p.shopAddress, p.shopPhone, p.website].filter(Boolean).map(esc).join(" · ")}</div>
+      </div>
     </div>
     <div class="srMeta"><div class="srKicker">Service Review</div><div class="srDate">${esc(p.date || "")}</div></div>
   </header>
