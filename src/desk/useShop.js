@@ -199,7 +199,15 @@ export function useShop(cfg) {
       if (!c || !cfg.portalEnabled) return;
       const email = String(c.email || "").trim().toLowerCase();
       if (!email) return;
-      const data = portalPayload({ customer: c, vehicles: Object.values(d.vehicles), orders: Object.values(d.orders), specs: d.specs, parts: d.parts, cfg, jobs: d.jobs });
+      /* this runs right after a customer, vehicle or invoice is saved; a
+         problem building the customer's page must never fail that save */
+      let data;
+      try {
+        data = portalPayload({ customer: c, vehicles: Object.values(d.vehicles), orders: Object.values(d.orders), specs: d.specs, parts: d.parts, cfg, jobs: d.jobs });
+      } catch (e) {
+        console.error("portal build failed", e);
+        return;
+      }
       cloud.publishPortal(customerId, email, String(c.phone || "").replace(/\D/g, ""), data).catch((e) => console.error("portal publish failed", e));
     },
     [cfg]

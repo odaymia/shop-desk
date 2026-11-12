@@ -4,6 +4,8 @@
 import { orderTotals, jobLines, lineAmount, laborQtyText, owesBalance } from "./invoice.js";
 import { findSpec, oilChangeLines } from "./specs.js";
 import { checklistSummary } from "./checklist.js";
+import { vehicleReviewRows } from "./serviceReview.js";
+import { reviewReport, reviewForGarage } from "./serviceReviewReport.js";
 
 const MONTH = 30.4 * 86400000;
 
@@ -39,7 +41,11 @@ export function dueServices(orders, vehicle, intervals = DEFAULT_INTERVALS, now 
 
 /* One customer's portal record. */
 export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, jobs }) {
-  const intervals = cfg.serviceIntervals || DEFAULT_INTERVALS;
+  /* `cfg.serviceIntervals` is the Service Review's table (a list), not this
+     older reminder map; feeding it to dueServices threw on any car with an
+     invoice and stopped the customer's page from publishing. A shop that
+     saved its own reminder map under `portalIntervals` still gets it. */
+  const intervals = cfg.portalIntervals && !Array.isArray(cfg.portalIntervals) ? cfg.portalIntervals : DEFAULT_INTERVALS;
   const vehs = vehicles.filter((v) => v.customerId === customer.id && v.active !== false);
   return {
     name: [customer.first, customer.last].filter(Boolean).join(" ") || customer.company || "",
@@ -84,6 +90,9 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
         });
       const spec = findSpec(specs, v);
       const oilQuote = spec ? quoteOilChange(spec.spec, parts, cfg) : null;
+      /* the shop's service review for this car, as the customer sees it */
+      const rv = vehicleReviewRows({ cfg, vehicle: v, orders, parts, spec: spec ? spec.spec : null });
+      const review = reviewForGarage(reviewReport({ cfg, vehicle: v, mileage: rv.mileage, rows: rv.rows }));
       return {
         id: v.id,
         name: [v.year, v.make, v.model, v.submodel].filter(Boolean).join(" "),
@@ -91,6 +100,7 @@ export function portalPayload({ customer, vehicles, orders, specs, parts, cfg, j
         vin: v.vin || "",
         mileage: v.mileage || null,
         due: dueServices(orders, v, intervals),
+        review,
         history,
         oil: spec ? { grade: spec.spec.oilViscosity, quarts: spec.spec.oilCapacityQt, exact: spec.exact } : null,
         oilQuote,

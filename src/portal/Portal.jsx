@@ -346,13 +346,88 @@ function ShopSection({ rows, shop, user }) {
   );
 }
 
-function DueSection({ v, shop }) {
+/* The shop's service review for this car: the same lists the shop prints
+   and texts, drawn in the garage's own style. */
+function ReviewBlock({ r }) {
+  const rec = r.recommended || [];
+  const insp = r.inspect || [];
+  const done = r.upToDate || [];
+  return (
+    <>
+      {rec.length ? (
+        <>
+          <ul className="ptRev">
+            {rec.map((s) => (
+              <li key={s.id} className={s.tone}>
+                <div className="ptRevTop">
+                  <strong>{s.name}</strong>
+                  <span className="ptRevRight">
+                    <em>{s.statusLabel}</em>
+                    {s.priceText ? <b>{s.priceText}</b> : null}
+                  </span>
+                </div>
+                {s.why ? <p>{s.why}</p> : null}
+              </li>
+            ))}
+          </ul>
+          {r.recommendedTotal ? (
+            <div className="ptRevTotal">
+              <span>Estimated total if done today</span>
+              <b>{r.recommendedTotalText}</b>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="ptRevGood">✓ Everything looks up to date. Nothing is due right now.</div>
+      )}
+      {insp.length > 0 && (
+        <>
+          <h3>We'll keep an eye on these</h3>
+          <ul className="ptRevList">
+            {insp.map((s) => (
+              <li key={s.id}>
+                {s.name}
+                {s.priceText ? <span>{s.priceText}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {done.length > 0 && (
+        <>
+          <h3>Up to date</h3>
+          <ul className="ptRevList done">
+            {done.map((s) => (
+              <li key={s.id}>
+                ✓ {s.name}
+                {s.lastDone ? <span>last done {s.lastDone}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="ptSub" style={{ marginTop: 12 }}>
+        Prices are estimates and are confirmed before any work is done.
+      </p>
+    </>
+  );
+}
+
+export function DueSection({ v, shop }) {
   if (!v) return <div className="ptCard"><p className="ptSub">Pick a car above.</p></div>;
   return (
     <div className="ptCard">
-      <h2>Recommended services</h2>
-      <p className="ptSub">Based on your last visits and the shop's service intervals.</p>
-      {v.due && v.due.length ? (
+      <h2>{v.review ? "Service review" : "Recommended services"}</h2>
+      <p className="ptSub">
+        {v.review
+          ? `What's due for your ${v.name || "car"}, checked against its service history with us${v.review.mileageText ? ` at ${v.review.mileageText}` : ""}.`
+          : "Based on your last visits and the shop's service intervals."}
+      </p>
+      {v.review ? (
+        <div style={{ marginTop: 12 }}>
+          <ReviewBlock r={v.review} />
+        </div>
+      ) : v.due && v.due.length ? (
         <ul className="ptDue" style={{ marginTop: 12 }}>
           {v.due.map((s) => (
             <li key={s.key} className={s.status}>

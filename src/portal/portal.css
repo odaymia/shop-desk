@@ -16,6 +16,27 @@
 .ptDue li span { color:var(--muted); font-size:13px; text-align:right; }
 .ptDue li.overdue span { color:var(--warn); font-weight:600; }
 .ptDue li.soon span { color:var(--amber); font-weight:600; }
+/* the service review on a car's page */
+.ptRev { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.ptRev li { border:1px solid var(--line); border-left:5px solid var(--muted); border-radius:12px; padding:12px 14px; background:#fff; }
+.ptRev li.due { border-left-color:var(--warn); }
+.ptRev li.soon { border-left-color:var(--amber); }
+.ptRevTop { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+.ptRevTop strong { font-size:16px; }
+.ptRevRight { display:flex; align-items:center; gap:10px; }
+.ptRevRight em { font-style:normal; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:3px 10px; border-radius:999px; white-space:nowrap; background:var(--panel); color:var(--muted); }
+.ptRev li.due .ptRevRight em { background:rgba(198,40,40,.10); color:var(--warn); }
+.ptRev li.soon .ptRevRight em { background:rgba(196,122,0,.12); color:var(--amber); }
+.ptRevRight b { font-size:17px; font-variant-numeric:tabular-nums; }
+.ptRev li p { margin:6px 0 0; color:var(--muted); font-size:13.5px; line-height:1.45; }
+.ptRevTotal { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:12px; padding:12px 14px; border-radius:12px; background:var(--panel); border:1px solid var(--line); }
+.ptRevTotal span { color:var(--muted); font-weight:600; }
+.ptRevTotal b { font-size:20px; font-variant-numeric:tabular-nums; }
+.ptRevGood { padding:14px; border-radius:12px; background:rgba(46,139,87,.08); color:var(--live); font-weight:700; }
+.ptRevList { list-style:none; margin:0; padding:0; }
+.ptRevList li { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:15px; }
+.ptRevList li span { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; text-align:right; }
+.ptRevList.done li { color:var(--live); }
 .ptHist { list-style:none; margin:0; padding:0; }
 .ptHist li { padding:10px 0; border-bottom:1px solid var(--line); }
 .ptHist li:last-child { border-bottom:none; }

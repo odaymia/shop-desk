@@ -273,3 +273,50 @@ export function reviewCounts(rows) {
   for (const r of rows || []) if (c[r.status] != null) c[r.status] += 1;
   return c;
 }
+
+/* ---- The same review, away from the ticket (the customer's My Garage page) ----
+   The ticket's review asks MOTOR for the car's factory schedule, which needs
+   the network and takes a moment. So that other places can show the same
+   answer without asking again, the review leaves a small note on the vehicle
+   (`serviceSched`): which services MOTOR says the car doesn't have, and the
+   interval it settled on for the rest. No names or text, only our own service
+   ids and numbers. */
+export function schedFromMerge(baseIntervals, mergedIntervals) {
+  const kept = new Set((mergedIntervals || []).map((x) => x.id));
+  const hidden = (baseIntervals || []).filter((x) => !kept.has(x.id)).map((x) => String(x.id)).sort();
+  const items = {};
+  for (const x of [...(mergedIntervals || [])].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
+    if (x.source === "MOTOR") items[x.id] = { miles: num(x.miles), months: num(x.months) };
+  }
+  return { hidden, items };
+}
+export const schedIsEmpty = (sched) => !sched || (!(sched.hidden || []).length && !Object.keys(sched.items || {}).length);
+export const sameSched = (a, b) => (schedIsEmpty(a) && schedIsEmpty(b)) || JSON.stringify(a || null) === JSON.stringify(b || null);
+
+/* Put that note back onto the shop's interval table. */
+export function applySched(intervals, sched) {
+  if (schedIsEmpty(sched)) return intervals || [];
+  const hidden = new Set((sched.hidden || []).map(String));
+  const items = sched.items || {};
+  return (intervals || [])
+    .filter((x) => !hidden.has(String(x.id)))
+    .map((x) => (items[x.id] ? { ...x, miles: num(items[x.id].miles) || num(x.miles), months: num(items[x.id].months) || num(x.months), source: "MOTOR" } : x));
+}
+
+/* The review for one vehicle from the records alone: the shop's services
+   (with the factory intervals the last in-shop review found, unless the shop
+   runs store-only), checked against the car's invoiced history at its last
+   known mileage, minus anything checked off as not on this car. Rows carry
+   the inventory part and price like the ticket's review. Pure. */
+export function vehicleReviewRows({ cfg = {}, vehicle = {}, orders, parts, spec, now = Date.now() }) {
+  const table = Array.isArray(cfg.serviceIntervals) && cfg.serviceIntervals.length ? cfg.serviceIntervals : DEFAULT_SERVICE_INTERVALS;
+  const base = activeIntervals(table);
+  const intervals = (cfg.serviceIntervalSource || "both") === "store" ? base : applySched(base, vehicle.serviceSched);
+  const mine = Object.values(orders || {}).filter((o) => o && o.vehicleId === vehicle.id);
+  const mileage = mine.reduce((m, o) => (o.status === "invoiced" ? Math.max(m, orderMileage(o)) : m), num(vehicle.mileage));
+  const rows = serviceReview(intervals, mine, mileage, null, now).map((r) => {
+    const part = servicePart(parts, r, spec);
+    return { ...r, part, effPrice: part ? num(part.price) : num(r.price) };
+  });
+  return { mileage, rows: splitBySkip(rows, vehicleSkips(vehicle)).on };
+}

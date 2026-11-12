@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Modal, fmtDate } from "./ui.jsx";
 import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, schedFromMerge, sameSched, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { motorVehicleFor, motorMaintenance, motorFluids, motorFilters } from "../lib/motor.js";
 import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
 import { reviewReport } from "../lib/serviceReviewReport.js";
@@ -51,6 +51,8 @@ export function logoForLink(src, maxH = 140) {
    writer can recommend what's due at an oil change. */
 export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare, flash }) {
   const vehicle = shop.vehicles[order.vehicleId] || {};
+  const vehicleRef = useRef(vehicle); // the latest record, for saves made after the MOTOR lookup returns
+  vehicleRef.current = vehicle;
   const [motorFilterSpec, setMotorFilterSpec] = useState(null); // exact filter numbers from live MOTOR
   const [shared, setShared] = useState(null); // { link, sent } after sending the customer a link
   const vehOrders = useMemo(() => ordersOf(shop.orders, { vehicleId: order.vehicleId }), [shop.orders, order.vehicleId]);
@@ -92,6 +94,14 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
         const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
         const applicable = isSample ? baseIntervals : filterApplicable(baseIntervals, motorNames);
         const mm = mergeMotorIntervals(applicable, m.services, mode, cfg.serviceSeverity === "severe" ? "severe" : "normal");
+        /* remember what the factory schedule said for this car, so the
+           customer's My Garage page shows the same review without asking
+           MOTOR again. Real data only, and only when it changed. */
+        if (!isSample) {
+          const sched = schedFromMerge(baseIntervals, mm.intervals);
+          const veh = vehicleRef.current;
+          if (veh && veh.id && !sameSched(veh.serviceSched, sched)) shop.saveVehicle({ ...veh, serviceSched: sched });
+        }
         if (mm.matched > 0 || applicable.length !== baseIntervals.length) {
           setMerged(mm);
           setMotorState(v.sample || m.sample ? "motor-sample" : "motor");

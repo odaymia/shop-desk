@@ -94,3 +94,19 @@ export function reviewReport({ cfg = {}, vehicle = {}, mileage = 0, rows = [], a
     recommendedTotalText: money(recommendedTotal),
   };
 }
+
+/* The review as the customer's My Garage page shows it: the same three lists
+   as the printout, trimmed to what that page draws (the garage already has
+   the shop's name, the car and the logo). */
+export function reviewForGarage(report) {
+  if (!report) return null;
+  return {
+    at: report.at,
+    mileageText: report.mileageText || "",
+    recommended: (report.recommended || []).map((x) => ({ id: x.id, name: x.name, tone: x.tone, statusLabel: x.statusLabel, priceText: x.priceText, partNumber: x.partNumber, why: x.why })),
+    inspect: (report.inspect || []).map((x) => ({ id: x.id, name: x.name, priceText: x.priceText })),
+    upToDate: (report.upToDate || []).map((x) => ({ id: x.id, name: x.name, lastDone: x.lastDone })),
+    recommendedTotal: report.recommendedTotal || 0,
+    recommendedTotalText: report.recommendedTotalText || "",
+  };
+}
