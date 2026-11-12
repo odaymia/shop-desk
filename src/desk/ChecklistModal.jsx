@@ -1,18 +1,27 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal } from "./ui.jsx";
-import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parsePressure, formatPressure, applyEquipment } from "../lib/checklist.js";
+import { startChecklist, optionsOf, cycle, withDepthDefault, displayValue, parsePressure, formatPressure, applyEquipment, fitChecklistToCar, DEFAULT_CHECKLIST } from "../lib/checklist.js";
 import { motorVehicleFor, motorFluids, motorMaintenance } from "../lib/motor.js";
 
 /* The service checklist, driven from the keyboard: Enter takes the
    answer and moves on, Space (or the arrows) picks a different one,
    1–9 jumps straight to a choice, Backspace goes back. Items whose
-   part or service is on the ticket start at Replaced. Closing saves. */
-export function ChecklistModal({ cfg, order, vehicle, prior, parts, onSave, onCancel }) {
+   part or service is on the ticket start at Replaced. Closing saves.
+   `skipServices` are the services checked off for this car on the service
+   review; their items are left off the checklist. */
+export function ChecklistModal({ cfg, order, vehicle, prior, parts, skipServices, onSave, onCancel }) {
   const cfgItems = cfg.checklist && cfg.checklist.length ? cfg.checklist : undefined;
   const fresh = !(order.checklist && order.checklist.items && order.checklist.items.length);
-  const [items, setItems] = useState(() =>
-    fresh ? startChecklist(cfgItems, order.lines, prior, parts) : order.checklist.items.map((x) => ({ ...x }))
+  const [fit] = useState(() =>
+    fitChecklistToCar(
+      fresh ? startChecklist(cfgItems, order.lines, prior, parts) : order.checklist.items.map((x) => ({ ...x })),
+      cfgItems,
+      skipServices,
+      { off: fresh ? [] : order.checklist.off, lines: order.lines, prior, parts }
+    )
   );
+  const [items, setItems] = useState(fit.items);
+  const offLabels = fit.off.map((id) => ((cfgItems || DEFAULT_CHECKLIST).find((c) => c.id === id) || {}).label).filter(Boolean);
 
   // On a fresh checklist, mark fluids the car doesn't have as N/A — but only from
   // real MOTOR data, never the sample fallback.
@@ -42,7 +51,7 @@ export function ChecklistModal({ cfg, order, vehicle, prior, parts, onSave, onCa
   const opts = cur && cur.kind === "choice" ? optionsOf(cur, cfgItems) : [];
 
   const setVal = (v) => setItems((a) => a.map((x, i) => (i === idx ? { ...x, value: v } : x)));
-  const finish = () => onSave(itemsRef.current);
+  const finish = () => onSave(itemsRef.current, fit.off);
   const go = (n) => {
     if (n < 0) return;
     if (n >= items.length) return finish();
@@ -172,6 +181,11 @@ export function ChecklistModal({ cfg, order, vehicle, prior, parts, onSave, onCa
               />
               {cur.kind === "depth" && <span className="muted">/32nds</span>}
             </div>
+          )}
+          {offLabels.length > 0 && (
+            <p className="muted" style={{ fontSize: 13 }}>
+              Not on this car, so left off: {offLabels.join(", ")}. Change it on the service review.
+            </p>
           )}
           <div className="ckKeys">
             <b>Enter</b> next · <b>Space</b> or arrows change · <b>1–9</b> pick · <b>Backspace</b> back · <b>Esc</b> saves and closes

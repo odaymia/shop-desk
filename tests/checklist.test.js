@@ -215,3 +215,73 @@ test("naOptionOf finds the N/A choice", () => {
   assert.equal(naOptionOf(["Full", "N/A (electric)", "Can't check"]), "N/A (electric)");
   assert.equal(naOptionOf(["Level OK", "Replaced"]), "");
 });
+
+import { checklistIdsForServices, fitChecklistToCar } from "../src/lib/checklist.js";
+import { DEFAULT_SERVICE_INTERVALS, skippedServices } from "../src/lib/serviceReview.js";
+
+const svc = (...ids) => DEFAULT_SERVICE_INTERVALS.filter((s) => ids.includes(s.id));
+
+test("not on this car: each service pairs with the right checklist items", () => {
+  const ids = (...s) => [...checklistIdsForServices(undefined, svc(...s))].sort();
+  assert.deepEqual(ids("diff"), ["frontDiff", "rearDiff"]);
+  assert.deepEqual(ids("psFluid"), ["psFluid"]);
+  assert.deepEqual(ids("trans"), ["trans"]);
+  assert.deepEqual(ids("engineAir"), ["airFilter"]); // not the cabin filter
+  assert.deepEqual(ids("cabinAir"), ["cabinFilter"]); // not the engine filter
+  assert.deepEqual(ids("oil"), ["oil", "oilFilter"]); // an electric car has neither
+  assert.deepEqual(ids("coolant"), ["coolant"]);
+  assert.deepEqual(ids("brakeFluid"), ["brakeFluid"]);
+  assert.deepEqual(ids("wipers"), ["wipers"]);
+  // services with nothing on the checklist touch nothing (tire rotation is not tire pressure or depth)
+  assert.deepEqual(ids("tireRotate", "sparkPlugs", "serpentine", "fuelFilter"), []);
+  assert.deepEqual(ids(), []);
+});
+
+test("not on this car: a shop's own rows pair by wording", () => {
+  const cfgItems = [
+    { id: "ck1", label: "Rear diff fluid", kind: "choice", options: ["Level OK"], value: "Level OK", auto: "rear diff | rear differential" },
+    { id: "ck2", label: "Front diff fluid", kind: "choice", options: ["Level OK"], value: "Level OK", auto: "front diff | front differential" },
+    { id: "ck3", label: "Power steering fluid", kind: "choice", options: ["Full"], value: "Full", auto: "power steering fluid" },
+  ];
+  const rear = [{ id: "svc9", name: "Rear differential service", match: "rear diff | rear differential" }];
+  assert.deepEqual([...checklistIdsForServices(cfgItems, rear)], ["ck1"]); // rear only, front stays
+  const ps = [{ id: "svc7", name: "Power steering fluid service", match: "power steering fluid | power steering flush" }];
+  assert.deepEqual([...checklistIdsForServices(cfgItems, ps)], ["ck3"]);
+});
+
+test("not on this car: skipped services come off a fresh checklist and return when checked back on", () => {
+  const car = { id: "v1", serviceSkip: ["diff", "psFluid"] };
+  const skipped = skippedServices(DEFAULT_SERVICE_INTERVALS, car);
+  const fresh = startChecklist(undefined, [], null);
+  const fit = fitChecklistToCar(fresh, undefined, skipped);
+  const ids = fit.items.map((i) => i.id);
+  assert.ok(!ids.includes("rearDiff") && !ids.includes("frontDiff") && !ids.includes("psFluid"));
+  assert.ok(ids.includes("trans") && ids.includes("oil") && ids.includes("tirePsi"));
+  assert.equal(fit.items.length, fresh.length - 3);
+  assert.deepEqual(fit.off.sort(), ["frontDiff", "psFluid", "rearDiff"]);
+
+  // a car with nothing checked off: the very same array back, nothing to save
+  const same = fitChecklistToCar(fresh, undefined, skippedServices(DEFAULT_SERVICE_INTERVALS, { id: "v2" }));
+  assert.equal(same.items, fresh);
+  assert.deepEqual(same.off, []);
+
+  // the tech filled it in, then power steering is checked back on: it returns in its usual spot, answers kept
+  const filled = fit.items.map((i) => (i.id === "trans" ? { ...i, value: "Added" } : i));
+  const back = fitChecklistToCar(filled, undefined, skippedServices(DEFAULT_SERVICE_INTERVALS, { id: "v1", serviceSkip: ["diff"] }), { off: fit.off, lines: [] });
+  const order = back.items.map((i) => i.id);
+  assert.ok(order.includes("psFluid") && !order.includes("rearDiff"));
+  assert.equal(order.indexOf("psFluid"), order.indexOf("brakeFluid") + 1); // where Settings lists it
+  assert.equal(back.items.find((i) => i.id === "trans").value, "Added");
+  assert.equal(back.items.find((i) => i.id === "psFluid").value, "Full");
+  assert.deepEqual(back.off.sort(), ["frontDiff", "rearDiff"]);
+});
+
+test("not on this car: a service sold on this ticket stays on the checklist", () => {
+  const lines = [{ kind: "labor", description: "Power steering fluid flush" }];
+  const fresh = startChecklist(undefined, lines, null);
+  const fit = fitChecklistToCar(fresh, undefined, svc("psFluid", "diff"));
+  const ps = fit.items.find((i) => i.id === "psFluid");
+  assert.equal(ps.value, "Replaced"); // sold, so recorded
+  assert.ok(!fit.items.some((i) => i.id === "rearDiff"));
+  assert.ok(!fit.off.includes("psFluid"));
+});

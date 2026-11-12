@@ -310,7 +310,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
             })}
             {skipped.length > 0 && (
               <tr className="svcOffHead">
-                <td colSpan={7}>Not on this car · left out every visit until checked back on</td>
+                <td colSpan={7}>Not on this car · left off the review and the checklist until checked back on</td>
               </tr>
             )}
             {skipped.map((r) => (
@@ -334,7 +334,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
               ? `Showing your ${storeLabel.toLowerCase()} recommendations and this vehicle's manufacturer schedule side by side; due/done uses the manufacturer number.`
               : "Manufacturer recommendations where available; the rest use your own (Settings → Service review)."
             : `${storeLabel} recommendations (Settings → Service review) — connect MOTOR for each vehicle's manufacturer schedule.`}{" "}
-        "Done" is detected from this car's past tickets. Which services and source are set in Settings.{canSkip ? " Uncheck a service this car doesn't have and it stays off for this car only." : ""}
+        "Done" is detected from this car's past tickets. Which services and source are set in Settings.{canSkip ? " Uncheck a service this car doesn't have and it stays off this car's review and checklist." : ""}
       </p>
     </Modal>
     {target ? createPortal(printNode, target) : printNode}

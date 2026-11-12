@@ -50,7 +50,8 @@ import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
 import { OilChangePicker } from "./OilChangePicker.jsx";
 import { ChecklistModal, ChecklistCard } from "./ChecklistModal.jsx";
-import { priorChecklist, syncChecklist } from "../lib/checklist.js";
+import { priorChecklist, syncChecklist, fitChecklistToCar } from "../lib/checklist.js";
+import { skippedServices, vehicleSkips, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { Inspection, InspectionCard } from "./Inspection.jsx";
 import { inspectionRecommendations } from "../lib/inspection.js";
 import { MotorLookup } from "./MotorLookup.jsx";
@@ -271,6 +272,30 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   useEffect(() => {
     if (!draftCustomerId && draftVehCustomerId) update({ customerId: draftVehCustomerId });
   }, [draftCustomerId, draftVehCustomerId, update]);
+
+  /* Services checked off for this car on the service review come off its
+     checklist too. A checklist already filled on an open ticket follows
+     along: unchecking a service drops its items, checking it back on
+     restores them. A posted invoice is never touched. */
+  const skipKey = vehicleSkips(draftVehicle).join("|");
+  const skipServices = useMemo(
+    () => skippedServices(cfg.serviceIntervals && cfg.serviceIntervals.length ? cfg.serviceIntervals : DEFAULT_SERVICE_INTERVALS, { serviceSkip: skipKey ? skipKey.split("|") : [] }),
+    [cfg.serviceIntervals, skipKey]
+  );
+  useEffect(() => {
+    const cur = draftRef.current;
+    if (!cur || !cur.checklist || !cur.checklist.items) return;
+    if (cur.status === STATUS.invoiced || cur.status === STATUS.void || cur.status === STATUS.deleted) return;
+    const fit = fitChecklistToCar(cur.checklist.items, cfg.checklist, skipServices, {
+      off: cur.checklist.off,
+      lines: cur.lines,
+      prior: priorChecklist(shop.orders, cur.vehicleId, cur.id),
+      parts: shop.parts,
+    });
+    if (fit.items === cur.checklist.items && fit.off.join("|") === (cur.checklist.off || []).join("|")) return;
+    update((d) => ({ ...d, checklist: { ...d.checklist, items: fit.items, off: fit.off } }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skipServices, draft && draft.vehicleId]);
 
   if (!draft)
     return (
@@ -1667,12 +1692,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
           vehicle={vehicle}
           parts={shop.parts}
           prior={priorChecklist(shop.orders, o.vehicleId, o.id)}
+          skipServices={skipServices}
           onCancel={closeChecklist}
-          onSave={(items) => {
+          onSave={(items, off) => {
             const at = Date.now();
             update((d) => ({
               ...d,
-              checklist: { at, byId: d.techId || null, items },
+              checklist: { at, byId: d.techId || null, items, ...(off && off.length ? { off } : {}) },
               history: d.checklist ? d.history : [...(d.history || []), { at, what: "service checklist filled" }],
             }));
             closeChecklist();

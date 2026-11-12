@@ -100,6 +100,13 @@ export function withServiceSkip(vehicle, id, skip) {
   return { ...vehicle, serviceSkip: skip ? [...cur, String(id)] : cur };
 }
 
+/* The service rows checked off for this vehicle (for the checklist, which
+   drops its matching items). */
+export function skippedServices(intervals, vehicle) {
+  const skip = new Set(vehicleSkips(vehicle));
+  return skip.size ? (intervals || []).filter((s) => s && skip.has(String(s.id))) : [];
+}
+
 /* Split review rows into the ones this car has (`on`) and the ones checked off
    for it (`off`). Order within each group is kept. */
 export function splitBySkip(rows, skipIds) {

@@ -150,6 +150,72 @@ export function applyEquipment(items, cfgItems, motorNames) {
   });
 }
 
+/* ---- "Not on this car" ----
+   The service review lets a writer check a service off for one vehicle (no
+   rear differential, electric power steering). The same choice takes the
+   matching items off that car's checklist. A service and a checklist item
+   are two separate settings lists, so they're paired here: by the standard
+   ids, and for a shop's own rows by wording (the service's match words
+   against the item's label, or failing that the item's ticket words against
+   the service's name). The first way that finds anything wins, so loose
+   wording never widens an exact pairing ("engine filter" must not tie the
+   air filter to "Engine oil & filter"). */
+const SERVICE_CHECKS = { oil: ["oil", "oilFilter"], diff: ["rearDiff", "frontDiff"], engineAir: ["airFilter"], cabinAir: ["cabinFilter"] };
+
+/* Checklist item ids that go with these services ({ id, name, match }). */
+export function checklistIdsForServices(cfgItems, services) {
+  const cfg = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
+  const ids = new Set();
+  for (const svc of services || []) {
+    if (!svc || !svc.id) continue;
+    const known = SERVICE_CHECKS[svc.id] || [];
+    const rows = cfg.filter((it) => it && it.id);
+    const ways = [
+      (it) => it.id === svc.id || known.includes(it.id),
+      (it) => !!svc.match && matchesAuto(svc.match, it.label),
+      (it) => !!it.auto && !!svc.name && matchesAuto(it.auto, svc.name),
+    ];
+    for (const way of ways) {
+      const hit = rows.filter(way);
+      if (!hit.length) continue;
+      for (const it of hit) ids.add(it.id);
+      break;
+    }
+  }
+  return ids;
+}
+
+/* Fit a checklist to the car: drop the items for services checked off for
+   this vehicle, and put back any that were dropped earlier (`opts.off`) and
+   have since been checked back on. An item whose service is on this ticket
+   stays, since the work was sold. Returns { items, off }: `off` is the list
+   of item ids left out, saved with the checklist so they can be restored.
+   `items` is the same array when nothing changed. Pure. */
+export function fitChecklistToCar(items, cfgItems, services, opts = {}) {
+  if (!Array.isArray(items)) return { items, off: [] };
+  const want = checklistIdsForServices(cfgItems, services);
+  const prevOff = (opts.off || []).map(String);
+  const kept = items.filter((it) => !(it && want.has(it.id) && !it.auto));
+  const have = new Set(kept.map((it) => it && it.id));
+  const back = prevOff.filter((id) => !want.has(id) && !have.has(id));
+  let out = kept.length === items.length ? items : kept;
+  if (back.length) {
+    const fresh = startChecklist(cfgItems, opts.lines, opts.prior, opts.parts);
+    const pos = (id) => fresh.findIndex((f) => f.id === id);
+    out = [...kept];
+    for (const id of back) {
+      const f = fresh.find((x) => x.id === id);
+      if (!f) continue; // gone from Settings since
+      let at = out.findIndex((x) => pos(x.id) > pos(id));
+      if (at < 0) at = out.length;
+      out.splice(at, 0, f);
+    }
+    if (out.length === items.length && out.every((x, i) => x === items[i])) out = items;
+  }
+  const present = new Set(out.map((it) => it && it.id));
+  return { items: out, off: [...want].filter((id) => !present.has(id)) };
+}
+
 export function startChecklist(cfgItems, lines, prior, parts) {
   const src = cfgItems && cfgItems.length ? cfgItems : DEFAULT_CHECKLIST;
   return src
