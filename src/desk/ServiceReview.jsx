@@ -20,6 +20,32 @@ const STATUS = {
 };
 const miles = (n) => (Number(n) || 0).toLocaleString() + " mi";
 
+/* The shop logo, shrunk for the link texted to a customer. The uploaded logo
+   can be several hundred KB and a copy is stored with every link, so the
+   online page gets one sized for its header (shown 58px tall; 140px keeps it
+   sharp on a phone). Resolves to "" if the image can't be read, and the link
+   goes out without a logo. */
+export function logoForLink(src, maxH = 140) {
+  return new Promise((res) => {
+    if (!src || typeof Image === "undefined") return res("");
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxH / (img.naturalHeight || img.height || maxH));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+        c.height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL("image/png"));
+      } catch {
+        res("");
+      }
+    };
+    img.onerror = () => res("");
+    img.src = src;
+  });
+}
+
 /* Service review: for the ticket's vehicle, show every maintenance service, when
    it was last done (from this car's history), and whether it's due — so the
    writer can recommend what's due at an oil change. */
@@ -148,7 +174,8 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
 
   const sendLink = async () => {
     if (!onShare) return;
-    const r = await onShare(report);
+    const logo = await logoForLink(cfg.logo || defaultLogo);
+    const r = await onShare(logo ? { ...report, logo } : report);
     if (r && r.link) setShared(r);
   };
 
@@ -158,8 +185,8 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
       {/* no page margin: the browser then prints no header or footer of its
           own (title, time, web address); the report carries its own spacing */}
       <style>{`@media print { @page { size: auto; margin: 0; } }`}</style>
-      {/* the shop's logo goes on the paper copy, same as a printed ticket; it is
-          left out of `report` itself so the link texted to a customer stays small */}
+      {/* the shop's logo goes on the paper copy at full quality, same as a
+          printed ticket; the link texted to a customer gets a shrunk copy (sendLink) */}
       <div className="printWrap" dangerouslySetInnerHTML={{ __html: reviewReportHtml({ ...report, logo: cfg.logo || defaultLogo }) }} />
     </div>
   );

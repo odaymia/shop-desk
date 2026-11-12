@@ -5,6 +5,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/cloudConfig.js";
 import { reviewReportHtml } from "../lib/serviceReviewHtml.js";
 import { reviewReport } from "../lib/serviceReviewReport.js";
+import defaultLogo from "../assets/genie-logo.png";
 
 const FN = `${SUPABASE_URL}/functions/v1/sign`;
 const app = document.getElementById("app");
@@ -164,7 +165,7 @@ const token = new URLSearchParams(location.search).get("t");
 (async () => {
   if (!token) return fail("This link is missing its code. Please ask the shop to resend it.");
   if (token === "demo") return render(demo());
-  if (token === "demo-review") return renderReview(demoReview());
+  if (token === "demo-review") return renderReview({ ...demoReview(), logo: defaultLogo }); // a real link carries the shop's own logo
   try {
     const { ok, data } = await get(token);
     if (!ok || !data || !data.payload) return fail((data && data.error) || "This link is no longer valid.");

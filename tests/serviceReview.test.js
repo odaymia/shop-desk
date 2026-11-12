@@ -201,9 +201,9 @@ test("not on this car: skipped rows leave the review, the tally and the due list
 import { reviewReport } from "../src/lib/serviceReviewReport.js";
 import { reviewReportHtml } from "../src/lib/serviceReviewHtml.js";
 
-test("printout: the shop logo sits in the header when given, and the shared report carries none", () => {
+test("the shop logo sits in the header when given; the report itself carries none until one is attached", () => {
   const report = reviewReport({ cfg: { shopName: "Genie Auto Center", logo: "data:image/png;base64,AAAA" }, vehicle: { year: 2015, make: "Ford", model: "F-150" }, mileage: 1000, rows: [] });
-  assert.equal(report.logo, undefined); // the texted link stays small
+  assert.equal(report.logo, undefined); // print attaches the full logo, the texted link a shrunk copy
   const plain = reviewReportHtml(report);
   assert.ok(!plain.includes("<img"));
   assert.ok(plain.includes("Genie Auto Center"));
