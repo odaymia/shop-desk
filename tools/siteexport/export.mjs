@@ -26,7 +26,12 @@ const flag = (name) => (args.find((a) => a.startsWith(`--${name}=`)) || "").spli
 const [slug, domain, out, ...moves] = args.filter((a) => !a.startsWith("--"));
 /* the policies' "effective" date: keep the same one on every rebuild until
    the wording changes (--policy-date=YYYY-MM-DD) */
-const policyDate = flag("policy-date") || new Date().toISOString().slice(0, 10);
+const policyDateArg = flag("policy-date"); // default: today where the shop is
+/* --policies-from=<folder>: the policy pages already on the site. A policy
+   whose wording hasn't changed keeps the effective date it has there; one
+   that has changed gets the policy date (today unless given). This is what
+   lets the scheduled job rebuild the policies without re-dating them daily. */
+const policiesFrom = flag("policies-from");
 if (!slug || !domain || !out) {
   console.error("usage: node tools/siteexport/export.mjs <slug> <domain> <out-dir> [old-path=target ...]");
   process.exit(1);
@@ -117,10 +122,11 @@ for (const m of moves) {
 }
 
 const addr = [p.address, p.cityLine].filter(Boolean).join(", ");
+const policyDate = policyDateArg || new Intl.DateTimeFormat("en-CA", { timeZone: p.timeZone || "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const when = new Date(policyDate + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 const contactLines = [esc(p.name), addr && esc(addr), p.phone && esc(p.phone), p.email && `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`].filter(Boolean).join("<br>");
 const reach = [p.email && `email <a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`, p.phone && `call ${esc(p.phone)}`].filter(Boolean).join(" or ");
-const policyPage = (title, canonicalPath, body) => `<!DOCTYPE html>
+const policyPage = (title, canonicalPath, body, when) => `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · ${esc(p.name)}</title>
 <meta name="description" content="${esc(title)} for ${esc(p.name)}.">
@@ -147,10 +153,108 @@ ${body}
 <div class="box">${contactLines}</div>
 </main></body></html>
 `;
+const EFFECTIVE = /Effective ([A-Z][a-z]+ \d{1,2}, \d{4})/;
+const writePolicy = (title, canonicalPath, body) => {
+  const rel = `${canonicalPath}index.html`;
+  let date = when;
+  if (policiesFrom) {
+    try {
+      const have = fs.readFileSync(path.join(policiesFrom, rel), "utf8");
+      const m = have.match(EFFECTIVE);
+      if (m && have === policyPage(title, canonicalPath, body, m[1])) date = m[1]; // same wording: same date
+    } catch {
+      /* no copy there yet */
+    }
+  }
+  write(rel, policyPage(title, canonicalPath, body, date));
+};
 
-write(
-  "policies/privacy-policy/index.html",
-  policyPage(
+/* ---- What the policies must disclose ----
+   The measurement and advertising tags the shop switched on in Settings →
+   Website (the same cleaned ids the page itself uses), and the tire widget.
+   The policies are written from this list, so they say what the site does. */
+const T = p.tracking || {};
+const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
+const trackers = [
+  T.metaPixel && {
+    name: "Meta Pixel",
+    matching: true,
+    by: "Meta (Facebook and Instagram)",
+    ads: true,
+    what: "measures how our Facebook and Instagram ads are working, and lets us show our ads to people who have visited this site",
+    cookies: "<code>_fbp</code>, and <code>_fbc</code> if you came from one of our ads",
+    policy: ext("https://www.facebook.com/privacy/policy/", "Meta privacy policy"),
+    optout: ext("https://www.facebook.com/adpreferences/ad_settings", "Meta ad settings"),
+  },
+  T.ga4 && {
+    name: "Google Analytics",
+    by: "Google",
+    ads: false,
+    what: "counts visits and shows us which pages people use",
+    cookies: "<code>_ga</code> and <code>_ga_…</code>",
+    policy: ext("https://policies.google.com/privacy", "Google privacy policy"),
+    optout: ext("https://tools.google.com/dlpage/gaoptout", "Google Analytics opt-out add-on"),
+  },
+  T.googleAds && {
+    name: "Google Ads",
+    matching: true,
+    by: "Google",
+    ads: true,
+    what: "measures how our Google ads are working, and lets us show our ads to people who have visited this site",
+    cookies: "<code>_gcl_au</code>",
+    policy: ext("https://policies.google.com/privacy", "Google privacy policy"),
+    optout: ext("https://myadcenter.google.com/", "Google My Ad Center"),
+  },
+  T.gtm && {
+    name: "Google Tag Manager",
+    by: "Google",
+    ads: false,
+    what: "loads the measurement tags we use",
+    cookies: "none of its own",
+    policy: ext("https://policies.google.com/privacy", "Google privacy policy"),
+    optout: "",
+  },
+  T.tiktokPixel && {
+    name: "TikTok Pixel",
+    matching: true,
+    by: "TikTok",
+    ads: true,
+    what: "measures how our TikTok ads are working, and lets us show our ads to people who have visited this site",
+    cookies: "<code>_ttp</code>",
+    policy: ext("https://www.tiktok.com/legal/privacy-policy", "TikTok privacy policy"),
+    optout: "",
+  },
+  T.clarity && {
+    name: "Microsoft Clarity",
+    by: "Microsoft",
+    ads: false,
+    what: "shows us how people use the page, such as where they tap and scroll, so we can improve it",
+    cookies: "<code>_clck</code> and <code>_clsk</code>",
+    policy: ext("https://privacy.microsoft.com/privacystatement", "Microsoft privacy statement"),
+    optout: "",
+  },
+].filter(Boolean);
+const tracked = trackers.length > 0;
+const hasAds = trackers.some((t) => t.ads);
+const hasTireTool = !!(p.tireConnect && String(p.tireConnect).trim());
+const list = (a) => (a.length <= 1 ? a.join("") : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`);
+const trackerNames = list(trackers.map((t) => t.name));
+const optouts = trackers.map((t) => t.optout).filter(Boolean);
+const measures = hasAds ? "how our website and our advertising are working" : "how our website is being used";
+/* Advertising pixels have a setting on the provider's side ("automatic
+   advanced matching", "enhanced conversions") that reads contact details out
+   of a page's forms and sends a hashed copy. The site can't see whether the
+   shop turned it on, so the policies are written as if it is. */
+const matchers = trackers.filter((t) => t.matching);
+const matchNames = list(matchers.map((t) => t.name));
+const matchNote = matchers.length
+  ? `When you send a form here, ${matchNames} may also receive a scrambled (hashed) copy of contact details you typed, such as your email address, phone number, or name, which ${matchers.length > 1 ? "those companies" : list(matchers.map((t) => t.by.split(" (")[0]))} can use to match your visit to an account you have with ${matchers.length > 1 ? "them" : "it"}.`
+  : "";
+const notSent = matchers.length
+  ? `${trackers.length > 1 ? "None of these services receive" : "It doesn't receive"} your service history, your receipts, or the notes you write to us.`
+  : `We don't send ${trackers.length > 1 ? "these services" : "this service"} your name, phone number, or email.`;
+
+writePolicy(
     "Privacy policy",
     "policies/privacy-policy/",
     `<p>${esc(p.name)} ("we," "us") runs this website and our auto service shop. This policy explains what personal information we collect, how we use it, and the choices you have. It applies to this website and to the records we keep when you're our customer.</p>
@@ -162,7 +266,17 @@ write(
 <tr><td>Vehicle details (year, make, model, mileage, VIN, license plate)</td><td>When you tell us about your car or we service it</td></tr>
 <tr><td>Notes you send us</td><td>When you describe a problem or a request on this site</td></tr>
 <tr><td>Service history, estimates, invoices, and payments</td><td>When we work on your vehicle</td></tr>
-<tr><td>Basic technical information (like your IP address and browser type)</td><td>Automatically, when your browser loads this site and the services it uses (see "Services we use" below)</td></tr>
+<tr><td>Basic technical information (like your IP address and browser type)</td><td>Automatically, when your browser loads this site and the services it uses (see "Services we use" below)</td></tr>${
+      tracked
+        ? `
+<tr><td>How you use this site: the pages you view, and actions like tapping Call or Directions, looking up an oil change price for a vehicle, or sending a form</td><td>Automatically, through ${trackerNames} (see "Services we use" below)</td></tr>${
+            matchers.length
+              ? `
+<tr><td>A scrambled (hashed) copy of contact details you type into a form here, such as your email address, phone number, or name</td><td>When you send a form, ${matchNames} may receive it (see "Services we use" below)</td></tr>`
+              : ""
+          }`
+        : ""
+    }
 </table>
 <p>We don't collect payment card numbers through this website.</p>
 
@@ -172,13 +286,23 @@ write(
 <li>To do the work on your car and keep your service history, which you can see in My Garage</li>
 <li>To send service reminders</li>
 <li>To send specials and coupons, if you signed up or are our customer. You can stop these anytime (see "Your choices")</li>
-<li>To keep records the law requires of auto repair shops, and to protect against fraud</li>
+<li>To keep records the law requires of auto repair shops, and to protect against fraud</li>${
+      tracked
+        ? `
+<li>To see ${measures}${hasAds ? ", and to show our ads to people who have visited this site" : ""}</li>`
+        : ""
+    }
 </ul>
 
 <h2>Who we share it with</h2>
 <p><b>We never sell or rent your personal information.</b> We share it only with:</p>
 <ul>
-<li><b>Service providers</b> who run our shop software, website, and email for us, only as needed to provide those services</li>
+<li><b>Service providers</b> who run our shop software, website, and email for us, only as needed to provide those services</li>${
+      tracked
+        ? `
+<li><b>${hasAds ? "Advertising and measurement services" : "Measurement services"}</b> (${trackerNames}), which receive information about your visit to this site${matchers.length ? " and may receive a scrambled copy of contact details you type into a form" : ", but not your name, phone number, or email"}. See "Services we use on this site" below</li>`
+        : ""
+    }
 <li><b>Anyone you ask us to share it with</b></li>
 <li><b>Authorities</b>, when the law requires it</li>
 </ul>
@@ -189,22 +313,49 @@ write(
 <li><b>Google Maps</b>: the map on our page (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google privacy policy</a>)</li>
 <li><b>Google Fonts</b>: the lettering on this site (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google privacy policy</a>)</li>
 <li><b>Unsplash</b>: some of the photos (<a href="https://unsplash.com/privacy" target="_blank" rel="noopener">Unsplash privacy policy</a>)</li>
-<li><b>Supabase and GitHub</b>: they host our site and securely store what you send us</li>
+<li><b>Supabase and GitHub</b>: they host our site and securely store what you send us</li>${
+      hasTireTool
+        ? `
+<li><b>TireConnect</b>: the tire search and quote tool. What you enter there, such as your vehicle or tire size, goes to TireConnect (${ext("https://www.tireconnect.ca/privacy-policy/", "TireConnect privacy policy")})</li>`
+        : ""
+    }${trackers
+      .map(
+        (t) => `
+<li><b>${t.name}</b>, from ${t.by}: ${t.what} (${t.policy})</li>`
+      )
+      .join("")}
 </ul>
-<p>We don't use advertising trackers or analytics on this site. See our <a href="/policies/cookie-policy/">cookie policy</a>.</p>
+${
+  tracked
+    ? `<p>${trackerNames} ${trackers.length > 1 ? "learn" : "learns"} which pages you view here and when you tap Call or Directions, look up an oil change price, or send a form. ${matchNote ? matchNote + " " : ""}${notSent} The ${trackers.length > 1 ? "companies that run them" : "company that runs it"} may ${matchers.length ? "also" : "still"} recognize your browser or device, for example if you're signed in to ${trackers.length > 1 ? "their" : "its"} apps, and ${trackers.length > 1 ? "use" : "uses"} what ${trackers.length > 1 ? "they learn" : "it learns"} under ${trackers.length > 1 ? "their" : "its"} own privacy ${trackers.length > 1 ? "policies" : "policy"}. See our <a href="/policies/cookie-policy/">cookie policy</a> for the cookies involved, and "Your choices" below to opt out.</p>`
+    : `<p>We don't use advertising trackers or analytics on this site. See our <a href="/policies/cookie-policy/">cookie policy</a>.</p>`
+}
 
 <h2>Your choices</h2>
 <ul>
 <li><b>Emails:</b> every marketing email has an unsubscribe link. You can also ${reach || "contact us"} and we'll take you off the list.</li>
 <li><b>See or correct your information:</b> ${reach ? reach.charAt(0).toUpperCase() + reach.slice(1) : "Contact us"} to ask what we have about you, or to fix anything that's wrong. Customers can also see their cars and receipts in My Garage.</li>
-<li><b>Deletion:</b> you can ask us to delete your information. We'll delete what we're allowed to. Some repair records must be kept by law.</li>
+<li><b>Deletion:</b> you can ask us to delete your information. We'll delete what we're allowed to. Some repair records must be kept by law.</li>${
+      tracked
+        ? `
+<li><b>${hasAds ? "Ads and measurement" : "Measurement"}:</b> ${optouts.length ? `you can opt out in ${list(optouts)}. ` : ""}You can also block or clear cookies in your browser's settings, or use a browser that blocks trackers. This site works the same either way.</li>`
+        : ""
+    }
 </ul>
 
 <h2>California residents</h2>
-<p>If you live in California, you have the right to know what personal information we collect and how we use and share it, to ask us to delete or correct it, and not to be treated differently for using these rights. We do not sell or share personal information for cross-context behavioral advertising. To make a request, contact us using the details below. We'll need to confirm it's you before we act on a request.</p>
+<p>If you live in California, you have the right to know what personal information we collect and how we use and share it, to ask us to delete or correct it, and not to be treated differently for using these rights. ${
+      hasAds
+        ? `We don't sell personal information. We do use advertising services (${list(trackers.filter((t) => t.ads).map((t) => t.name))}) that receive information about visits to this site, so we can measure our ads and show them to people who have visited. California law may treat that as "sharing" for cross-context behavioral advertising, and you can opt out of it using "Ads and measurement" under "Your choices" above, or by contacting us.`
+        : "We do not sell or share personal information for cross-context behavioral advertising."
+    } To make a request, contact us using the details below. We'll need to confirm it's you before we act on a request.</p>
 
 <h2>Do Not Track</h2>
-<p>Some browsers send a "Do Not Track" signal. Because this site doesn't track you across other websites, it works the same whether or not that signal is on.</p>
+<p>${
+      tracked
+        ? `Some browsers send a "Do Not Track" signal. There's no agreed standard for it, and this site doesn't change what it does when it's on. To limit tracking, use the options under "Your choices" above.`
+        : `Some browsers send a "Do Not Track" signal. Because this site doesn't track you across other websites, it works the same whether or not that signal is on.`
+    }</p>
 
 <h2>How long we keep it</h2>
 <p>We keep customer and repair records for as long as needed to serve you and as the law requires. We keep email signups until you unsubscribe or ask us to delete them.</p>
@@ -217,37 +368,52 @@ write(
 
 <h2>Changes to this policy</h2>
 <p>If we change this policy, we'll post the new version here and update the effective date at the top.</p>`
-  )
 );
 
-write(
-  "policies/cookie-policy/index.html",
-  policyPage(
+writePolicy(
     "Cookie policy",
     "policies/cookie-policy/",
-    `<p>Cookies are small files a website stores in your browser. This page explains which ones you'll find on our site. The short version: <b>we don't set any cookies of our own, and we don't use advertising or analytics trackers.</b></p>
+    `<p>Cookies are small files a website stores in your browser. This page explains which ones you'll find on our site. The short version: <b>${
+      tracked
+        ? `we don't set any cookies of our own, but we use ${trackerNames} to see ${measures}, and ${trackers.length > 1 ? "they store" : "it stores"} cookies in your browser.`
+        : "we don't set any cookies of our own, and we don't use advertising or analytics trackers."
+    }</b></p>
 
 <h2>Cookies we set</h2>
-<p>None. Our pages work without storing anything in your browser.</p>
+<p>${tracked ? "None of our own. Our pages work without them. The services below store theirs when the page loads." : "None. Our pages work without storing anything in your browser."}</p>
 
 <h2>Cookies from services on our pages</h2>
 <table>
 <tr><th>Service</th><th>What it's for</th><th>Cookies</th></tr>
 <tr><td>Google Maps</td><td>The map showing where we are</td><td>Google may set cookies when the map loads, for example to remember settings and to protect against abuse. See <a href="https://policies.google.com/technologies/cookies" target="_blank" rel="noopener">how Google uses cookies</a>.</td></tr>
 <tr><td>Google Fonts</td><td>The lettering on the site</td><td>No cookies. Your browser requests the font files from Google.</td></tr>
-<tr><td>Unsplash</td><td>Some of our photos</td><td>No cookies. Your browser requests the images from Unsplash.</td></tr>
+<tr><td>Unsplash</td><td>Some of our photos</td><td>No cookies. Your browser requests the images from Unsplash.</td></tr>${
+      hasTireTool
+        ? `
+<tr><td>TireConnect</td><td>The tire search and quote tool</td><td>TireConnect may store cookies or similar data in your browser so the tool works and remembers your search.</td></tr>`
+        : ""
+    }${trackers
+      .map(
+        (t) => `
+<tr><td>${t.name}, from ${t.by}</td><td>${t.what.charAt(0).toUpperCase() + t.what.slice(1)}</td><td>${t.cookies === "none of its own" ? "None of its own." : `Yes: ${t.cookies}. They let ${t.by.split(" (")[0]} recognize your browser on later visits.`} See the ${t.policy}.</td></tr>`
+      )
+      .join("")}
 </table>
 
 <h2>Other things we store</h2>
-<p>When you send us a form (an appointment request, an offer, or an email signup), what you type is sent to us and stored securely on our side, not in your browser. See our <a href="/policies/privacy-policy/">privacy policy</a>.</p>
+<p>When you send us a form (an appointment request, an offer, or an email signup), what you type is sent to us and stored securely on our side, not in your browser.${matchNote ? " " + matchNote : ""} See our <a href="/policies/privacy-policy/">privacy policy</a>.</p>
 <p>If you're our customer and sign in to My Garage, that sign-in is kept in your browser so you stay signed in. It's needed for the sign-in to work and isn't used to track you.</p>
 
 <h2>Your choices</h2>
-<p>You can block or delete cookies in your browser's settings. Our site still works without them, but the map may not show if you block Google's cookies. You can always use the "Get directions" button instead.</p>
+<p>You can block or delete cookies in your browser's settings. Our site still works without them, but the map may not show if you block Google's cookies. You can always use the "Get directions" button instead.</p>${
+      tracked && optouts.length
+        ? `
+<p>To stop ${hasAds ? "ad and measurement" : "measurement"} cookies in particular, you can also opt out in ${list(optouts)}.</p>`
+        : ""
+    }
 
 <h2>Changes</h2>
 <p>If we add a service that uses cookies, we'll update this page and the effective date at the top.</p>`
-  )
 );
 /* The job that keeps index.html current once this folder is a GitHub repo.
    GitHub's own token can't change workflow files, so the job never rewrites
@@ -258,8 +424,9 @@ write(
 # Written by tools/siteexport/export.mjs in the shop-desk repo. Change it there.
 #
 # Every 15 minutes (and when this file changes, or on demand) it rebuilds
-# index.html from the shop's published site with the current Bolt Badger
-# page design, and commits it only when something changed. Between a publish
+# index.html and the privacy and cookie policies from the shop's published
+# site with the current Bolt Badger page design, and commits only when
+# something changed. A policy keeps its effective date until its wording does. Between a publish
 # and the next run, visitors still get the new content: the page's script
 # updates it in place.
 name: Rebuild the page from Bolt Badger
@@ -301,7 +468,7 @@ jobs:
         run: |
           out="$RUNNER_TEMP/site"
           code=0
-          node .bolt-badger/tools/siteexport/export.mjs "$SITE_SLUG" "$SITE_DOMAIN" "$out" || code=$?
+          node .bolt-badger/tools/siteexport/export.mjs "$SITE_SLUG" "$SITE_DOMAIN" "$out" --policies-from=. || code=$?
           rm -rf .bolt-badger
           if [ "$code" = "3" ]; then
             echo "The website is switched off in Bolt Badger. Leaving the page as it is."
@@ -314,7 +481,11 @@ jobs:
           grep -q "</html>" "$out/index.html"
           test "$(wc -c < "$out/index.html")" -gt 20000
           cp "$out/index.html" index.html
-          git add index.html
+          # the policies follow whichever measurement tags the shop has switched on
+          for f in privacy-policy cookie-policy; do
+            mkdir -p "policies/$f" && cp "$out/policies/$f/index.html" "policies/$f/index.html"
+          done
+          git add index.html policies/privacy-policy/index.html policies/cookie-policy/index.html
           if git diff --cached --quiet; then
             echo "Already up to date."
             exit 0
