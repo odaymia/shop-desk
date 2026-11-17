@@ -344,3 +344,50 @@ test("renderSite wires engagement events (service, tires, forms)", () => {
   // and Meta's auto button-detection is off (no phantom Subscribe/Contact events)
   assert.ok(html.includes("'autoConfig',false"));
 });
+
+import fs from "node:fs";
+
+test("live redraw: the page's own style and scripts are marked, and its script can be run again", () => {
+  const html = renderSite({ name: "T", hoursWeek: Array(7).fill({ open: "08:00", close: "18:00", closed: false }), services: [], updatedAt: 5 }, { live: { src: "https://x.example/site/app.js", slug: "t", canonical: "https://t.example/" } });
+  // the redraw (src/site/redraw.js) swaps exactly these and leaves third-party tags alone
+  assert.equal(html.split("<style data-sb>").length, 2);
+  assert.ok(html.includes('<script data-sb="data">window.SITE='));
+  const start = html.indexOf('<script data-sb="app">') + '<script data-sb="app">'.length;
+  const js = html.slice(start, html.indexOf("</script>", start));
+  assert.doesNotThrow(() => new Function(js)); // still valid script
+  // every page-wide listener goes through on(), which the next run undoes via window.__sbOff
+  assert.ok(js.includes("window.__sbOff"));
+  assert.ok(!/(document|window)\.addEventListener\(/.test(js));
+  assert.ok(/on\(document,"click"/.test(js) && /on\(window,"hashchange"/.test(js));
+
+  // run it twice against a stand-in page: the second run must leave one set of listeners, not two
+  const listeners = { document: [], window: [] };
+  const mk = (bag) => ({
+    addEventListener: (ev, fn) => bag.push(fn),
+    removeEventListener: (ev, fn) => {
+      const i = bag.indexOf(fn);
+      if (i >= 0) bag.splice(i, 1);
+    },
+  });
+  const el = () => ({ className: "", lastChild: {}, getAttribute: () => "", setAttribute() {}, classList: { toggle() {}, contains: () => false, add() {} }, querySelector: () => null, remove() {} });
+  const document = { ...mk(listeners.document), title: "T", body: el(), getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
+  const window = { ...mk(listeners.window), SITE: { hours: null, tz: "America/Los_Angeles", days: [], pkgs: [], cars: [] } };
+  const location = { hash: "", search: "", pathname: "/" };
+  const runOnce = () => new Function("window", "document", "location", "history", "URLSearchParams", "Intl", js)(window, document, location, { replaceState() {} }, URLSearchParams, Intl);
+  runOnce();
+  const first = [listeners.document.length, listeners.window.length];
+  assert.ok(first[0] >= 3 && first[1] >= 3);
+  runOnce();
+  assert.deepEqual([listeners.document.length, listeners.window.length], first);
+});
+
+test("live redraw: the site script never reopens the document", () => {
+  // document.open()/document.write() left Instagram's in-app browser with an unstyled page
+  for (const f of ["src/site/main.js", "src/site/redraw.js"]) {
+    const code = fs
+      .readFileSync(new URL(`../${f}`, import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "") // comments may mention it
+      .replace(/^\s*\/\/.*$/gm, "");
+    assert.ok(!/document\s*\.\s*(open|write|writeln)\s*\(/.test(code), `${f} must not use document.open/write`);
+  }
+});

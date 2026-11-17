@@ -541,7 +541,7 @@ ${logoUrl ? `<link rel="icon" href="${esc(logoUrl)}">` : ""}
 ${live ? `<meta name="bolt-badger-site" content="${esc(live.slug)}">${safeUrl(live.canonical) ? `<link rel="canonical" href="${esc(live.canonical)}">` : ""}` : ""}
 <script type="application/ld+json">${jsonForScript(jsonLd(p, fullAddress))}</script>
 ${trk.head}
-<style>
+<style data-sb>
 :root{--brand:${brand};--accent:${accent};--ink:#15171b;--ink2:#5b616c;--line:#e7e3dc;--paper:#f7f5f0;--card:#fff;--dark:#121417;--dark2:#1b1e23;--ok:#22a25a;
 --display:"Barlow Condensed","Arial Narrow",Impact,system-ui,sans-serif;--body:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
 --brandSoft:color-mix(in srgb,var(--brand) 10%,#fff);--shadow:0 1px 2px rgba(20,20,20,.04),0 8px 28px rgba(20,20,20,.07)}
@@ -1101,8 +1101,8 @@ ${
   ${garage ? `<a class="btn light" href="${garage}">My Garage</a>` : p.booking ? `<a class="btn light" href="#book">Book</a>` : `<a class="btn light" href="${dirUrl}">Directions</a>`}
 </div>
 
-<script>window.SITE=${jsonForScript(pageData)};</script>
-<script>${CLIENT_JS}</script>
+<script data-sb="data">window.SITE=${jsonForScript(pageData)};</script>
+<script data-sb="app">${CLIENT_JS}</script>
 ${live ? `<script type="module" src="${esc(live.src)}"></script>` : ""}
 </body>
 </html>`;
@@ -1112,6 +1112,12 @@ ${live ? `<script type="module" src="${esc(live.src)}"></script>` : ""}
    quote, the booking form, and the scroll-in animation. Self-contained so the downloaded page works
    anywhere. Kept in step with openStatus, packagePrice and packagesFor in website.js. */
 const CLIENT_JS = `(function(){
+// Re-runnable: when the page is redrawn in place with newer content (src/site/redraw.js)
+// this script runs again on the new elements, so first undo what the last run attached
+// to the document and window. Everything page-wide goes through on().
+if(window.__sbOff){try{window.__sbOff()}catch(e){}}
+var offs=[];function on(t,ev,fn){t.addEventListener(ev,fn);offs.push(function(){t.removeEventListener(ev,fn)})}
+window.__sbOff=function(){offs.forEach(function(f){try{f()}catch(e){}});offs=[]};
 var S=window.SITE,$=function(id){return document.getElementById(id)};
 function clock(t){var a=t.split(":"),h=+a[0],m=+a[1];return (h%12||12)+(m?":"+(m<10?"0":"")+m:"")+(h>=12?"pm":"am")}
 function mins(t){var a=t.split(":");return a[0]*60+ +a[1]}
@@ -1143,14 +1149,14 @@ if(qy&&C.length){
   qd.onchange=function(){var L=qd.value?pick():[];fill(qe,uniq(L.map(function(c){return c[3]||"Standard"})),"Engine");if(L.length===1){qe.value=L[0][3]||"Standard";show(L[0])}else show(null)};
   qe.onchange=function(){var c=pick().filter(function(c){return(c[3]||"Standard")===qe.value})[0];show(c||null)};
 }
-document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-svc]");if(!a)return;var f=$("bookForm");if(!f)return;var sel=f.elements.service,v=a.getAttribute("data-svc");for(var i=0;i<sel.options.length;i++)if(sel.options[i].text===v)sel.value=v;
+on(document,"click",function(e){var a=e.target.closest&&e.target.closest("[data-svc]");if(!a)return;var f=$("bookForm");if(!f)return;var sel=f.elements.service,v=a.getAttribute("data-svc");for(var i=0;i<sel.options.length;i++)if(sel.options[i].text===v)sel.value=v;
   var y=qy&&qy.value,m=qm&&qm.value,d=qd&&qd.value;if(y&&m&&d&&!f.elements.vehicle.value)f.elements.vehicle.value=y+" "+m+" "+d});
-var rv=document.querySelectorAll(".rv");if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});rv.forEach(function(el){io.observe(el)})}else rv.forEach(function(el){el.classList.add("in")});
-document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-scroll]");if(!a)return;var t=document.getElementById(a.getAttribute("data-scroll"));if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});
+var rv=document.querySelectorAll(".rv");if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});rv.forEach(function(el){io.observe(el)});offs.push(function(){io.disconnect()})}else rv.forEach(function(el){el.classList.add("in")});
+on(document,"click",function(e){var a=e.target.closest&&e.target.closest("[data-scroll]");if(!a)return;var t=document.getElementById(a.getAttribute("data-scroll"));if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});
 var qo=new URLSearchParams(location.search).get("offer");if(qo&&!location.hash){var os="offer-"+qo.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");if(document.getElementById(os))history.replaceState(null,"",location.pathname+location.search+"#"+os)}
-var mb=document.querySelector(".menuBtn");if(mb){var setNav=function(o){document.body.classList.toggle("navOpen",o);mb.setAttribute("aria-expanded",o?"true":"false")};mb.onclick=function(){setNav(!document.body.classList.contains("navOpen"))};document.querySelectorAll(".mobileNav a").forEach(function(a){a.addEventListener("click",function(){setNav(false)})});window.addEventListener("hashchange",function(){setNav(false)})}
+var mb=document.querySelector(".menuBtn");if(mb){var setNav=function(o){document.body.classList.toggle("navOpen",o);mb.setAttribute("aria-expanded",o?"true":"false")};mb.onclick=function(){setNav(!document.body.classList.contains("navOpen"))};document.querySelectorAll(".mobileNav a").forEach(function(a){a.addEventListener("click",function(){setNav(false)})});on(window,"hashchange",function(){setNav(false)})}
 var baseTitle=document.title;function route(){var h=location.hash,el=h&&/^#(service|offer)-/.test(h)?document.getElementById(h.slice(1)):null;if(el){window.scrollTo(0,0);document.title=el.getAttribute("data-title")||baseTitle}else document.title=baseTitle}
-window.addEventListener("hashchange",route);route();
+on(window,"hashchange",route);route();
 document.querySelectorAll("form.signupForm").forEach(function(form){var msg=form.querySelector(".formMsg");form.onsubmit=function(e){e.preventDefault();var f=form.elements,em=(f.email.value||"").trim();
   if(f.website.value)return;
   if(!/^[^@\\s]+@[^@\\s]+\\.[a-z]{2,}$/i.test(em)){msg.className="formMsg err";msg.textContent="That email doesn't look right.";return}
@@ -1193,13 +1199,13 @@ function track(name,params){params=params||{};
   try{if(window.fbq)fbq("trackCustom",name,params)}catch(e){}}
 window.sbTrack=track;
 // calls, directions, and any "shop for tires" link
-document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a");if(!a)return;var href=a.getAttribute("href")||"";
+on(document,"click",function(e){var a=e.target.closest&&e.target.closest("a");if(!a)return;var href=a.getAttribute("href")||"";
   if(href.indexOf("tel:")===0)track("call_click",{});
   else if(href.indexOf("/maps/dir/")>-1)track("directions_click",{});
   else if(href==="#tires"||(a.closest&&a.closest(".tcbar")))track("shop_tires",{content_name:"Tires"});});
 // each service page is its own conversion: service_brakes, service_ac, …
-var lastSvc="";function svcView(){var h=location.hash;if(h.indexOf("#service-")!==0)return;var id=h.slice(1);var el=document.getElementById(id);var t=(el&&el.getAttribute("data-title"))||"";var nm=t.split(" \\u00b7 ")[0];var ev=("service_"+id.replace(/^service-/,"").replace(/[^a-z0-9]+/gi,"_").replace(/^_+|_+$/g,"")).toLowerCase().slice(0,40);if(ev!=="service_"&&ev!==lastSvc){lastSvc=ev;track(ev,{content_name:nm||id,content_category:"service"})}}
-window.addEventListener("hashchange",svcView);svcView();
+var lastSvc=window.__sbSvc||"";function svcView(){var h=location.hash;if(h.indexOf("#service-")!==0)return;var id=h.slice(1);var el=document.getElementById(id);var t=(el&&el.getAttribute("data-title"))||"";var nm=t.split(" \\u00b7 ")[0];var ev=("service_"+id.replace(/^service-/,"").replace(/[^a-z0-9]+/gi,"_").replace(/^_+|_+$/g,"")).toLowerCase().slice(0,40);if(ev!=="service_"&&ev!==lastSvc){lastSvc=window.__sbSvc=ev;track(ev,{content_name:nm||id,content_category:"service"})}}
+on(window,"hashchange",svcView);svcView();
 // tire-widget use, read passively from the URL so it NEVER gates the widget
-var tireTs=0,bootTs=Date.now();window.addEventListener("hashchange",function(){if(location.hash.indexOf("#!tires")!==0)return;var now=Date.now();if(now-bootTs<2500)return;if(now-tireTs<4000)return;tireTs=now;track("tire_search",{content_name:"Tires"})});
+var tireTs=0,bootTs=Date.now();on(window,"hashchange",function(){if(location.hash.indexOf("#!tires")!==0)return;var now=Date.now();if(now-bootTs<2500)return;if(now-tireTs<4000)return;tireTs=now;track("tire_search",{content_name:"Tires"})});
 })();`;

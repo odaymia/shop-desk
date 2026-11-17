@@ -10,8 +10,13 @@
    - a redirect page for each old address the shop's previous site had
      (old-path=#service-brakes), so search results and bookmarks still land
    - a plain privacy policy (the site collects emails and phone numbers)
+   - portal/index.html, so My Garage opens on the shop's own domain
+   - .github/workflows/snapshot.yml: once the folder is a GitHub repo, this
+     rebuilds index.html every 15 minutes from whatever the shop has
+     published, so the page never goes stale (it runs this same script)
 
-   Reads VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY from .env. */
+   Reads VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY from the environment, or
+   from .env. Exits 3 when the shop has no published site. */
 import fs from "node:fs";
 import path from "node:path";
 import { renderSite } from "../../src/lib/siteRender.js";
@@ -34,13 +39,21 @@ const env = Object.fromEntries(
     .filter(Boolean)
     .map((m) => [m[1], m[2].replace(/^["']|["']$/g, "")])
 );
-const url = env.VITE_SUPABASE_URL;
-const key = env.VITE_SUPABASE_ANON_KEY;
+const url = process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL;
+const key = process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY;
 const APP = "https://odaymia.github.io/shop-desk/";
 
 const res = await fetch(`${url}/rest/v1/shop_site?select=shop_id,data&published=eq.true&slug=eq.${encodeURIComponent(slug)}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+if (!res.ok) {
+  console.error(`Couldn't read the published site (${res.status})`);
+  process.exit(1);
+}
 const [row] = await res.json();
-if (!row) throw new Error(`No published site "${slug}"`);
+if (!row) {
+  /* the website add-on is off for this shop; the caller decides what to do */
+  console.error(`No published site "${slug}"`);
+  process.exit(3);
+}
 const p = row.data;
 const home = `https://${domain}/`;
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -54,9 +67,33 @@ write(
   "index.html",
   renderSite(p, {
     api: { url, key, shopId: row.shop_id },
-    portalUrl: `${APP}portal/`,
+    /* same as the live redraw in src/site/main.js: My Garage stays on the
+       shop's own domain, served by portal/index.html below */
+    portalUrl: p.portal === false ? "" : `${home}portal/`,
     live: { src: `${APP}site/app.js`, slug, canonical: home },
   })
+);
+/* /portal/ on the shop's domain: a bare page that loads the same script,
+   which sees the path and mounts the customer portal there */
+write(
+  "portal/index.html",
+  `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>My Garage · ${esc(p.name)}</title>
+<!-- marks this as a Bolt Badger shop site so the app serves the customer portal here -->
+<meta name="bolt-badger-site" content="${esc(slug)}">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f5f0;color:#5b616c;font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center;padding:24px}</style>
+</head>
+<body>
+<div id="msg">Loading your garage…</div>
+<script type="module" src="${APP}site/app.js"></script>
+</body>
+</html>
+`
 );
 write("CNAME", domain + "\n");
 write(".nojekyll", "");
@@ -211,5 +248,87 @@ write(
 <h2>Changes</h2>
 <p>If we add a service that uses cookies, we'll update this page and the effective date at the top.</p>`
   )
+);
+/* The job that keeps index.html current once this folder is a GitHub repo.
+   GitHub's own token can't change workflow files, so the job never rewrites
+   this one; rerun the export by hand to update it. */
+write(
+  ".github/workflows/snapshot.yml",
+  `# Keeps this folder's page in step with what the shop publishes in Bolt Badger.
+# Written by tools/siteexport/export.mjs in the shop-desk repo. Change it there.
+#
+# Every 15 minutes (and when this file changes, or on demand) it rebuilds
+# index.html from the shop's published site with the current Bolt Badger
+# page design, and commits it only when something changed. Between a publish
+# and the next run, visitors still get the new content: the page's script
+# updates it in place.
+name: Rebuild the page from Bolt Badger
+
+on:
+  schedule:
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [site-published]
+  push:
+    branches: [main]
+    paths: [".github/workflows/snapshot.yml"]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+env:
+  SITE_SLUG: ${slug}
+  SITE_DOMAIN: ${domain}
+  APP_REPO: odaymia/shop-desk
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: \${{ env.APP_REPO }}
+          path: .bolt-badger
+      - name: Rebuild the page
+        run: |
+          out="$RUNNER_TEMP/site"
+          code=0
+          node .bolt-badger/tools/siteexport/export.mjs "$SITE_SLUG" "$SITE_DOMAIN" "$out" || code=$?
+          rm -rf .bolt-badger
+          if [ "$code" = "3" ]; then
+            echo "The website is switched off in Bolt Badger. Leaving the page as it is."
+            exit 0
+          fi
+          if [ "$code" != "0" ]; then exit "$code"; fi
+          set -e
+          # never publish a page that didn't render whole
+          grep -q "<meta name=\\"bolt-badger-site\\" content=\\"$SITE_SLUG\\">" "$out/index.html"
+          grep -q "</html>" "$out/index.html"
+          test "$(wc -c < "$out/index.html")" -gt 20000
+          cp "$out/index.html" index.html
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "Already up to date."
+            exit 0
+          fi
+          git config user.name "Bolt Badger"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Page rebuilt from the site published in Bolt Badger"
+          git push
+      # GitHub switches a schedule off after 60 days without repo activity
+      - name: Keep the schedule on
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/snapshot.yml/enable" || true
+`
 );
 console.log(`wrote ${out} for ${domain} (published ${new Date(p.updatedAt).toISOString()})`);

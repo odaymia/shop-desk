@@ -1,16 +1,19 @@
 /* A shop's public website. Two ways in:
 
    - /site/?s=<web address>: this app's own copy. Fetches the content the
-     shop published (supabase/website.sql) and writes the page rendered by
+     shop published (supabase/website.sql) and draws the page rendered by
      src/lib/siteRender.js.
    - the shop's own domain: a page already rendered (the "own domain" file
      from Settings → Website) carries <meta name="bolt-badger-site"> and
      loads this script from its fixed address, site/app.js. It checks for
-     newer content and redraws only if the shop has published since.
+     newer content and redraws only if the shop has published since. The
+     redraw swaps the page's parts in place (redraw.js); the document is
+     never reopened.
 
    No sign-in, no supabase-js: one public read; forms post one row each. */
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/cloudConfig.js";
 import { renderSite } from "../lib/siteRender.js";
+import { redraw } from "./redraw.js";
 
 const here = import.meta.url;
 const meta = document.querySelector('meta[name="bolt-badger-site"]');
@@ -29,11 +32,16 @@ const say = (text) => {
 const isPortalPath = /(?:^|\/)portal\/?$/i.test(location.pathname);
 
 async function loadPortal() {
-  document.open();
-  document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>My Garage</title></head><body><div id="root"></div></body></html>');
-  document.close();
+  /* the page here is a bare "Loading your garage…" card: clear it in place
+     (never document.write, see redraw.js) and mount the portal */
+  document.title = "My Garage";
+  document.head.querySelectorAll("style").forEach((el) => el.remove());
+  const root = document.createElement("div");
+  root.id = "root";
+  for (const a of [...document.body.attributes]) document.body.removeAttribute(a.name);
+  document.body.replaceChildren(root);
   const { mountPortal } = await import("../portal/mount.jsx");
-  mountPortal(document.getElementById("root"));
+  mountPortal(root);
 }
 
 async function load() {
@@ -51,9 +59,7 @@ async function load() {
        (its own domain, a saved file) stops showing the shop, instead of
        living on with old prices and a form that goes nowhere */
     if (onOwnDomain) {
-      document.open();
-      document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Website not active</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f5f0;color:#15171b;font:17px/1.6 system-ui,-apple-system,sans-serif;text-align:center;padding:24px}h1{font-size:24px;margin:0 0 8px}p{color:#5b616c;margin:0}</style></head><body><div><h1>This website isn\'t active right now</h1><p>Please check back soon.</p></div></body></html>');
-      document.close();
+      await redraw('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Website not active</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f5f0;color:#15171b;font:17px/1.6 system-ui,-apple-system,sans-serif;text-align:center;padding:24px}h1{font-size:24px;margin:0 0 8px}p{color:#5b616c;margin:0}</style></head><body><div><h1>This website isn\'t active right now</h1><p>Please check back soon.</p></div></body></html>');
       return;
     }
     return say("We couldn't find that shop's website.");
@@ -69,9 +75,8 @@ async function load() {
     portalUrl: row.data.portal === false ? "" : (onOwnDomain ? new URL("/portal/", location.origin).href : new URL("../portal/", here).href),
     live: onOwnDomain ? { src: here, slug, canonical: (document.querySelector('link[rel="canonical"]') || {}).href || "" } : null,
   });
-  document.open();
-  document.write(html);
-  document.close();
+  /* in place, never document.write: see redraw.js */
+  await redraw(html, { appSrc: here });
 }
 
 load().catch(() => say("This page couldn't load. Please try again in a minute."));
