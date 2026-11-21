@@ -13,6 +13,10 @@
 //                marketing email to that address
 // Mail apps' one-click unsubscribe (RFC 8058) POSTs to ?u=<token> directly.
 //
+// Resend's webhooks POST here too (told apart by their svix-id header): each
+// says an email was delivered, opened, clicked, bounced or marked as spam,
+// and is recorded on that email's outbox row (email_event in email.sql).
+//
 // Deploy: Supabase dashboard → Edge Functions → Deploy a new function → name
 // it "email" → paste this file → turn OFF "Enforce JWT verification" (the
 // unsubscribe link has to work for people who aren't signed in; staff
@@ -24,6 +28,12 @@
 //   EMAIL_DEFAULT_FROM  (optional) sender for shops without their own verified
 //                       domain, e.g. "Bolt Badger <mail@yourdomain.com>"
 //   EMAIL_CRON_SECRET   (optional) lets a scheduled job call { action: "drain" }
+//   RESEND_WEBHOOK_SECRET  for opens and clicks: the "Signing secret"
+//                       (whsec_…) of the webhook made in resend.com → Webhooks,
+//                       pointed at this function's URL with the events
+//                       email.delivered, email.opened, email.clicked,
+//                       email.bounced and email.complained. Also turn on Open
+//                       tracking and Click tracking for the domain in Resend.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
@@ -40,6 +50,7 @@ const SECRET = Deno.env.get("EMAIL_SECRET") || "";
 const UNSUB_PAGE = Deno.env.get("EMAIL_UNSUB_PAGE") || "";
 const DEFAULT_FROM = Deno.env.get("EMAIL_DEFAULT_FROM") || "";
 const CRON_SECRET = Deno.env.get("EMAIL_CRON_SECRET") || "";
+const WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET") || "";
 const FN_URL = `${SUPA_URL}/functions/v1/email`;
 
 const str = (s: unknown) => String(s ?? "").trim();
@@ -210,9 +221,80 @@ async function unsubscribe(t: string) {
   return { email: who.email, shop: str(data && (data.value as Record<string, unknown>).shopName) };
 }
 
+/* ---------- Resend webhooks: delivered, opened, clicked, bounced, complained ----------
+   Signed the Svix way: HMAC-SHA256 over "<id>.<timestamp>.<body>" with the
+   base64 part of the whsec_ secret; the header may carry several signatures.
+   tests/emailStats.test.js runs the two functions between the markers. */
+/* <webhook-core> */
+async function validWebhook(secret: string, id: string, timestamp: string, sigHeader: string, body: string, nowMs = Date.now()) {
+  if (!secret || !id || !timestamp || !sigHeader) return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || Math.abs(nowMs / 1000 - ts) > 5 * 60) return false; // stale or replayed
+  let keyBytes: Uint8Array;
+  try {
+    keyBytes = Uint8Array.from(atob(secret.replace(/^whsec_/, "")), (c) => c.charCodeAt(0));
+  } catch {
+    return false;
+  }
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${id}.${timestamp}.${body}`)));
+  const want = btoa(String.fromCharCode(...mac));
+  for (const part of sigHeader.split(" ")) {
+    const got = part.startsWith("v1,") ? part.slice(3) : "";
+    if (got.length !== want.length) continue;
+    let diff = 0;
+    for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ got.charCodeAt(i);
+    if (diff === 0) return true;
+  }
+  return false;
+}
+
+/* The one fact each notice carries, or null for kinds we don't record. */
+function readEvent(ev: Record<string, unknown>, unsubPrefixes: string[]) {
+  const kind = ({ "email.delivered": "delivered", "email.opened": "opened", "email.clicked": "clicked", "email.bounced": "bounced", "email.complained": "complained" } as Record<string, string>)[str(ev.type)];
+  const d = (ev.data as Record<string, unknown>) || {};
+  const providerId = str(d.email_id);
+  if (!kind || !providerId) return null;
+  const click = (d.click as Record<string, unknown>) || {};
+  const bounce = (d.bounce as Record<string, unknown>) || {};
+  const url = kind === "clicked" ? str(click.link) : "";
+  /* the unsubscribe link is a link too, but tapping it isn't interest */
+  if (kind === "clicked" && unsubPrefixes.some((p) => p && url.startsWith(p))) return null;
+  const at = str(click.timestamp) || str(ev.created_at) || str(d.created_at);
+  const when = at && !Number.isNaN(Date.parse(at)) ? new Date(at).toISOString() : new Date().toISOString();
+  return { kind, providerId, url, at: when, detail: kind === "bounced" ? str(bounce.type) || "Permanent" : "" };
+}
+/* </webhook-core> */
+
+async function webhook(req: Request) {
+  const raw = await req.text();
+  const id = req.headers.get("svix-id") || "";
+  if (!WEBHOOK_SECRET) return json({ error: "Webhook secret not set" }, 503);
+  if (!(await validWebhook(WEBHOOK_SECRET, id, req.headers.get("svix-timestamp") || "", req.headers.get("svix-signature") || "", raw))) return json({ error: "Bad signature" }, 401);
+  let ev: Record<string, unknown> = {};
+  try {
+    ev = JSON.parse(raw);
+  } catch {
+    return json({ error: "Bad request" }, 400);
+  }
+  const e = readEvent(ev, [UNSUB_PAGE, FN_URL]);
+  if (!e) return json({ ok: true, ignored: true });
+  const record = () => admin.rpc("email_event", { p_event_id: id, p_provider_id: e.providerId, p_type: e.kind, p_at: e.at, p_url: e.url || null, p_detail: e.detail || null });
+  let { data, error } = await record();
+  /* a notice can beat the send to the database by a moment: the id of an
+     email just sent may not be saved on its row yet. Look once more. */
+  if (!error && data === "unknown") {
+    await sleep(2500);
+    ({ data, error } = await record());
+  }
+  if (error) return json({ error: "Couldn't record" }, 500); // Resend tries again later
+  return json({ ok: true, result: data });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+  if (req.headers.get("svix-id")) return webhook(req);
 
   /* one-click unsubscribe from the mail app: POST ?u=<token> */
   const u = new URL(req.url).searchParams.get("u");
@@ -249,7 +331,10 @@ Deno.serve(async (req) => {
   if (action === "status") {
     const cfg = await shopEmailCfg(shopId);
     const { count: queued } = await admin.from("email_outbox").select("id", { count: "exact", head: true }).eq("shop_id", shopId).eq("status", "queued");
-    return json({ ready: !!RESEND && !!SECRET && !!cfg.from, hasKey: !!RESEND, from: cfg.from, replyTo: cfg.replyTo, dailyLimit: cfg.dailyLimit, sentToday: await sentToday(shopId), queued: queued || 0 });
+    /* opens and clicks: is the webhook secret in place, and has anything arrived */
+    const { data: lastEv, error: evErr } = await admin.from("email_outbox").select("delivered_at").eq("shop_id", shopId).not("delivered_at", "is", null).order("delivered_at", { ascending: false }).limit(1);
+    const tracking = { secret: !!WEBHOOK_SECRET, tables: !evErr, lastEventAt: (lastEv && lastEv[0] && (lastEv[0].delivered_at as string)) || null };
+    return json({ ready: !!RESEND && !!SECRET && !!cfg.from, hasKey: !!RESEND, from: cfg.from, replyTo: cfg.replyTo, dailyLimit: cfg.dailyLimit, sentToday: await sentToday(shopId), queued: queued || 0, tracking, webhookUrl: FN_URL });
   }
 
   if (action === "drain") return json({ ok: true, ...(await drainShop(shopId)) });

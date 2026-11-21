@@ -10,6 +10,8 @@ import { runAutomations, emailOpts, emailServices } from "./emailRunner.js";
 import { EmailBuilder, EmailPreview } from "./EmailBuilder.jsx";
 import { TEMPLATES, specBlocks, upcomingHolidays, emailPhotoUrl } from "../lib/emailBlocks.js";
 import { Postcards } from "./Postcards.jsx";
+import { EmailReport } from "./EmailReport.jsx";
+import { campaignNumbers, pct } from "../lib/emailStats.js";
 
 /* Marketing: write and send email campaigns, set up the automatic emails,
    mail oil change postcards, the email list, and the sender settings. Sending itself happens in the "email" Edge
@@ -81,10 +83,24 @@ function Campaigns({ shop, cfg, flash }) {
   const [err, setErr] = useState("");
   const [draft, setDraftState] = useState(() => lsGet("bb:emailDraft", null));
   const [picking, setPicking] = useState(false);
+  const [report, setReport] = useState(null); // { message, detail } for "How it went"
   const setDraft = (d) => {
     setDraftState(d);
     lsSet("bb:emailDraft", d);
   };
+  const openReport = (m) => {
+    setReport({ message: m, detail: null });
+    cloud
+      .emailCampaignDetail(m.id)
+      .then((detail) => setReport((r) => (r && r.message.id === m.id ? { ...r, detail } : r)))
+      .catch(() => setReport((r) => (r && r.message.id === m.id ? { ...r, detail: { rows: [], clicks: [], tracking: false } } : r)));
+  };
+  /* a new campaign to just the people behind one number (those who clicked, say) */
+  const followUp = (label, emails) => {
+    setReport(null);
+    setDraft({ ...fromTemplate(TEMPLATES.find((t) => t.id === "blank") || TEMPLATES[0]), only: { label, emails } });
+  };
+  const anyTracked = list.some((m) => campaignNumbers(m).tracked);
   const load = () =>
     cloud
       .listEmailMessages()
@@ -152,6 +168,8 @@ function Campaigns({ shop, cfg, flash }) {
               <th>Campaign</th>
               <th>To</th>
               <th className="r">Sent</th>
+              <th className="r">Opened</th>
+              <th className="r">Clicked</th>
               <th className="r">Waiting</th>
               <th className="r">Didn't send</th>
             </tr>
@@ -159,31 +177,57 @@ function Campaigns({ shop, cfg, flash }) {
           <tbody>
             {list.length === 0 && (
               <tr>
-                <td colSpan={6} className="emptyNote">
+                <td colSpan={8} className="emptyNote">
                   No campaigns yet. Write one to your whole list, or just the people who haven't been in for a while.
                 </td>
               </tr>
             )}
-            {list.map((m) => (
-              <tr key={m.id}>
-                <td className="muted">{fmtDate(new Date(m.created_at).getTime())}</td>
-                <td>
-                  <b>{m.name || m.subject}</b>
-                  {m.name ? <div className="sub muted">{m.subject}</div> : null}
-                </td>
-                <td className="muted">{(m.audience && m.audience.label) || ""}</td>
-                <td className="r num">{m.counts.sent || 0}</td>
-                <td className="r num">{(m.counts.queued || 0) + (m.counts.sending || 0)}</td>
-                <td className="r num">{(m.counts.failed || 0) + (m.counts.skipped || 0)}</td>
-              </tr>
-            ))}
+            {list.map((m) => {
+              const n = campaignNumbers(m);
+              return (
+                <tr key={m.id} className="row" onClick={() => openReport(m)} title="See how it went">
+                  <td className="muted">{fmtDate(new Date(m.created_at).getTime())}</td>
+                  <td>
+                    <b>{m.name || m.subject}</b>
+                    {m.name ? <div className="sub muted">{m.subject}</div> : null}
+                  </td>
+                  <td className="muted">{(m.audience && m.audience.label) || ""}</td>
+                  <td className="r num">{m.counts.sent || 0}</td>
+                  <td className="r num">
+                    {n.tracked ? (
+                      <>
+                        {n.openRate}
+                        <span className="sub muted">{n.opened.toLocaleString()}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="r num">
+                    {n.tracked ? (
+                      <>
+                        {n.clickRate}
+                        <span className="sub muted">{n.clicked.toLocaleString()}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="r num">{(m.counts.queued || 0) + (m.counts.sending || 0)}</td>
+                  <td className="r num">{(m.counts.failed || 0) + (m.counts.skipped || 0)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
       <p className="legalNote">
+        Click a campaign to see how it went: who opened and clicked, which links, and who came in afterward.
+        {list.length > 0 && !anyTracked ? " Opens and clicks show once they're set up (Email settings → Opens and clicks) and only for emails sent after that." : ""}{" "}
         "Waiting" emails go out as your daily limit allows (Email → Settings). "Didn't send" is people who unsubscribed in
         the meantime, or addresses the mail service refused.
       </p>
+      {report && <EmailReport message={report.message} detail={report.detail} shop={shop} cfg={cfg} onClose={() => setReport(null)} onFollowUp={followUp} />}
     </div>
   );
 }
@@ -213,10 +257,19 @@ function Composer({ shop, cfg, flash, draft, setDraft, onDone }) {
     cloud.listSuppressions().then((l) => setSupp(new Set(l.map((x) => x.email))));
   }, []);
   const { rows } = useMemo(() => buildEmailList({ customers: shop.customers, orders: shop.orders, signups, suppressed: supp }), [shop.customers, shop.orders, signups, supp]);
-  const audience = useMemo(() => filterEmailList(rows, { who: draft.who, since: draft.since }), [rows, draft.who, draft.since]);
+  /* `draft.only` narrows the campaign to a picked group (the people who
+     clicked an earlier one). People who've unsubscribed since are still left out. */
+  const audience = useMemo(() => {
+    const base = filterEmailList(rows, { who: draft.who, since: draft.since });
+    if (!draft.only || !Array.isArray(draft.only.emails)) return base;
+    const want = new Set(draft.only.emails.map((e) => String(e || "").trim().toLowerCase()));
+    return base.filter((r) => want.has(String(r.email || "").trim().toLowerCase()));
+  }, [rows, draft.who, draft.since, draft.only]);
   const services = useMemo(() => emailServices(shop, cfg), [shop.jobs, shop.parts, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
   const msg = useMemo(() => composeEmail(cfg, shop.coupons, draft, { ...emailOpts(), services }), [cfg, shop.coupons, draft, services]);
-  const label = [WHO.find((w) => w[0] === draft.who)[1], draft.since !== "any" ? SINCE.find((s) => s[0] === draft.since)[1].toLowerCase() : ""].filter(Boolean).join(", ");
+  const label = draft.only
+    ? draft.only.label
+    : [WHO.find((w) => w[0] === draft.who)[1], draft.since !== "any" ? SINCE.find((s) => s[0] === draft.since)[1].toLowerCase() : ""].filter(Boolean).join(", ");
   const limit = emailOf(cfg).dailyLimit;
   const ready = String(draft.subject || "").trim() && specBlocks(draft).length > 0;
 
@@ -275,7 +328,17 @@ function Composer({ shop, cfg, flash, draft, setDraft, onDone }) {
           <h3 className="subhead" style={{ marginTop: 24 }}>
             Who gets it
           </h3>
-          <div className="fldRow">
+          {draft.only && (
+            <p className="emOnly">
+              <span>
+                Only: <b>{draft.only.label}</b>
+              </span>
+              <button className="btn tiny" onClick={() => setDraft({ ...draft, only: undefined })}>
+                Send to a whole group instead
+              </button>
+            </p>
+          )}
+          <div className="fldRow" style={draft.only ? { display: "none" } : undefined}>
             <Field label="People">
               <select value={draft.who} onChange={(e) => set("who")(e.target.value)}>
                 {WHO.map(([k, l]) => (
@@ -366,6 +429,7 @@ function Automations({ shop, cfg, saveCfg, flash }) {
   const [auto, setAuto] = useState(() => automationsOf(cfg));
   const [open, setOpen] = useState("");
   const [stats, setStats] = useState({});
+  const [rates, setRates] = useState({}); // per automation: opens and clicks over the last 30 days
   const [running, setRunning] = useState(false);
   useEffect(() => setAuto(automationsOf(cfg)), [cfg]);
   useEffect(() => {
@@ -374,8 +438,19 @@ function Automations({ shop, cfg, saveCfg, flash }) {
       .then((l) => {
         const month = Date.now() - 30 * 86400000;
         const s = {};
-        for (const m of l) if (m.kind !== "campaign" && Date.parse(m.created_at) > month) s[m.kind] = (s[m.kind] || 0) + (m.counts.sent || 0);
+        const t = {};
+        for (const m of l) {
+          if (m.kind === "campaign" || !(Date.parse(m.created_at) > month)) continue;
+          s[m.kind] = (s[m.kind] || 0) + (m.counts.sent || 0);
+          const n = campaignNumbers(m);
+          if (!n.tracked) continue;
+          const a = (t[m.kind] = t[m.kind] || { base: 0, opened: 0, clicked: 0 });
+          a.base += n.base;
+          a.opened += n.opened;
+          a.clicked += n.clicked;
+        }
         setStats(s);
+        setRates(t);
       })
       .catch(() => {});
   }, []);
@@ -427,6 +502,7 @@ function Automations({ shop, cfg, saveCfg, flash }) {
                 <div className="muted">
                   {info.when}
                   {stats[k] ? ` · ${stats[k]} sent in the last 30 days` : ""}
+                  {rates[k] ? ` · ${pct(rates[k].opened, rates[k].base)} opened · ${pct(rates[k].clicked, rates[k].base)} clicked` : ""}
                 </div>
               </div>
               <div className="rowBtns" style={{ alignItems: "center" }}>
@@ -515,6 +591,8 @@ function EmailSettings({ cfg, saveCfg, flash }) {
     setTimeout(loadStatus, 1500);
   };
   const domain = (cfg.website && cfg.website.domain ? cfg.website.domain : "").replace(/^www\./, "");
+  const trackingOn = !!(status && status.tracking && status.tracking.lastEventAt);
+  const webhookUrl = (status && status.webhookUrl) || "https://<your-project>.supabase.co/functions/v1/email";
 
   return (
     <div className="deskBody" style={{ maxWidth: 820 }}>
@@ -527,6 +605,22 @@ function EmailSettings({ cfg, saveCfg, flash }) {
               <br />
               Sent today: {status.sentToday} of {status.dailyLimit} · Waiting: {status.queued}
               {!status.hasKey ? <><br />The email function has no RESEND_API_KEY yet.</> : null}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <b style={{ color: trackingOn ? "var(--green, #1f8a4c)" : "var(--muted)" }}>
+                {trackingOn ? "Opens and clicks: receiving" : status.tracking && status.tracking.secret && status.tracking.tables ? "Opens and clicks: connected, nothing received yet" : "Opens and clicks: not set up"}
+              </b>
+              <div className="muted" style={{ marginTop: 4 }}>
+                {!status.tracking
+                  ? "The email function is an older copy. Redeploy it (step 3 below)."
+                  : trackingOn
+                    ? `Last report from the mail service: ${new Date(status.tracking.lastEventAt).toLocaleString()}`
+                    : !status.tracking.tables
+                      ? "Run supabase/email.sql again (step 1 below)."
+                      : !status.tracking.secret
+                        ? "The email function has no RESEND_WEBHOOK_SECRET yet (steps 2 and 3 below)."
+                        : "Send a campaign or a test. Reports arrive within a minute of delivery."}
+              </div>
             </div>
           </>
         ) : (
@@ -581,6 +675,26 @@ function EmailSettings({ cfg, saveCfg, flash }) {
         </li>
         <li>Fill in the From address above, save, and send yourself a test from a campaign.</li>
       </ol>
+      <h3 className="subhead" style={{ marginTop: 30 }}>
+        Opens and clicks (once)
+      </h3>
+      <ol className="legalNote" style={{ paddingLeft: 20, lineHeight: 1.7 }}>
+        <li>Run supabase/email.sql in the Supabase SQL editor again. It adds the tracking columns and is safe to re-run.</li>
+        <li>
+          In Resend → Domains → {domain || "your domain"}, turn on <b>Open tracking</b> and <b>Click tracking</b>. Then in
+          Resend → Webhooks, add an endpoint at{" "}
+          <code style={{ wordBreak: "break-all" }}>{webhookUrl}</code> for the events email.delivered, email.opened,
+          email.clicked, email.bounced and email.complained, and copy its Signing secret (starts with whsec_).
+        </li>
+        <li>
+          In Supabase → Edge Functions → Secrets, add RESEND_WEBHOOK_SECRET with that signing secret, then redeploy the
+          email function from supabase/functions/email/index.ts.
+        </li>
+      </ol>
+      <p className="legalNote">
+        Only emails sent after this show opens and clicks. Addresses that bounce for good, and people who mark an email as
+        spam, are taken off your list automatically.
+      </p>
       <p className="legalNote">
         Every email carries your shop's address and an unsubscribe link, and anyone who unsubscribes is never emailed again
         from here, as the CAN-SPAM Act requires.

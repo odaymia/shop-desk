@@ -640,7 +640,47 @@ async function listEmailMessages(limit = 60) {
   const { data: counts } = await supabase.rpc("email_message_counts", { p_shop: state.shopId });
   const by = {};
   for (const c of counts || []) (by[c.message_id] = by[c.message_id] || {})[c.status] = Number(c.n);
-  return (data || []).map((m) => ({ ...m, counts: by[m.id] || {} }));
+  /* how each went after it left (delivered, opened, clicked…). `stats` is
+     null when that query isn't installed yet (email.sql not re-run). */
+  const { data: stats, error: statsErr } = await supabase.rpc("email_message_stats", { p_shop: state.shopId });
+  const st = {};
+  for (const r of stats || []) st[r.message_id] = { delivered: Number(r.delivered), opened: Number(r.opened), clicked: Number(r.clicked), bounced: Number(r.bounced), complained: Number(r.complained) };
+  const none = { delivered: 0, opened: 0, clicked: 0, bounced: 0, complained: 0 };
+  return (data || []).map((m) => ({ ...m, counts: by[m.id] || {}, stats: statsErr ? null : st[m.id] || none }));
+}
+/* One campaign, person by person: every email it sent and what happened to
+   it, plus the links clicked. `tracking` is false when the tracking columns
+   aren't there yet. */
+async function emailCampaignDetail(messageId) {
+  if (!state.linked) return { rows: [], clicks: [], tracking: false };
+  const base = "id, email, status, sent_at, error";
+  const more = ", delivered_at, opened_at, clicked_at, bounced_at, bounce_type, complained_at, open_count, click_count";
+  const page = async (table, cols) => {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from(table).select(cols).eq("shop_id", state.shopId).eq("message_id", messageId).order(table === "email_outbox" ? "id" : "outbox_id").range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) return out;
+    }
+  };
+  let rows;
+  let tracking = true;
+  try {
+    rows = await page("email_outbox", base + more);
+  } catch {
+    tracking = false;
+    rows = await page("email_outbox", base);
+  }
+  let clicks = [];
+  if (tracking) {
+    try {
+      clicks = await page("email_clicks", "outbox_id, url, n");
+    } catch {
+      /* table not there yet */
+    }
+  }
+  return { rows, clicks, tracking };
 }
 async function listSuppressions() {
   if (!state.linked) return [];
@@ -761,6 +801,7 @@ export const cloud = {
   addSiteSignups,
   saveEmailMessage,
   listEmailMessages,
+  emailCampaignDetail,
   listSuppressions,
   setSuppressed,
   listMailKeys,
