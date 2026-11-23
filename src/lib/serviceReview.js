@@ -127,7 +127,7 @@ export const activeIntervals = (intervals) => (intervals || []).filter((s) => s 
      - "both": same effective interval as "motor", but keep both numbers so the
        screen can show store vs manufacturer side by side.
    Each row carries storeMiles/Months, motorMiles/Months, motorSpecialMiles/
-   Months (a special-use-only replacement, for show), the effective
+   Months (the maker's special-use interval, for show), the effective
    miles/months (used for due/done), and a source tag. Pure. */
 export function mergeMotorIntervals(intervals, motorServices, mode = "both", severity = "normal") {
   const severe = severity === "severe";
@@ -163,13 +163,18 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
     /* only a replace/service interval counts; a schedule line that says to
        inspect is left off the review altogether */
     const m = cands.find((c) => !isInspect(c)) || null;
-    /* a replacement the maker schedules only for special use (towing, heavy
-       loads, dust) has no normal-driving interval, so it doesn't decide
-       what is due; it is still carried so the screen can show it, labelled */
+    /* the maker's special-use interval (towing, heavy loads, dust) doesn't
+       decide what is due on the normal schedule, but it is carried so the
+       screen can show it, labelled. That includes a replacement scheduled
+       only for special use, which has no normal-driving interval at all. */
+    const hasSevere = (c) => num(c.severeMiles) > 0 || num(c.severeMonths) > 0;
     const sp =
-      !m && !severe && mode !== "store"
-        ? (motorServices || []).find((c) => c && c.name && !isInspect(c) && (num(c.severeMiles) > 0 || num(c.severeMonths) > 0) && (c.forId ? c.forId === svc.id : keys.some((k) => c.name.toLowerCase().includes(k)))) || null
-        : null;
+      severe || mode === "store"
+        ? null
+        : m && hasSevere(m)
+          ? m
+          : (motorServices || []).find((c) => c && c.name && !isInspect(c) && hasSevere(c) && (c.forId ? c.forId === svc.id : keys.some((k) => c.name.toLowerCase().includes(k)))) || null;
+    const same = sp && m && num(sp.severeMiles) === m.miles && num(sp.severeMonths) === m.months;
     const motorMiles = m ? m.miles : 0;
     const motorMonths = m ? m.months : 0;
     const useMotor = !!m && mode !== "store";
@@ -181,8 +186,10 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
       motorMiles,
       motorMonths,
       motorName: m ? m.name : "",
-      motorSpecialMiles: sp ? num(sp.severeMiles) : 0,
-      motorSpecialMonths: sp ? num(sp.severeMonths) : 0,
+      motorSpecialMiles: sp && !same ? num(sp.severeMiles) : 0,
+      motorSpecialMonths: sp && !same ? num(sp.severeMonths) : 0,
+      motorSpecialRepeatMiles: sp && !same ? num(sp.severeRepeatMiles) : 0,
+      motorSpecialRepeatMonths: sp && !same ? num(sp.severeRepeatMonths) : 0,
       /* MOTOR answered for this car but lists no replacement for this
          service (a lifetime fluid, say): the store interval stands in */
       noFactory: haveMotor && !m && keys.length > 0,

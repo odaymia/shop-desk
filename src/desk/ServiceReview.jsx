@@ -326,6 +326,29 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
           <tbody>
             {rows.map((r) => {
               const st = STATUS[r.status] || STATUS.unknown;
+              /* the maker's replace interval, and the special-use one, beside the shop's */
+              const factoryLines = (
+                <>
+                  {(mode === "both" || motorState === "oem-shown") && r.motorMiles > 0 ? (
+                    <span className="sub">
+                      {r.basis === "inspect" ? "" : `${storeLabel} ${miles(r.storeMiles)} · `}
+                        <span style={{ color: "#1657d6" }}>Manufacturer {r.basis === "inspect" ? "replace " : ""}{miles(r.motorMiles)}</span>
+                    </span>
+                  ) : null}
+                  {r.motorSpecialMiles > 0 || r.motorSpecialMonths > 0 ? (
+                    <span className="sub">
+                      {r.motorMiles > 0 || r.motorMonths > 0 || r.basis === "inspect" ? "" : mode === "both" || motorState === "oem-shown" ? `${storeLabel} ${miles(r.storeMiles)} · ` : ""}
+                      <span style={{ color: "#1657d6" }}>
+                        {motorState === "oem" || motorState === "oem-shown" ? "Special use" : "Severe service"} {r.motorSpecialMiles ? miles(r.motorSpecialMiles) : ""}
+                        {r.motorSpecialMiles && r.motorSpecialMonths ? " / " : ""}
+                        {r.motorSpecialMonths ? `${r.motorSpecialMonths} mo` : ""}
+                        {r.motorSpecialRepeatMiles > 0 && r.motorSpecialRepeatMiles !== r.motorSpecialMiles ? `, then every ${miles(r.motorSpecialRepeatMiles)}` : ""}
+                      </span>
+                      {r.motorMiles > 0 || r.motorMonths > 0 ? "" : " only"}
+                    </span>
+                  ) : null}
+                </>
+              );
               return (
                 <tr key={r.id}>
                   {canSkip && (
@@ -348,7 +371,10 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                   </td>
                   <td className="muted">
                     {r.basis === "inspect" ? (
-                      "On inspection"
+                      <>
+                        On inspection
+                        {factoryLines}
+                      </>
                     ) : (
                       <>
                         {miles(r.miles)}
@@ -361,22 +387,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                             <span className="sub" style={{ color: "#92400e" }}>{storeLabel} recommendation</span>
                           )
                         ) : null}
-                        {r.motorSpecialMiles > 0 || r.motorSpecialMonths > 0 ? (
-                          <span className="sub">
-                            {mode === "both" || motorState === "oem-shown" ? `${storeLabel} ${miles(r.storeMiles)} · ` : ""}
-                            <span style={{ color: "#1657d6" }}>
-                              Manufacturer {r.motorSpecialMiles ? miles(r.motorSpecialMiles) : ""}
-                              {r.motorSpecialMiles && r.motorSpecialMonths ? " / " : ""}
-                              {r.motorSpecialMonths ? `${r.motorSpecialMonths} mo` : ""}
-                            </span>
-                            , {motorState === "oem" || motorState === "oem-shown" ? "special use only" : "severe service only"}
-                          </span>
-                        ) : null}
-                        {(mode === "both" || motorState === "oem-shown") && r.motorMiles > 0 ? (
-                          <span className="sub">
-                            {storeLabel} {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Manufacturer {miles(r.motorMiles)}</span>
-                          </span>
-                        ) : null}
+                        {factoryLines}
                       </>
                     )}
                   </td>

@@ -205,7 +205,8 @@ test("service review: the factory schedule goes to the right service, with its r
   assert.deepEqual([row("trans").source, row("trans").noFactory], ["store", true]); // no normal-use replacement
   // the special-use replacement is carried for show, and doesn't decide what's due
   assert.deepEqual([row("trans").motorSpecialMiles, row("trans").miles, row("trans").motorMiles], [60000, row("trans").storeMiles, 0]);
-  assert.equal(row("oil").motorSpecialMiles, 0); // only when there's no normal interval
+  assert.deepEqual([row("oil").motorSpecialMiles, row("oil").motorSpecialMonths, row("oil").miles], [5000, 6, 10000]); // every special-use interval is carried
+  assert.equal(row("coolant").motorSpecialMiles, 0); // none in the manual, none shown
   assert.equal(row("sparkPlugs").miles, 120000);
   // the shop set special use: the special schedule applies
   const sev = mergeMotorIntervals(applicable, sch.services, "both", "severe").intervals;
