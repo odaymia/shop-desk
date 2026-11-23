@@ -136,9 +136,15 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
      normal interval and drops out of a normal schedule. */
   const svcs = (motorServices || [])
     .map((m) => {
+      if (!m || !m.name) return null;
+      const useSevere = severe && (num(m.severeMiles) > 0 || num(m.severeMonths) > 0);
       const miles = severe ? num(m.severeMiles) || num(m.miles) : num(m.miles);
       const months = severe ? num(m.severeMonths) || num(m.months) : num(m.months);
-      return m && m.name ? { ...m, miles, months } : null;
+      /* some schedules have a first interval and a different one after
+         (coolant at 100,000 mi, then every 50,000) */
+      const repeatMiles = useSevere ? num(m.severeRepeatMiles) : num(m.repeatMiles);
+      const repeatMonths = useSevere ? num(m.severeRepeatMonths) : num(m.repeatMonths);
+      return { ...m, miles, months, repeatMiles, repeatMonths };
     })
     .filter((m) => m && (m.miles > 0 || m.months > 0));
   const isInspect = (m) => /inspect/i.test(m.serviceType || "") || (!m.serviceType && /inspect/i.test(m.name));
@@ -149,7 +155,9 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
     const storeMiles = num(svc.miles);
     const storeMonths = num(svc.months);
     const keys = (svc.motorKeys || []).map((k) => k.toLowerCase());
-    const cands = mode === "store" ? [] : svcs.filter((m) => keys.some((k) => m.name.toLowerCase().includes(k)));
+    /* a schedule entry that names the desk service it is for (`forId`, from
+       the shop's own factory data) matches only that one; otherwise by words */
+    const cands = mode === "store" ? [] : svcs.filter((m) => (m.forId ? m.forId === svc.id : keys.some((k) => m.name.toLowerCase().includes(k))));
     cands.sort((a, b) => rank(b) - rank(a) || a.miles - b.miles);
     /* the replace/service interval decides "due"; an inspect-only match
        becomes a note ("inspect every 15,000 mi"), not the due date */
@@ -173,10 +181,24 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
       noFactory: haveMotor && !m && keys.length > 0,
       miles: useMotor ? motorMiles || storeMiles : storeMiles,
       months: useMotor ? motorMonths || storeMonths : storeMonths,
+      /* the interval after the first, when the schedule gives a different one */
+      repeatMiles: useMotor ? num(m.repeatMiles) : 0,
+      repeatMonths: useMotor ? num(m.repeatMonths) : 0,
       source: useMotor ? "MOTOR" : "store",
     };
   });
   return { intervals: merged, source: matched && mode !== "store" ? "MOTOR" : "store", matched, mode, severity: severe ? "severe" : "normal" };
+}
+
+/* Keep a merged schedule's manufacturer numbers on show (motorMiles,
+   motorMonths, the inspect note) while the shop's own interval goes back to
+   deciding what is due. For factory data the owner hasn't chosen to follow. */
+export function storeDecides(merged) {
+  return {
+    ...merged,
+    source: "store",
+    intervals: (merged.intervals || []).map((r) => ({ ...r, miles: num(r.storeMiles), months: num(r.storeMonths), repeatMiles: 0, repeatMonths: 0, source: "store", noFactory: false })),
+  };
 }
 
 /* Tidy an edited interval table for saving (Settings). */
@@ -231,11 +253,12 @@ export function lastDoneMap(orders, intervals, exceptId) {
    no history and not enough info. */
 export function serviceStatus(svc, last, currentMileage, now = Date.now()) {
   if (svc.basis === "inspect") return "inspect"; // checked each visit, replaced if needed
-  const miles = num(svc.miles);
-  const months = num(svc.months);
   if (!last) {
-    return currentMileage && miles && currentMileage >= miles ? "due" : "unknown";
+    return currentMileage && num(svc.miles) && currentMileage >= num(svc.miles) ? "due" : "unknown";
   }
+  /* once it has been done, the repeat interval applies when there is one */
+  const miles = num(svc.repeatMiles) || num(svc.miles);
+  const months = num(svc.repeatMonths) || num(svc.months);
   const milesSince = currentMileage && last.mileage ? currentMileage - last.mileage : null;
   const monthsSince = last.at ? (now - last.at) / MONTH_MS : null;
   const overMiles = milesSince != null && miles ? milesSince >= miles : false;
@@ -253,7 +276,8 @@ export function serviceReview(intervals, orders, currentMileage, exceptId, now =
   const rows = (intervals || []).map((svc) => {
     const l = last[svc.id] || null;
     const status = serviceStatus(svc, l, currentMileage, now);
-    const nextDueMiles = l && l.mileage && svc.miles ? l.mileage + num(svc.miles) : svc.miles ? (Math.floor(num(currentMileage) / num(svc.miles)) + 1) * num(svc.miles) : 0;
+    const again = num(svc.repeatMiles) || num(svc.miles);
+    const nextDueMiles = l && l.mileage && again ? l.mileage + again : svc.miles ? (Math.floor(num(currentMileage) / num(svc.miles)) + 1) * num(svc.miles) : 0;
     return {
       ...svc, // carries basis, source, store/motor intervals, price, match…
       miles: num(svc.miles),
@@ -286,7 +310,10 @@ export function schedFromMerge(baseIntervals, mergedIntervals) {
   const hidden = (baseIntervals || []).filter((x) => !kept.has(x.id)).map((x) => String(x.id)).sort();
   const items = {};
   for (const x of [...(mergedIntervals || [])].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
-    if (x.source === "MOTOR") items[x.id] = { miles: num(x.miles), months: num(x.months) };
+    if (x.source !== "MOTOR") continue;
+    items[x.id] = { miles: num(x.miles), months: num(x.months) };
+    if (num(x.repeatMiles) > 0) items[x.id].repeatMiles = num(x.repeatMiles);
+    if (num(x.repeatMonths) > 0) items[x.id].repeatMonths = num(x.repeatMonths);
   }
   return { hidden, items };
 }
@@ -300,7 +327,11 @@ export function applySched(intervals, sched) {
   const items = sched.items || {};
   return (intervals || [])
     .filter((x) => !hidden.has(String(x.id)))
-    .map((x) => (items[x.id] ? { ...x, miles: num(items[x.id].miles) || num(x.miles), months: num(items[x.id].months) || num(x.months), source: "MOTOR" } : x));
+    .map((x) =>
+      items[x.id]
+        ? { ...x, miles: num(items[x.id].miles) || num(x.miles), months: num(items[x.id].months) || num(x.months), repeatMiles: num(items[x.id].repeatMiles), repeatMonths: num(items[x.id].repeatMonths), source: "MOTOR" }
+        : x
+    );
 }
 
 /* The review for one vehicle from the records alone: the shop's services

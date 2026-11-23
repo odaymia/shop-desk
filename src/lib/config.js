@@ -42,6 +42,12 @@ export const DEFAULT_CFG = {
   serviceIntervals: DEFAULT_SERVICE_INTERVALS, // maintenance-interval table for the Service Review; edited in Settings
   serviceReviewOnOil: true, // pop the Service Review ("what's due") when an oil change is added to a ticket
   serviceIntervalSource: "both", // Service Review intervals: "store" | "motor" (manufacturer) | "both"
+  /* The schedule from the shop's own owner's-manual research (src/data/oem):
+     false = shown next to the shop's interval, which still decides what is
+     due; true = the factory interval decides. Off by default: a maker's
+     normal-driving schedule is often longer than the shop recommends (oil
+     at 10,000 mi), and switching what's "due" is the owner's call. */
+  serviceFactoryDecides: false,
   serviceStoreLabel: "Store", // what the shop calls its own recommendations on the Service Review (e.g. "Store", "Valvoline")
   cardPayments: false, // accept cards in-app via Stripe Connect (Settings → Payments); the shop connects its own account
   portalEnabled: false, // customer portal: publish customer records for sign-in at /portal/

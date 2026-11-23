@@ -55,6 +55,8 @@ import { Inspection, InspectionCard } from "./Inspection.jsx";
 import { inspectionRecommendations } from "../lib/inspection.js";
 import { MotorLookup } from "./MotorLookup.jsx";
 import { ServiceReview } from "./ServiceReview.jsx";
+import { hasOemData, loadOemData, oemView, oemOilSpec, qtText } from "../lib/oemData.js";
+import { OemSpecsCard } from "./OemSpecs.jsx";
 import { MotorReference } from "./MotorReference.jsx";
 import { cloud, sGet, sSet, sList } from "../storage/index.js";
 import { CART_PREFIX, SIGNREQ_KEY, INFOREQ_KEY, INTAKEREQ_KEY, SYMPTOMREQ_KEY, symptomResultKey, bayReqKey } from "../lib/keys.js";
@@ -130,6 +132,23 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   const [sticker, setSticker] = useState(null); // { id, auto } — the reminder sticker to print
 
   const draftVehicle = draft ? shop.vehicles[draft.vehicleId] : null;
+  /* Factory fluids and schedule for this car, from the shop's own research
+     in owner's manuals (src/lib/oemData.js). Loaded on demand, and only for
+     a make there is data for. */
+  const oemMake = draftVehicle && hasOemData(draftVehicle.make) ? String(draftVehicle.make).trim().toLowerCase() : "";
+  const [oemData, setOemData] = useState(null);
+  useEffect(() => {
+    if (!oemMake) return undefined;
+    let ok = true;
+    loadOemData(oemMake).then((d) => ok && setOemData(d)).catch(() => {});
+    return () => { ok = false; };
+  }, [oemMake]);
+  const oemV = useMemo(
+    () => (oemMake && oemData && String(oemData.make).toLowerCase() === oemMake ? oemView(oemData, draftVehicle) : null),
+    [oemMake, oemData, draftVehicle]
+  );
+  /* the oil change, only when the manual gives exactly one answer for this car */
+  const oemOil = useMemo(() => oemOilSpec(oemV), [oemV]);
 
   /* adopt changes from another device only when we have nothing unsaved */
   useEffect(() => {
@@ -295,9 +314,13 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
      shop's repair categories that address it */
   const workSuggest = suggestedWork(o.concern, cfg);
   /* the shop's own spec for this engine (entered, learned from past work,
-     or filled from MOTOR): the oil change prefills quarts and grade from it */
+     or filled from MOTOR) comes first; without one, the factory oil spec
+     from the owner's manual, when it is unambiguous for this car. The oil
+     change prefills quarts and grade from whichever it is. */
   const shopSpec = vehicle ? (findSpec(shop.specs, vehicle) || {}).spec : null;
-  const effSpec = shopSpec;
+  const effSpec =
+    shopSpec ||
+    (oemOil ? { year: vehicle.year, make: vehicle.make, model: vehicle.model, engine: vehicle.engine, oilViscosity: oemOil.grade, oilSpec: oemOil.spec, oilCapacityQt: oemOil.qt, oilFilters: [] } : null);
   const t = orderTotals(o, cfg, customer);
   const rules = rulesFor(o, cfg, customer);
   const locked = o.status === STATUS.invoiced || o.status === STATUS.void || o.status === STATUS.deleted;
@@ -1007,10 +1030,19 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               shop={shop}
               cfg={cfg}
               locked={locked}
+              oemOil={oemOil}
               onMotor={fillFromMotor}
               motorBusy={motorBusy}
               onEdit={() => setSpecEdit(true)}
               onAdd={() => setPick("oil")}
+            />
+          )}
+          {vehicle && oemV && (
+            <OemSpecsCard
+              view={oemV}
+              vehicle={vehicle}
+              oil={shopSpec ? null : oemOil}
+              onPick={(patch) => shop.saveVehicle({ ...vehicle, oem: { ...(vehicle.oem || {}), ...patch } })}
             />
           )}
 
@@ -2355,7 +2387,7 @@ function CardCharge({ order, cfg, customer, amount, onPaid, onLinkSent, onManual
 
 /* Oil grade, quarts, filter numbers and Valvoline picks for the car on
    the ticket. Learned once per engine; a licensed feed can fill it later. */
-function SpecsCard({ vehicle, shop, cfg, locked, onEdit, onAdd, onMotor, motorBusy }) {
+function SpecsCard({ vehicle, shop, cfg, locked, oemOil, onEdit, onAdd, onMotor, motorBusy }) {
   const motorBtn = !locked && onMotor && (
     <button className="btn tiny" onClick={onMotor} disabled={motorBusy} title="Look up this car's Valvoline oil, air, cabin and fuel filters and wiper blades from MOTOR">
       {motorBusy ? "Looking up…" : "Filters from MOTOR"}
@@ -2377,11 +2409,18 @@ function SpecsCard({ vehicle, shop, cfg, locked, onEdit, onAdd, onMotor, motorBu
             </span>
           )}
         </div>
-        <p className="muted" style={{ margin: 0 }}>
-          No oil grade or capacity on file yet for a {vehicle.year} {vehicle.make} {vehicle.model}
-          {vehicle.engine ? ` ${vehicle.engine}` : ""}. Enter it once from the oil cap or the owner's manual and it comes up for
-          every one of these from now on.
-        </p>
+        {oemOil ? (
+          <p style={{ margin: 0 }}>
+            Using the factory spec: <b>{oemOil.grade}</b> · <b>{qtText(oemOil.qt)}</b> with filter. The oil change fills in
+            from it. Add your own specs for this engine to use those instead.
+          </p>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>
+            No oil grade or capacity on file yet for a {vehicle.year} {vehicle.make} {vehicle.model}
+            {vehicle.engine ? ` ${vehicle.engine}` : ""}. Enter it once from the oil cap or the owner's manual and it comes up for
+            every one of these from now on.
+          </p>
+        )}
       </div>
     );
   const oils = matchOil(shop.parts, sp.oilViscosity);

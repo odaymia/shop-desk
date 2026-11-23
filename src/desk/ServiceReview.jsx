@@ -3,9 +3,10 @@ import { createPortal } from "react-dom";
 import { Modal, fmtDate } from "./ui.jsx";
 import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, schedFromMerge, sameSched, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, schedFromMerge, sameSched, storeDecides, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
 import { motorVehicleFor, motorMaintenance, motorFluids, motorFilters } from "../lib/motor.js";
 import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
+import { hasOemData, loadOemData, oemView, oemSchedule } from "../lib/oemData.js";
 import { reviewReport } from "../lib/serviceReviewReport.js";
 import { reviewReportHtml } from "../lib/serviceReviewHtml.js";
 import { QR } from "./QR.jsx";
@@ -63,45 +64,79 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
   const [motorState, setMotorState] = useState(mode === "store" ? "store" : "loading"); // loading | motor | motor-sample | store
   const [motorWhy, setMotorWhy] = useState(""); // why the manufacturer schedule isn't showing
 
-  // pull the vehicle's real factory schedule from MOTOR (unless the owner chose store-only)
+  /* The manufacturer's schedule for this car (unless the owner chose
+     store-only). First the shop's own factory data, researched from the
+     owner's manual, for whatever it settles for this exact car; otherwise
+     MOTOR. MOTOR is still asked for the car's filter part numbers. */
   useEffect(() => {
     if (mode === "store") return;
     let live = true;
-    if (String(vehicle.vin || "").trim().length !== 17 && !(vehicle.motor && vehicle.motor.baseVehicleId)) {
-      setMotorState("store");
-      return;
-    }
+    const severity = cfg.serviceSeverity === "severe" ? "severe" : "normal";
+    /* remember what the schedule said for this car, so the customer's My
+       Garage page shows the same review. Only when it changed. */
+    const remember = (mm) => {
+      const sched = schedFromMerge(baseIntervals, mm.intervals);
+      const veh = vehicleRef.current;
+      if (veh && veh.id && !sameSched(veh.serviceSched, sched)) shop.saveVehicle({ ...veh, serviceSched: sched });
+    };
     (async () => {
+      let fromManual = false;
+      try {
+        const od = hasOemData(vehicle.make) ? await loadOemData(vehicle.make) : null;
+        if (!live) return;
+        const sch = od ? oemSchedule(oemView(od, vehicle)) : null;
+        if (sch && (sch.services.length || sch.notOnCar.length)) {
+          const applicable = baseIntervals.filter((x) => !sch.notOnCar.includes(x.id));
+          const follow = !!cfg.serviceFactoryDecides;
+          /* unless the owner chose to follow it, the factory interval is
+             shown beside the shop's and the shop's still decides what's due.
+             Services the manual says the car doesn't have are left off
+             either way. */
+          const mm = follow ? mergeMotorIntervals(applicable, sch.services, mode, severity) : storeDecides(mergeMotorIntervals(applicable, sch.services, "both", severity));
+          if (mm.intervals.some((x) => x.motorMiles > 0 || x.motorMonths > 0) || applicable.length !== baseIntervals.length) {
+            setMerged(mm);
+            setMotorState(follow ? "oem" : "oem-shown");
+            remember(mm);
+            fromManual = true;
+          }
+        }
+      } catch {
+        /* no factory data for this car: MOTOR below */
+      }
+      if (String(vehicle.vin || "").trim().length !== 17 && !(vehicle.motor && vehicle.motor.baseVehicleId)) {
+        if (live && !fromManual) setMotorState("store");
+        return;
+      }
       try {
         const v = await motorVehicleFor(vehicle);
         if (!live) return;
-        if (!v.vehicle) return setMotorWhy(v.error || "MOTOR didn't find this car."), setMotorState("store");
+        if (!v.vehicle) {
+          if (!fromManual) {
+            setMotorWhy(v.error || "MOTOR didn't find this car.");
+            setMotorState("store");
+          }
+          return;
+        }
         const [m, f, fil] = await Promise.all([
-          motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId),
-          motorFluids(v.vehicle.baseVehicleId),
+          fromManual ? Promise.resolve({ services: [] }) : motorMaintenance(v.vehicle.baseVehicleId, v.vehicle.engineId),
+          fromManual ? Promise.resolve({ fluids: [] }) : motorFluids(v.vehicle.baseVehicleId),
           motorFilters(v.vehicle.baseVehicleId).catch(() => null),
         ]);
         if (!live) return;
-        if (m.error) throw new Error(m.error);
         /* the exact filter part numbers MOTOR lists for this car — used to put
            the right part (and its price) on parts services. Real data only. */
         if (fil && !fil.sample && !fil.error) {
           const en = pickEngine(fil.engines, { engineId: v.vehicle.engineId, engineText: vehicle.engine });
           if (en || (fil.engines || []).length <= 1) setMotorFilterSpec(specFromMotorFilters(fil, en));
         }
+        if (fromManual) return;
+        if (m.error) throw new Error(m.error);
         const isSample = v.sample || m.sample || f.sample;
         // only hide services from REAL per-vehicle data — never from the sample fallback
         const motorNames = [...(f.fluids || []).map((x) => x.name), ...(m.services || []).map((x) => x.name)];
         const applicable = isSample ? baseIntervals : filterApplicable(baseIntervals, motorNames);
-        const mm = mergeMotorIntervals(applicable, m.services, mode, cfg.serviceSeverity === "severe" ? "severe" : "normal");
-        /* remember what the factory schedule said for this car, so the
-           customer's My Garage page shows the same review without asking
-           MOTOR again. Real data only, and only when it changed. */
-        if (!isSample) {
-          const sched = schedFromMerge(baseIntervals, mm.intervals);
-          const veh = vehicleRef.current;
-          if (veh && veh.id && !sameSched(veh.serviceSched, sched)) shop.saveVehicle({ ...veh, serviceSched: sched });
-        }
+        const mm = mergeMotorIntervals(applicable, m.services, mode, severity);
+        if (!isSample) remember(mm);
         if (mm.matched > 0 || applicable.length !== baseIntervals.length) {
           setMerged(mm);
           setMotorState(v.sample || m.sample ? "motor-sample" : "motor");
@@ -114,7 +149,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
           setMotorState("store");
         }
       } catch (e) {
-        if (live) {
+        if (live && !fromManual) {
           setMotorWhy(`Couldn't read MOTOR's schedule: ${e.message || "lookup failed"}`);
           setMotorState("store");
         }
@@ -210,6 +245,10 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
           <div className="muted" style={{ fontSize: 13 }}>
             {motorState === "loading"
               ? "Loading the manufacturer schedule…"
+              : motorState === "oem-shown"
+                ? `✓ ${storeLabel} recommendations decide what's due · the ${vehicle.make || "factory"} owner's manual schedule is shown beside them · checked against this car's history`
+              : motorState === "oem"
+                ? `✓ ${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations (${cfg.serviceSeverity === "severe" ? "special use" : "normal driving"}) · from the ${vehicle.make || "factory"} owner's manual · checked against this car's history`
               : motorState === "motor"
                 ? `✓ ${mode === "both" ? `${storeLabel} + manufacturer` : "Manufacturer"} recommendations (${cfg.serviceSeverity === "severe" ? "severe service" : "normal driving"}) · checked against this car's history`
                 : motorState === "motor-sample"
@@ -314,6 +353,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                       <>
                         {miles(r.miles)}
                         {r.months ? ` / ${r.months} mo` : ""}
+                        {r.repeatMiles > 0 && r.repeatMiles !== r.miles ? <span className="sub">first, then every {miles(r.repeatMiles)}{r.repeatMonths ? ` / ${r.repeatMonths} mo` : ""}</span> : null}
                         {mode !== "both" && motorState !== "store" ? (
                           r.source === "MOTOR" ? (
                             <span className="sub" style={{ color: "#1657d6" }}>Manufacturer</span>
@@ -321,7 +361,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                             <span className="sub" style={{ color: "#92400e" }}>{storeLabel} recommendation</span>
                           )
                         ) : null}
-                        {mode === "both" && r.motorMiles > 0 ? (
+                        {(mode === "both" || motorState === "oem-shown") && r.motorMiles > 0 ? (
                           <span className="sub">
                             {storeLabel} {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Manufacturer {miles(r.motorMiles)}</span>
                           </span>
@@ -369,7 +409,9 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
         </table>
       </div>
       <p className="legalNote" style={{ marginTop: 12 }}>
-        {mode === "store"
+        {motorState === "oem-shown"
+          ? `Due and done use your ${storeLabel.toLowerCase()} intervals. The manufacturer number beside each is from your owner's-manual research; to let it decide what's due, see Settings → Service review.`
+          : mode === "store"
           ? `Showing your ${storeLabel.toLowerCase()} recommendations (Settings → Service review).`
           : merged.source === "MOTOR"
             ? mode === "both"

@@ -29,6 +29,9 @@ src/desk/ChecklistModal.jsx  the keyboard-driven service checklist and its card 
 src/desk/desk.css          desk stylesheet, including print rules
 src/lib/invoice.js         ticket math: lines, tax, supplies, payments — no UI
 src/lib/checklist.js       service checklist: defaults, auto-Replaced from ticket lines, cycling — no UI
+src/lib/oemData.js         factory fluids and service schedule per car, from the shop's own owner's-manual research — no UI
+src/data/oem/<make>.json   that research, per make, built by tools/oemdata/build.py from the workbook; loaded on demand
+src/desk/OemSpecs.jsx      the "Factory specs" card on the ticket
 src/lib/website.js         the shop's public website: content payload, hours, quote — no UI
 src/lib/siteRender.js      renders that payload to one self-contained HTML page (pure)
 src/site/main.js           /site/?s=<address>: fetches the published payload, writes the page
@@ -46,6 +49,32 @@ tests/                     node:test files, `npm test`
 
 `src/lib/invoice.js` is pure functions and must stay that way: nothing in
 it touches React, the DOM, or storage.
+
+## Factory data (owner's-manual research)
+
+`src/data/oem/` holds the shop's own research from owner's manuals and the
+manufacturer's maintenance guides (Toyota 2011-2026 so far). Rebuild a file
+from its workbook with `python3 tools/oemdata/build.py "<workbook.xlsx>"
+src/data/oem/<make>.json --make <Make>`; add the make to `LOADERS` in
+`src/lib/oemData.js`. The converter keeps every row as written.
+
+The rules in `oemData.js` come from the research itself and must not be
+loosened:
+
+- A value is used automatically (oil change prefill, the manufacturer
+  interval on the service review) only when it is unambiguous for the exact
+  car: the rows that could apply agree, and they don't hinge on something
+  still unknown about it. Otherwise it is shown with its condition and a
+  person picks. "AWD only" never applies to a car whose drive isn't known.
+- Only a drain-and-refill engine oil quantity is ever prefilled. System and
+  reference capacities are shown with the manual's wording, never filled in.
+- An inspection is never turned into a replacement. A schedule for special
+  use (towing, dust, short trips) stays separate from normal driving.
+- Rows marked unverified are shown as such and never used automatically.
+- The shop's own spec for an engine always comes before the factory one.
+
+Do not add scraped third-party catalog data here. The Valvoline
+product-finder data was removed on purpose.
 
 ## Storage
 

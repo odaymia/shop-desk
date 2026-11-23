@@ -934,6 +934,18 @@ export function DeskSettings({ cfg, saveCfg, flash, roster, saveRoster, shop }) 
                   <span className="muted" style={{ fontSize: 12 }}>Makers give a shorter schedule for severe conditions. Most cars run the normal one.</span>
                 </div>
                 <div className="fld">
+                  <span>Factory schedule from your owner's-manual research</span>
+                  <select value={d.serviceFactoryDecides ? "decides" : "shown"} onChange={(e) => set("serviceFactoryDecides")(e.target.value === "decides")}>
+                    <option value="shown">Show it beside yours; yours decides what's due</option>
+                    <option value="decides">Let it decide what's due</option>
+                  </select>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    For makes you've researched (Toyota 2011 and newer so far). A maker's normal-driving schedule is often longer than
+                    yours, such as oil at 10,000 miles. Services a car doesn't have, like power steering fluid on electric steering,
+                    are left off either way.
+                  </span>
+                </div>
+                <div className="fld">
                   <span>What to call your recommendations</span>
                   <Text value={d.serviceStoreLabel ?? "Store"} onChange={set("serviceStoreLabel")} placeholder="Store" />
                   <span className="muted" style={{ fontSize: 12 }}>e.g. "Store", "Valvoline", "{cfg.shopName || "Genie"}" — shows on the review next to your intervals.</span>
