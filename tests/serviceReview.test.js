@@ -140,7 +140,7 @@ test("factory schedule: replace beats inspect, severe-only drops out of normal, 
   const r = mergeMI(intervals, motor, "motor", "normal").intervals;
   const af = r.find((x) => x.id === "af");
   assert.equal(af.miles, 30000);
-  assert.equal(af.motorInspectMiles, 15000);
+  assert.equal("motorInspectMiles" in af, false); // an inspect line is never listed
   assert.equal(r.find((x) => x.id === "cool").miles, 100000);
   const atf = r.find((x) => x.id === "atf");
   assert.equal(atf.noFactory, true);

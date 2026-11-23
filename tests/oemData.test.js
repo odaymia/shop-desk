@@ -164,16 +164,16 @@ test("serviceIdOf and useOf sort rows the way the desk needs", () => {
   assert.equal(useOf("Initial then repeat."), "normal");
 });
 
-test("schedule: replacements for normal use, special use kept apart, inspections never become replacements", () => {
+test("schedule: replacements only, special use kept apart, inspections left out", () => {
   const s = oemSchedule(oemView(data, camry));
   const by = (id, type) => s.services.find((x) => x.forId === id && x.serviceType === type);
   assert.deepEqual([by("oil", "Replace").miles, by("oil", "Replace").months, by("oil", "Replace").severeMiles, by("oil", "Replace").severeMonths], [10000, 12, 5000, 6]);
   assert.deepEqual([by("coolant", "Replace").miles, by("coolant", "Replace").repeatMiles, by("coolant", "Replace").repeatMonths], [100000, 50000, 60]);
   // transmission: Toyota lists a replacement only for special use, and an inspection otherwise
   assert.deepEqual([by("trans", "Replace").miles, by("trans", "Replace").severeMiles], [0, 60000]);
-  assert.equal(by("trans", "Inspect").miles, 30000);
-  assert.equal(by("brakeFluid", "Replace"), undefined); // only inspected: no flush is invented
-  assert.equal(by("brakeFluid", "Inspect").miles, 5000);
+  // brake fluid is only inspected: no flush is invented, and the inspection isn't listed
+  assert.equal(s.services.some((x) => x.forId === "brakeFluid"), false);
+  assert.equal(s.services.every((x) => x.serviceType === "Replace"), true);
   assert.deepEqual(s.notOnCar, ["psFluid"]); // electric power steering
   // can't tell which Camry: no schedule is applied
   assert.deepEqual(oemSchedule(oemView(data, { year: 2015, model: "Camry", engine: "2.5L 4-cyl" })).services, []);
@@ -185,7 +185,8 @@ test("schedule: an AWD-only service waits until the car's drive is known", () =>
   assert.equal(oemSchedule(oemView(data, rav)).services.some((x) => x.forId === "diff"), false);
   assert.equal(oemSchedule(oemView(data, rav)).services.some((x) => x.forId === "oil"), true);
   const awd = oemSchedule(oemView(data, { ...rav, oem: { drive: "awd" } })).services;
-  assert.deepEqual([awd.find((x) => x.forId === "diff" && x.serviceType === "Replace").severeMiles, awd.find((x) => x.forId === "diff" && x.serviceType === "Inspect").miles], [15000, 15000]);
+  assert.equal(awd.find((x) => x.forId === "diff" && x.serviceType === "Replace").severeMiles, 15000);
+  assert.equal(awd.some((x) => x.serviceType !== "Replace"), false);
   assert.equal(oemSchedule(oemView(data, { ...rav, oem: { drive: "2wd" } })).services.some((x) => x.forId === "diff"), false);
 });
 
@@ -200,7 +201,7 @@ test("service review: the factory schedule goes to the right service, with its r
   assert.deepEqual([row("coolant").miles, row("coolant").repeatMiles, row("coolant").repeatMonths], [100000, 50000, 60]);
   // "Engine coolant Replace" must not land on anything but coolant, and nothing else picks up a coolant number
   assert.equal(row("brakeFluid").source, "store"); // Toyota only inspects it: the shop's interval stands
-  assert.equal(row("brakeFluid").motorInspectMiles, 5000);
+  assert.equal("motorInspectMiles" in row("brakeFluid"), false); // inspect intervals aren't carried onto the review
   assert.deepEqual([row("trans").source, row("trans").noFactory], ["store", true]); // no normal-use replacement
   assert.equal(row("sparkPlugs").miles, 120000);
   // the shop set special use: the special schedule applies

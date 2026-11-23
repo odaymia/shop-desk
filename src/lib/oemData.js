@@ -298,12 +298,13 @@ export function oemOilSpec(view) {
 }
 
 const REPLACE = /^replace$/i;
-const INSPECT = /^inspect/i;
 /* The schedule in the shape the service review already merges (the same
    fields a MOTOR schedule arrives in), one entry per desk service:
    { forId, name, serviceType, miles, months, repeatMiles, repeatMonths,
-   severeMiles, severeMonths }. Only what is settled for this car. Also the
-   services the manual says this car doesn't have. */
+   severeMiles, severeMonths }. Only what is settled for this car, and only
+   replacements: a row that says to inspect is not an interval to sell
+   against, so it never reaches the service review. Also the services the
+   manual says this car doesn't have. */
 export function oemSchedule(view) {
   if (!view) return { services: [], notOnCar: [], source: "" };
   const out = [];
@@ -314,14 +315,12 @@ export function oemSchedule(view) {
     const timed = (r) => (r.firstMiles || r.firstMonths || r.repeatMiles || r.repeatMonths) > 0;
     const normal = settled(view, mine.filter((r) => REPLACE.test(r.action) && r.use === "normal" && timed(r)), interval);
     const special = settled(view, mine.filter((r) => REPLACE.test(r.action) && r.use === "special" && timed(r)), interval);
-    const inspect = settled(view, mine.filter((r) => INSPECT.test(r.action) && r.use === "normal" && timed(r)), interval);
     const name = (view.services.find((r) => r.id === id) || {}).service || id;
     if (normal || special) {
       const n = normal || [0, 0, 0, 0];
       const sp = special || [0, 0, 0, 0];
       out.push({ forId: id, name: `${name} Replace`, serviceType: "Replace", miles: n[0], months: n[1], repeatMiles: n[2], repeatMonths: n[3], severeMiles: sp[0], severeMonths: sp[1], severeRepeatMiles: sp[2], severeRepeatMonths: sp[3] });
     }
-    if (inspect) out.push({ forId: id, name: `${name} Inspect`, serviceType: "Inspect", miles: inspect[0] || inspect[2], months: inspect[1] || inspect[3] });
   }
   return { services: out, notOnCar: oemNotOnCar(view), source: view.make };
 }

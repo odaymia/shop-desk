@@ -159,10 +159,9 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
        the shop's own factory data) matches only that one; otherwise by words */
     const cands = mode === "store" ? [] : svcs.filter((m) => (m.forId ? m.forId === svc.id : keys.some((k) => m.name.toLowerCase().includes(k))));
     cands.sort((a, b) => rank(b) - rank(a) || a.miles - b.miles);
-    /* the replace/service interval decides "due"; an inspect-only match
-       becomes a note ("inspect every 15,000 mi"), not the due date */
+    /* only a replace/service interval counts; a schedule line that says to
+       inspect is left off the review altogether */
     const m = cands.find((c) => !isInspect(c)) || null;
-    const insp = cands.find(isInspect) || null;
     const motorMiles = m ? m.miles : 0;
     const motorMonths = m ? m.months : 0;
     const useMotor = !!m && mode !== "store";
@@ -174,8 +173,6 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
       motorMiles,
       motorMonths,
       motorName: m ? m.name : "",
-      motorInspectMiles: insp ? insp.miles : 0,
-      motorInspectMonths: insp ? insp.months : 0,
       /* MOTOR answered for this car but lists no replacement for this
          service (a lifetime fluid, say): the store interval stands in */
       noFactory: haveMotor && !m && keys.length > 0,
@@ -191,7 +188,7 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
 }
 
 /* Keep a merged schedule's manufacturer numbers on show (motorMiles,
-   motorMonths, the inspect note) while the shop's own interval goes back to
+   motorMonths) while the shop's own interval goes back to
    deciding what is due. For factory data the owner hasn't chosen to follow. */
 export function storeDecides(merged) {
   return {

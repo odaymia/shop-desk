@@ -366,12 +366,6 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                             {storeLabel} {miles(r.storeMiles)} · <span style={{ color: "#1657d6" }}>Manufacturer {miles(r.motorMiles)}</span>
                           </span>
                         ) : null}
-                        {r.motorInspectMiles > 0 || r.motorInspectMonths > 0 ? (
-                          <span className="sub">
-                            Maker says inspect every {r.motorInspectMiles ? miles(r.motorInspectMiles) : `${r.motorInspectMonths} mo`}
-                          </span>
-                        ) : null}
-
                       </>
                     )}
                   </td>
