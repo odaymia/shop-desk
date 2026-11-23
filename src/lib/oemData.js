@@ -57,19 +57,21 @@ export function parseScope(text) {
 }
 
 /* ---------- what is known about the car ----------
-   `pick` is what a person chose for this car on the ticket, saved on the
-   vehicle as `oem`: { listing, engine, drive, trans }. */
+   `pick` is what a person chose for this car, on the ticket or when adding
+   it, saved on the vehicle as `oem`: { listing, engine, code, fuel, drive,
+   trans } (engine is the displacement, code the engine code when there is
+   one, fuel "gas" or "hybrid"). */
 export function carTraits(vehicle, pick) {
   const v = vehicle || {};
   const p = pick || v.oem || {};
   const detail = [v.ls && v.ls.aces, v.motor && v.motor.engine].filter(Boolean).join(" ");
   const text = [v.model, v.submodel, v.engine, detail].filter(Boolean).join(" ");
   const disp = String(p.engine || (String(v.engine || "").match(/\d\.\d(?=\s?L\b)/) || [])[0] || (detail.match(/\d\.\d(?=\s?L\b)/) || [])[0] || "");
-  const codes = new Set((detail.match(ENGINE_CODE) || []).filter((c) => /\d/.test(c)));
+  const codes = new Set([...(detail.match(ENGINE_CODE) || []), ...(String(v.engine || "").match(ENGINE_CODE) || []), ...(p.code ? [String(p.code)] : [])].filter((c) => /\d/.test(c)));
   /* a hybrid says so somewhere; a detailed engine description that doesn't
      is a gas engine; with nothing detailed, it isn't known */
   const hybridHint = /hybrid|prime\b|plug-?in|-FX[ES]\b|\bP?HEV\b|\bFHEV\b/i.test(text);
-  const hybrid = hybridHint ? true : detail ? false : null;
+  const hybrid = p.fuel === "hybrid" ? true : p.fuel === "gas" ? false : hybridHint ? true : detail ? false : null;
   const drive = p.drive || (/\b(AWD|4WD|4x4)\b/i.test(text) ? "awd" : /\b(FWD|RWD|2WD)\b/i.test(text) ? "2wd" : "");
   const trans = p.trans || "";
   return { disp, codes, hybrid, drive, trans };
@@ -342,3 +344,116 @@ export function oemNotOnCar(view) {
 
 /* "4.6 qt" */
 export const qtText = (q) => (q == null || q === "" ? "" : `${q} qt`);
+
+/* ---------- the lists for adding a car ----------
+   Model, then that model's engines and types, straight from the research.
+   The research files a hybrid apart from its gas sibling ("Camry",
+   "Camry Hybrid"); here it is one model whose engine list has both, the way
+   a counter person thinks of it. */
+const TYPE_SUFFIX = /\s+(Plug-in Hybrid|Hybrid|Prime|i-FORCE MAX|EV)$/i;
+const baseModel = (listing) => String(listing || "").replace(TYPE_SUFFIX, "");
+const researchedYear = (data, year) => (data && data.years && data.years[String(year)]) || null;
+
+/* Does the research cover this make's cars of this year at all? */
+export const oemCoversYear = (data, year) => !!researchedYear(data, year);
+
+/* The models of a year, A to Z. */
+export function oemModels(data, year) {
+  const y = researchedYear(data, year);
+  if (!y) return [];
+  return [...new Set(Object.keys(y).map(baseModel))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+/* Cylinders, from what the configuration says or the engine family. */
+const CYL_BY_CODE = [
+  [/^(G16E|M15A)/, 3],
+  [/^(1NZ|\dZR|\dAR|A25A|M20A|T24A|\dTR|FA2[04]|B46)/, 4],
+  [/^(\dGR|V35A|B58)/, 6],
+  [/^(\dUR|\dUZ)/, 8],
+];
+function cylinders(code, text) {
+  const hit = CYL_BY_CODE.find(([re]) => re.test(code || ""));
+  if (hit) return hit[1];
+  const m = String(text || "").match(/\b(?:V|I|L)(\d{1,2})\b/);
+  return m ? Number(m[1]) : 0;
+}
+const typeOf = (listing, text, code) =>
+  /plug-?in|prime|\bPHEV\b/i.test(`${listing} ${text}`)
+    ? "Plug-in Hybrid"
+    : /hybrid|\bHEV\b|i-FORCE MAX|e-AWD|eCVT/i.test(`${listing} ${text}`) || /-FX[ES]$/.test(code || "")
+      ? "Hybrid"
+      : /fuel cell|\bFCEV\b/i.test(text) || /mirai/i.test(listing)
+        ? "Fuel cell"
+        : /battery-electric|\bBEV\b/i.test(text) || /\bEV$|bZ4X/i.test(listing)
+          ? "Electric"
+          : "";
+const TYPE_ORDER = ["", "Hybrid", "Plug-in Hybrid", "Electric", "Fuel cell"];
+
+/* The engines and types of a model in a year:
+   [{ label, listing, engine (displacement), code, type, fuel }], smallest first,
+   gas before hybrid. `label` is what goes in the car's Engine field
+   ("2.5L 4-cyl", "2.5L 4-cyl Hybrid"); the rest is saved with the car so the
+   factory specs know exactly which rows are its own. */
+export function oemEngineOptions(data, year, model) {
+  const y = researchedYear(data, year);
+  const want = key(model);
+  if (!y || !want) return [];
+  const S = data.strings;
+  const found = new Map();
+  for (const [listing, entry] of Object.entries(y)) {
+    if (key(baseModel(listing)) !== want) continue;
+    const texts = [...new Set([...entry.f, ...entry.s].map((r) => S[r[0]]))];
+    const mine = [];
+    for (const t of texts) {
+      const sc = parseScope(t);
+      /* a displacement and the engine code written right after it belong together */
+      const pairs = [...t.matchAll(/(\d\.\d)\s?L\b([^;,/]*?)\b([A-Z0-9]{2,5}-[A-Z]{2,4}|B[45][68]B\d{2}O\d|FA2[04])\b/g)].filter((m) => /\d/.test(m[3]) && !/\d\.\d\s?L/.test(m[2]));
+      for (const m of pairs) mine.push({ disp: m[1], code: m[3], text: t });
+      const paired = new Set(pairs.map((m) => m[1]));
+      for (const d of sc.disp) if (!paired.has(d)) mine.push({ disp: d, code: "", text: t });
+      /* an engine code written alone ("3UR-FE / 3UR-FBE V8" after one size) */
+      if (sc.disp.size === 1) for (const c of sc.codes) if (!pairs.some((m) => m[3] === c)) mine.push({ disp: [...sc.disp][0], code: c, text: t });
+    }
+    const withCode = new Set(mine.filter((e) => e.code).map((e) => e.disp));
+    const engines = mine.filter((e) => e.code || !withCode.has(e.disp));
+    if (!engines.length) {
+      const type = typeOf(listing, texts.join(" "), "");
+      found.set(`${listing}||`, { listing, engine: "", code: "", type: type || "Electric", cyl: 0 });
+      continue;
+    }
+    for (const e of engines) {
+      /* a gas engine and a hybrid of the same size under one listing (the
+         2024 Tacoma) are two choices; with an engine code the code decides */
+      const type = typeOf(listing, e.code ? "" : e.text, e.code) || (e.code ? typeOf(listing, e.text, e.code) : "");
+      const k = `${listing}|${e.disp}|${e.code}|${e.code ? "" : type}`;
+      if (!found.has(k)) found.set(k, { listing, engine: e.disp, code: e.code, type, cyl: cylinders(e.code, e.text) });
+    }
+  }
+  const list = [...found.values()];
+  /* an engine written without its code borrows the cylinder count of the
+     same-size engine elsewhere in that year's lineup, when there's one answer */
+  const cylBySize = {};
+  for (const entry of Object.values(y)) {
+    for (const t of new Set([...entry.f, ...entry.s].map((r) => S[r[0]]))) {
+      for (const m of t.matchAll(/(\d\.\d)\s?L\b[^;,/]*?\b([A-Z0-9]{2,5}-[A-Z]{2,4}|B[45][68]B\d{2}O\d|FA2[04])\b/g)) {
+        const c = cylinders(m[2], "");
+        if (c) (cylBySize[m[1]] = cylBySize[m[1]] || new Set()).add(c);
+      }
+    }
+  }
+  for (const e of list) if (!e.cyl && cylBySize[e.engine] && cylBySize[e.engine].size === 1) e.cyl = [...cylBySize[e.engine]][0];
+  const name = (e) => [e.engine ? `${e.engine}L` : "", e.cyl ? `${e.cyl}-cyl` : "", e.type].filter(Boolean).join(" ");
+  const count = {};
+  for (const e of list) count[name(e)] = (count[name(e)] || 0) + 1;
+  return list
+    .map((e) => ({ label: count[name(e)] > 1 && e.code ? `${name(e)} (${e.code})` : name(e), listing: e.listing, engine: e.engine, code: e.code, type: e.type, fuel: /hybrid/i.test(e.type) ? "hybrid" : e.type ? "ev" : "gas" }))
+    .sort((a, b) => Number(a.engine || 99) - Number(b.engine || 99) || TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.label.localeCompare(b.label));
+}
+
+/* What still has to be asked about a car for its rows to be settled:
+   { drive, trans } true when some row hinges on it. */
+export function oemAsks(view) {
+  if (!view) return { drive: false, trans: false };
+  const rows = [...view.fluids, ...view.services];
+  return { drive: rows.some((r) => r.open.includes("drive")), trans: rows.some((r) => r.open.includes("trans")) };
+}

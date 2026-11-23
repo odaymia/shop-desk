@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { hasOemData, parseScope, carTraits, applies, oemListings, pickListing, oemView, oemOilSpec, oemSchedule, oemNotOnCar, serviceIdOf, useOf } from "../src/lib/oemData.js";
+import { hasOemData, parseScope, carTraits, applies, oemListings, pickListing, oemView, oemOilSpec, oemSchedule, oemNotOnCar, serviceIdOf, useOf, oemCoversYear, oemModels, oemEngineOptions, oemAsks } from "../src/lib/oemData.js";
 import { mergeMotorIntervals, serviceStatus, serviceReview, schedFromMerge, applySched, storeDecides, DEFAULT_SERVICE_INTERVALS } from "../src/lib/serviceReview.js";
 
 /* A small made-up data file in the shipped shape, so each rule is tested on
@@ -276,4 +276,62 @@ test("by default the factory schedule is shown beside the shop's, and the shop's
   assert.equal(serviceStatus(oil, { at: now - 100 * 86400000, mileage: 50000 }, 56000, now), "due");
   // and nothing about the interval is written to the car for My Garage, only what it lacks
   assert.deepEqual(schedFromMerge(base, shown.intervals), { hidden: ["psFluid"], items: {} });
+});
+
+test("adding a car: the model list, then that model's engines and types, only from the research", () => {
+  assert.equal(oemCoversYear(data, 2015), true);
+  assert.equal(oemCoversYear(data, 2009), false);
+  // a hybrid is a type of its model, not a model of its own
+  assert.deepEqual(oemModels(data, 2015), ["Camry"]);
+  assert.deepEqual(oemModels(data, 2019), ["Prius", "Prius c"]); // the Prime folds into Prius; the Prius c is its own car
+  assert.deepEqual(oemModels(data, 2009), []);
+  const camry = oemEngineOptions(data, 2015, "camry");
+  assert.deepEqual(camry.map((e) => e.label), ["2.5L 4-cyl", "2.5L 4-cyl Hybrid", "3.5L 6-cyl"]);
+  assert.deepEqual(camry.map((e) => [e.listing, e.engine, e.code, e.fuel]), [["Camry", "2.5", "2AR-FE", "gas"], ["Camry Hybrid", "2.5", "2AR-FXE", "hybrid"], ["Camry", "3.5", "2GR-FE", "gas"]]);
+  assert.deepEqual(oemEngineOptions(data, 2019, "Prius").map((e) => e.label), ["1.8L 4-cyl Hybrid", "1.8L 4-cyl Plug-in Hybrid"]);
+  // two engines that read the same are told apart by their code
+  assert.deepEqual(oemEngineOptions(data, 2020, "Corolla").map((e) => e.label), ["1.8L 4-cyl (2ZR-FAE)", "1.8L 4-cyl (2ZR-FE)"]);
+  assert.deepEqual(oemEngineOptions(data, 2015, "Tercel"), []); // not in the research: typed by hand
+  assert.deepEqual(oemEngineOptions(data, 2009, "Camry"), []);
+});
+
+test("adding a car: the choice saved with the car settles which rows are its own", () => {
+  for (const o of oemEngineOptions(data, 2015, "Camry")) {
+    const car = { year: 2015, make: "Toyota", model: "Camry", engine: o.label, oem: { listing: o.listing, engine: o.engine, code: o.code, fuel: o.fuel } };
+    const v = oemView(data, car);
+    assert.deepEqual([v.listing, v.sure], [o.listing, true]);
+    assert.equal(oemOilSpec(v).qt, o.engine === "3.5" ? 6.4 : 4.6);
+  }
+  // no trim, no engine description: before, this car couldn't be told from the hybrid
+  const hybrid = oemEngineOptions(data, 2015, "Camry")[1];
+  const v = oemView(data, { year: 2015, make: "Toyota", model: "Camry", engine: hybrid.label, oem: { listing: hybrid.listing, engine: hybrid.engine, code: hybrid.code, fuel: hybrid.fuel } });
+  assert.equal(v.traits.hybrid, true);
+  assert.equal(v.fluids.every((r) => /FXE|hybrid/i.test(r.scope)), true);
+  // the form asks about drive only when a row hinges on it
+  const rav = oemEngineOptions(data, 2018, "RAV4")[0];
+  const pick = { listing: rav.listing, engine: rav.engine, code: rav.code, fuel: rav.fuel };
+  assert.deepEqual(oemAsks(oemView(data, { year: 2018, model: "RAV4", engine: rav.label, oem: pick })), { drive: true, trans: false });
+  assert.deepEqual(oemAsks(oemView(data, { year: 2018, model: "RAV4", engine: rav.label, oem: { ...pick, drive: "awd" } })), { drive: false, trans: false });
+  assert.deepEqual(oemAsks(oemView(data, { year: 2015, model: "Camry", engine: "2.5L 4-cyl", oem: { listing: "Camry", engine: "2.5", code: "2AR-FE", fuel: "gas" } })), { drive: false, trans: false });
+  assert.deepEqual(oemAsks(null), { drive: false, trans: false });
+});
+
+test("adding a car: every choice in the shipped Toyota file leads to its own listing", () => {
+  const real = JSON.parse(fs.readFileSync(new URL("../src/data/oem/toyota.json", import.meta.url), "utf8"));
+  let n = 0;
+  for (const year of Object.keys(real.years)) {
+    for (const model of oemModels(real, year)) {
+      const opts = oemEngineOptions(real, year, model);
+      assert.ok(opts.length > 0, `${year} ${model} has no engine choice`);
+      assert.equal(new Set(opts.map((o) => o.label)).size, opts.length, `${year} ${model} has two choices that read the same`);
+      for (const o of opts) {
+        n++;
+        const v = oemView(real, { year: Number(year), make: "Toyota", model, engine: o.label, oem: { listing: o.listing, engine: o.engine || undefined, code: o.code || undefined, fuel: o.fuel } });
+        assert.ok(v && v.sure && v.listing === o.listing, `${year} ${model} ${o.label}`);
+      }
+    }
+  }
+  assert.ok(n > 400);
+  assert.deepEqual(oemEngineOptions(real, 2022, "Camry").map((e) => e.label), ["2.5L 4-cyl", "2.5L 4-cyl Hybrid", "3.5L 6-cyl"]);
+  assert.deepEqual(oemEngineOptions(real, 2022, "RAV4").map((e) => e.label), ["2.5L 4-cyl", "2.5L 4-cyl Hybrid", "2.5L 4-cyl Plug-in Hybrid"]);
 });

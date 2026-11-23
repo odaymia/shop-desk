@@ -3,6 +3,7 @@ import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
+import { hasOemData, loadOemData, oemCoversYear, oemModels, oemEngineOptions, oemView, oemAsks } from "../lib/oemData.js";
 import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
 import { realNameError } from "../lib/names.js";
 import { AddressField } from "./AddressField.jsx";
@@ -204,8 +205,9 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
   /* With MOTOR connected, Make → Model → Engine come from MOTOR itself:
      makes A–Z, and only the engines MOTOR lists for that car. Picking the
      engine links the car to MOTOR (labor guide, filters, service review).
-     Without MOTOR (demo, offline, not set up) the shop's own cars and
-     Valvoline's list fill in, sorted A–Z. */
+     Without MOTOR (demo, offline, not set up) the cars this shop has
+     serviced fill in, sorted A–Z. A make and year covered by the shop's
+     owner's-manual research uses that instead of either (below). */
   const low = (x) => String(x || "").trim().toLowerCase();
   const [mm, setMm] = useState({ on: false, makes: [], models: [], veh: null });
   useEffect(() => {
@@ -240,18 +242,54 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [motorModel && motorModel.id]);
   const az = (list) => [...list].sort((a, b) => String(a).localeCompare(String(b)));
-  /* makes and models: MOTOR's plus the ones this shop has serviced, A–Z.
-     Anything not listed can be typed in. */
+  /* The shop's own owner's-manual research (src/lib/oemData.js). For a make
+     and year it covers, the Model and Engine lists come from it and nothing
+     else: every model that year, then that model's engines and types (gas,
+     hybrid, plug-in). Picking one saves exactly which car it is, so the
+     factory specs need no questions on the ticket. */
+  const researchMake = hasOemData(d.make) ? low(d.make) : "";
+  const [research, setResearch] = useState(null);
+  useEffect(() => {
+    if (!researchMake) return undefined;
+    let ok = true;
+    loadOemData(researchMake).then((x) => ok && setResearch(x)).catch(() => {});
+    return () => { ok = false; };
+  }, [researchMake]);
+  const researched = !!researchMake && !!research && low(research.make) === researchMake && oemCoversYear(research, d.year);
+  const engineChoices = useMemo(() => (researched ? oemEngineOptions(research, d.year, d.model) : []), [researched, research, d.year, d.model]);
+  /* makes: MOTOR's plus the ones this shop has serviced, A–Z. Anything not
+     listed can be typed in. */
   const makeOptions = useMemo(() => az(mergeOpts(mm.on ? mm.makes.map((m) => m.name) : [], ymme.makesFor(d.year))), [mm.on, mm.makes, ymme, d.year]);
-  const modelOptions = useMemo(() => az(mergeOpts(motorMake ? mm.models.map((m) => m.name) : [], ymme.modelsFor(d.year, d.make))), [motorMake, mm.models, ymme, d.year, d.make]);
-  /* MOTOR's engines only, when it knows the car; otherwise the shop's own */
-  const engineOptions = useMemo(
-    () => (mm.veh && (mm.veh.engines || []).length ? mm.veh.engines.map((e) => e.name) : ymme.enginesFor(d.year, d.make, d.model)),
-    [mm.veh, ymme, d.year, d.make, d.model]
+  const modelOptions = useMemo(
+    () => (researched ? oemModels(research, d.year) : az(mergeOpts(motorMake ? mm.models.map((m) => m.name) : [], ymme.modelsFor(d.year, d.make)))),
+    [researched, research, motorMake, mm.models, ymme, d.year, d.make]
   );
-  const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "" }));
-  const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "" }));
-  const setModel = (v) => setD((x) => (v === x.model ? { ...x, model: v } : { ...x, model: v, engine: "" }));
+  /* without research: MOTOR's engines only, when it knows the car; otherwise the shop's own */
+  const engineOptions = useMemo(
+    () => (researched ? engineChoices.map((e) => e.label) : mm.veh && (mm.veh.engines || []).length ? mm.veh.engines.map((e) => e.name) : ymme.enginesFor(d.year, d.make, d.model)),
+    [researched, engineChoices, mm.veh, ymme, d.year, d.make, d.model]
+  );
+  /* changing the year, make or model starts the car over: what was known
+     about the old one (`oem`) no longer holds */
+  const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "", oem: undefined }));
+  const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "", oem: undefined }));
+  const setModel = (v) => setD((x) => (v === x.model ? { ...x, model: v } : { ...x, model: v, engine: "", oem: undefined }));
+  /* an engine picked from the research carries which listing, engine code
+     and fuel it is; one typed by hand carries nothing */
+  const setEngine = (v) =>
+    setD((x) => {
+      const hit = engineChoices.find((e) => low(e.label) === low(v));
+      if (!hit) return { ...x, engine: v, oem: v === x.engine ? x.oem : undefined };
+      const oem = { listing: hit.listing, fuel: hit.fuel };
+      if (hit.engine) oem.engine = hit.engine;
+      if (hit.code) oem.code = hit.code;
+      return { ...x, engine: hit.label, oem };
+    });
+  const setOem = (k) => (v) => setD((x) => ({ ...x, oem: { ...(x.oem || {}), [k]: v || undefined } }));
+  /* whether the research needs the drive or transmission to tell this car's rows apart */
+  const asks = useMemo(() => (researched && d.oem && d.oem.listing ? oemAsks(oemView(research, d)) : { drive: false, trans: false }), [researched, research, d]);
+  const askDrive = asks.drive || !!(d.oem && d.oem.drive);
+  const askTrans = asks.trans || !!(d.oem && d.oem.trans);
   const plateKey = cfg && cfg.plateApiKey;
   const applyDecode = (r) =>
     setD((x) => ({
@@ -396,8 +434,36 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
         <Field label="Trim">
           <Text value={d.submodel} onChange={set("submodel")} placeholder="SE" />
         </Field>
-        <PickOrType label="Engine" value={d.engine} onChange={set("engine")} options={engineOptions} placeholder="Engine" />
+        <PickOrType label={researched ? "Engine and type" : "Engine"} value={d.engine} onChange={setEngine} options={engineOptions} placeholder="Engine" />
       </div>
+      {researched && d.oem && d.oem.listing && (askDrive || askTrans) && (
+        <div className="fldRow">
+          {askDrive && (
+            <Field label="Drive">
+              <select value={d.oem.drive || ""} onChange={(e) => setOem("drive")(e.target.value)}>
+                <option value="">Not sure</option>
+                <option value="2wd">2WD (front or rear)</option>
+                <option value="awd">AWD / 4WD</option>
+              </select>
+            </Field>
+          )}
+          {askTrans && (
+            <Field label="Transmission">
+              <select value={d.oem.trans || ""} onChange={(e) => setOem("trans")(e.target.value)}>
+                <option value="">Not sure</option>
+                <option value="auto">Automatic</option>
+                <option value="manual">Manual</option>
+              </select>
+            </Field>
+          )}
+        </div>
+      )}
+      {researched && (
+        <p className="legalNote" style={{ margin: "0 0 12px" }}>
+          Models and engines for a {d.year} {d.make} come from your owner's-manual research.
+          {modelOptions.length && d.model && !engineOptions.length ? " This model isn't in it for this year, so type the engine in." : ""}
+        </p>
+      )}
       <div className="fldRow">
         <Field label="Color">
           <Text value={d.color} onChange={set("color")} />
