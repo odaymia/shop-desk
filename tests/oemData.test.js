@@ -203,11 +203,14 @@ test("service review: the factory schedule goes to the right service, with its r
   assert.equal(row("brakeFluid").source, "store"); // Toyota only inspects it: the shop's interval stands
   assert.equal("motorInspectMiles" in row("brakeFluid"), false); // inspect intervals aren't carried onto the review
   assert.deepEqual([row("trans").source, row("trans").noFactory], ["store", true]); // no normal-use replacement
+  // the special-use replacement is carried for show, and doesn't decide what's due
+  assert.deepEqual([row("trans").motorSpecialMiles, row("trans").miles, row("trans").motorMiles], [60000, row("trans").storeMiles, 0]);
+  assert.equal(row("oil").motorSpecialMiles, 0); // only when there's no normal interval
   assert.equal(row("sparkPlugs").miles, 120000);
   // the shop set special use: the special schedule applies
   const sev = mergeMotorIntervals(applicable, sch.services, "both", "severe").intervals;
   assert.equal(sev.find((x) => x.id === "oil").miles, 5000);
-  assert.equal(sev.find((x) => x.id === "trans").miles, 60000);
+  assert.deepEqual([sev.find((x) => x.id === "trans").miles, sev.find((x) => x.id === "trans").motorSpecialMiles], [60000, 0]); // there it is the interval itself
   // store-only shops ignore it
   assert.equal(mergeMotorIntervals(applicable, sch.services, "store").intervals.find((x) => x.id === "oil").miles, 5000);
 

@@ -126,7 +126,8 @@ export const activeIntervals = (intervals) => (intervals || []).filter((s) => s 
      - "motor": use the manufacturer interval where MOTOR has it, else the shop's.
      - "both": same effective interval as "motor", but keep both numbers so the
        screen can show store vs manufacturer side by side.
-   Each row carries storeMiles/Months, motorMiles/Months, the effective
+   Each row carries storeMiles/Months, motorMiles/Months, motorSpecialMiles/
+   Months (a special-use-only replacement, for show), the effective
    miles/months (used for due/done), and a source tag. Pure. */
 export function mergeMotorIntervals(intervals, motorServices, mode = "both", severity = "normal") {
   const severe = severity === "severe";
@@ -162,6 +163,13 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
     /* only a replace/service interval counts; a schedule line that says to
        inspect is left off the review altogether */
     const m = cands.find((c) => !isInspect(c)) || null;
+    /* a replacement the maker schedules only for special use (towing, heavy
+       loads, dust) has no normal-driving interval, so it doesn't decide
+       what is due; it is still carried so the screen can show it, labelled */
+    const sp =
+      !m && !severe && mode !== "store"
+        ? (motorServices || []).find((c) => c && c.name && !isInspect(c) && (num(c.severeMiles) > 0 || num(c.severeMonths) > 0) && (c.forId ? c.forId === svc.id : keys.some((k) => c.name.toLowerCase().includes(k)))) || null
+        : null;
     const motorMiles = m ? m.miles : 0;
     const motorMonths = m ? m.months : 0;
     const useMotor = !!m && mode !== "store";
@@ -173,6 +181,8 @@ export function mergeMotorIntervals(intervals, motorServices, mode = "both", sev
       motorMiles,
       motorMonths,
       motorName: m ? m.name : "",
+      motorSpecialMiles: sp ? num(sp.severeMiles) : 0,
+      motorSpecialMonths: sp ? num(sp.severeMonths) : 0,
       /* MOTOR answered for this car but lists no replacement for this
          service (a lifetime fluid, say): the store interval stands in */
       noFactory: haveMotor && !m && keys.length > 0,
