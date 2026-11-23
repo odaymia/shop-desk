@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Modal, Money, toNum, Field } from "./ui.jsx";
 import { oilPackageLines, oilItems, oilFilterItems, oilsForPackage, packageOilType, recommendedPackages, capacityOptions } from "../lib/oilchange.js";
 import { matchOil, matchFilter } from "../lib/specs.js";
-import { OilSpecLookup } from "./OilSpecLookup.jsx";
 import { uid } from "../lib/ids.js";
 import { searchText } from "./useShop.js";
 
@@ -79,13 +78,11 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
   const [quarts, setQuarts] = useState(spec && spec.oilCapacityQt ? spec.oilCapacityQt : "");
   const [oil, setOil] = useState(null);
   const [step, setStep] = useState("package"); // package | quarts | oil | filter
-  const [lookup, setLookup] = useState(false); // the Valvoline grade/capacity lookup
-  const [lookedGrade, setLookedGrade] = useState(""); // grade the lookup filled in
   const [autoQt, setAutoQt] = useState(false); // quarts came from the spec without asking
   const caps = capacityOptions(spec);
   const oils = oilItems(shop.parts);
   const filters = oilFilterItems(shop.parts);
-  const grade = lookedGrade || (spec ? spec.oilViscosity : "");
+  const grade = spec ? spec.oilViscosity : "";
   const suggestedOils = grade ? matchOil(shop.parts, grade) : [];
   const suggestedFilters = spec ? matchFilter(shop.parts, spec.oilFilters) : [];
   const q = toNum(quarts) || (pkg ? pkg.quarts : 5);
@@ -103,18 +100,6 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
     setStep("filter");
   };
 
-  if (lookup)
-    return (
-      <OilSpecLookup
-        onClose={() => setLookup(false)}
-        onApply={({ grade: g, qt }) => {
-          if (qt) setQuarts(qt);
-          if (g) setLookedGrade(g);
-          setLookup(false);
-        }}
-      />
-    );
-
   if (step === "package") {
     /* packages that fit the car's recommended oil go first, in green */
     const rec = recommendedPackages(packages, oils, { ...(spec || {}), oilViscosity: grade });
@@ -128,7 +113,7 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
               ? rec.ids.size
                 ? `This car takes ${rec.grade}${spec && spec.oilCapacityQt ? `, ${spec.oilCapacityQt} qt` : ""}. The packages in green have ${rec.grade} on the shelf.`
                 : `This car takes ${rec.grade}. No package has ${rec.grade} in inventory right now.`
-              : "No oil grade on file for this car. Look it up on the next step, or check the cap."}
+              : "No oil grade on file for this car. Check the oil cap or the owner's manual."}
           </p>
         )}
         <ul className="pickList">
@@ -140,7 +125,7 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
                 setPkg(p);
                 /* one capacity on file: use it and go straight to the oil;
                    several (by drive) or none: ask */
-                if (caps.length === 1 && !lookedGrade) {
+                if (caps.length === 1) {
                   setQuarts(String(caps[0].qt));
                   setAutoQt(true);
                   setStep("oil");
@@ -214,9 +199,6 @@ export function OilChangePicker({ cfg, shop, spec, onAdd, onClose }) {
             <>All {q || pkg.quarts} qt included in the package.</>
           )}
         </p>
-        <button className="btn lg full" style={{ marginBottom: 8 }} onClick={() => setLookup(true)}>
-          Look up grade &amp; capacity (Valvoline)
-        </button>
         <button className="btn primary lg full" onClick={() => setStep("oil")}>
           Next: which oil
         </button>

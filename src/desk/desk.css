@@ -357,8 +357,6 @@ table.lines .laborCell input.details { font-size:12px; min-height:28px; padding:
 .specGrid { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; align-items:baseline; }
 .specGrid span { color:var(--muted); }
 .specGrid strong { font-size:20px; }
-.prodList { margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
-.prodList li { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--asphalt); font-weight:600; }
 .kiosk { position:fixed; inset:0; overflow:auto; background:var(--asphalt); z-index:60; }
 .kiosk .deskBody { min-height:100vh; box-sizing:border-box; }
 .kioskExit { position:fixed; bottom:12px; right:12px; z-index:61; width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:18px; opacity:.25; cursor:pointer; }
@@ -696,9 +694,6 @@ table.countPrint tfoot td { font-weight:700; border-top:2px solid #333; }
 .svcChip { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; font-size:13px; }
 .svcChip.on { border-color:var(--signal); background:var(--panel); color:var(--ink); font-weight:600; }
 .svcChip input { margin:0; }
-.fluidGrid { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; }
-.fluidGrid .fSys { color:var(--muted); }
-.fluidGrid .fProd { font-weight:600; }
 .ckKeys { margin:16px 0 12px; font-size:12px; color:var(--muted); }
 .ckKeys b { color:var(--ink); font-weight:600; }
 .ckGrid { display:grid; grid-template-columns:1fr auto; gap:3px 12px; font-size:13px; }

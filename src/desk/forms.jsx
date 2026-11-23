@@ -3,7 +3,6 @@ import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
-import { loadValvolineSpecs, vvMakeList, vvModelList, vvEngineList } from "../lib/valvolineSpecs.js";
 import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
 import { realNameError } from "../lib/names.js";
 import { AddressField } from "./AddressField.jsx";
@@ -202,15 +201,6 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
      lists stay in step. */
   const ymme = useMemo(() => buildYmme(shop ? shop.vehicles : {}, shop ? shop.specs : {}), [shop]);
   const YEARS = useMemo(() => modelYears(), []);
-  /* The full make/model list from Valvoline's data, loaded on demand so a
-     make you've never serviced still shows up. Falls back to just the
-     shop's own cars until it arrives. */
-  const [vv, setVv] = useState(null);
-  useEffect(() => {
-    let ok = true;
-    loadValvolineSpecs().then((d) => ok && setVv(d)).catch(() => {});
-    return () => { ok = false; };
-  }, []);
   /* With MOTOR connected, Make → Model → Engine come from MOTOR itself:
      makes A–Z, and only the engines MOTOR lists for that car. Picking the
      engine links the car to MOTOR (labor guide, filters, service review).
@@ -250,30 +240,14 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [motorModel && motorModel.id]);
   const az = (list) => [...list].sort((a, b) => String(a).localeCompare(String(b)));
-  /* makes and models: MOTOR's plus the shop's and Valvoline's, A–Z, so a
-     make MOTOR doesn't carry (the sandbox has only a handful) still shows */
-  const makeOptions = useMemo(
-    () => az(mergeOpts(mm.on ? mm.makes.map((m) => m.name) : [], mergeOpts(ymme.makesFor(d.year), vv ? vvMakeList(vv) : []))),
-    [mm.on, mm.makes, ymme, d.year, vv]
-  );
-  const modelOptions = useMemo(
-    () =>
-      az(
-        mergeOpts(
-          motorMake ? mm.models.map((m) => m.name) : [],
-          mergeOpts(ymme.modelsFor(d.year, d.make), vv && d.make ? vvModelList(vv, d.make, d.year) : [])
-        )
-      ),
-    [motorMake, mm.models, ymme, d.year, d.make, vv]
-  );
-  /* MOTOR's engines only, when it knows the car; otherwise Valvoline's
-     year-accurate engines, then the shop's own */
+  /* makes and models: MOTOR's plus the ones this shop has serviced, A–Z.
+     Anything not listed can be typed in. */
+  const makeOptions = useMemo(() => az(mergeOpts(mm.on ? mm.makes.map((m) => m.name) : [], ymme.makesFor(d.year))), [mm.on, mm.makes, ymme, d.year]);
+  const modelOptions = useMemo(() => az(mergeOpts(motorMake ? mm.models.map((m) => m.name) : [], ymme.modelsFor(d.year, d.make))), [motorMake, mm.models, ymme, d.year, d.make]);
+  /* MOTOR's engines only, when it knows the car; otherwise the shop's own */
   const engineOptions = useMemo(
-    () =>
-      mm.veh && (mm.veh.engines || []).length
-        ? mm.veh.engines.map((e) => e.name)
-        : mergeOpts(vv && d.make && d.model ? vvEngineList(vv, d.make, d.model, d.year) : [], ymme.enginesFor(d.year, d.make, d.model)),
-    [mm.veh, ymme, d.year, d.make, d.model, vv]
+    () => (mm.veh && (mm.veh.engines || []).length ? mm.veh.engines.map((e) => e.name) : ymme.enginesFor(d.year, d.make, d.model)),
+    [mm.veh, ymme, d.year, d.make, d.model]
   );
   const setYear = (v) => setD((x) => (String(v) === String(x.year) ? { ...x, year: v } : { ...x, year: v, make: "", model: "", engine: "" }));
   const setMake = (v) => setD((x) => (v === x.make ? { ...x, make: v } : { ...x, make: v, model: "", engine: "" }));

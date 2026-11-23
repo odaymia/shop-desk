@@ -45,7 +45,6 @@ import { CATALOGS, cartToLines } from "../lib/parts.js";
 import { findSpec, matchOil, matchFilter, blankSpec } from "../lib/specs.js";
 import { motorVehicleFor, motorFilters } from "../lib/motor.js";
 import { pickEngine, specFromMotorFilters, mergeMotorFilters, specNumbersFor, isNotServiceable, wiperSizes, wipersBySize } from "../lib/motorFilters.js";
-import { loadValvolineSpecs, findValvolineSpec } from "../lib/valvolineSpecs.js";
 import { valvolineFor } from "../lib/valvoline.js";
 import { SpecForm } from "./SpecForm.jsx";
 import { OilChangePicker } from "./OilChangePicker.jsx";
@@ -130,23 +129,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   const [showRevs, setShowRevs] = useState(false);
   const [sticker, setSticker] = useState(null); // { id, auto } — the reminder sticker to print
 
-  /* When the car has no oil spec on file, pull Valvoline's for its exact
-     engine so the ticket shows grade + capacity + fluids automatically —
-     no manual lookup. Loaded on demand, only when it's actually needed. */
   const draftVehicle = draft ? shop.vehicles[draft.vehicleId] : null;
-  const draftShopSpec = draftVehicle ? (findSpec(shop.specs, draftVehicle) || {}).spec : null;
-  const [vvData, setVvData] = useState(null);
-  const needVv = !!draftVehicle && !draftShopSpec && !vvData;
-  useEffect(() => {
-    if (!needVv) return undefined;
-    let ok = true;
-    loadValvolineSpecs().then((d) => ok && setVvData(d)).catch(() => {});
-    return () => { ok = false; };
-  }, [needVv]);
-  const vvSpec = useMemo(
-    () => (draftVehicle && !draftShopSpec && vvData ? findValvolineSpec(vvData, draftVehicle) : null),
-    [draftVehicle, draftShopSpec, vvData]
-  );
 
   /* adopt changes from another device only when we have nothing unsaved */
   useEffect(() => {
@@ -311,12 +294,10 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
   /* from the stated concern, the BAR-safe first step (diagnose/inspect) and the
      shop's repair categories that address it */
   const workSuggest = suggestedWork(o.concern, cfg);
-  /* the shop's own spec if entered, otherwise Valvoline's — so the oil
-     change prefills quarts and grade either way */
+  /* the shop's own spec for this engine (entered, learned from past work,
+     or filled from MOTOR): the oil change prefills quarts and grade from it */
   const shopSpec = vehicle ? (findSpec(shop.specs, vehicle) || {}).spec : null;
-  const effSpec =
-    shopSpec ||
-    (vvSpec ? { year: vehicle.year, make: vehicle.make, model: vehicle.model, engine: vehicle.engine, oilViscosity: vvSpec.grade, oilCapacityQt: vvSpec.qt, oilFilters: [] } : null);
+  const effSpec = shopSpec;
   const t = orderTotals(o, cfg, customer);
   const rules = rulesFor(o, cfg, customer);
   const locked = o.status === STATUS.invoiced || o.status === STATUS.void || o.status === STATUS.deleted;
@@ -605,7 +586,7 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
       const base =
         cur && cur.exact
           ? cur.spec
-          : { ...blankSpec(vehicle), ...(vvSpec ? { oilViscosity: vvSpec.grade || "", oilCapacityQt: vvSpec.qt || "" } : {}), source: "motor" };
+          : { ...blankSpec(vehicle), source: "motor" };
       await shop.saveSpec(mergeMotorFilters(base, found));
       /* say what came back for the wipers, so a missing size is obvious */
       const sizes = Object.entries(wiperSizes(found));
@@ -1026,7 +1007,6 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               shop={shop}
               cfg={cfg}
               locked={locked}
-              vvSpec={vvSpec}
               onMotor={fillFromMotor}
               motorBusy={motorBusy}
               onEdit={() => setSpecEdit(true)}
@@ -2375,16 +2355,7 @@ function CardCharge({ order, cfg, customer, amount, onPaid, onLinkSent, onManual
 
 /* Oil grade, quarts, filter numbers and Valvoline picks for the car on
    the ticket. Learned once per engine; a licensed feed can fill it later. */
-/* Valvoline product names, said the way the counter would. */
-const vvShort = (name) =>
-  String(name || "")
-    .replace(/\s*Motor Oil\s*$/i, "")
-    .replace(/\bSAE\s+/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-const vvOilLabel = (name) => "Valvoline " + vvShort(name);
-
-function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd, onMotor, motorBusy }) {
+function SpecsCard({ vehicle, shop, cfg, locked, onEdit, onAdd, onMotor, motorBusy }) {
   const motorBtn = !locked && onMotor && (
     <button className="btn tiny" onClick={onMotor} disabled={motorBusy} title="Look up this car's Valvoline oil, air, cabin and fuel filters and wiper blades from MOTOR">
       {motorBusy ? "Looking up…" : "Filters from MOTOR"}
@@ -2392,55 +2363,6 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd, onMotor,
   );
   const found = findSpec(shop.specs, vehicle);
   const sp = found && found.spec;
-  /* Nothing entered by the shop, but Valvoline has this exact engine —
-     show it automatically instead of an empty "add specs" prompt. */
-  if (!sp && vvSpec)
-    return (
-      <div className="card specs" style={{ marginTop: 14 }}>
-        <div className="cardHead">
-          <h3>Service specs <span className="st" style={{ marginLeft: 8 }}>from Valvoline</span></h3>
-          {!locked && (
-            <span className="rowBtns">
-              {motorBtn}
-              <button className="btn tiny" onClick={onEdit}>
-                Edit
-              </button>
-              <button className="btn tiny primary" onClick={onAdd}>
-                + Oil change
-              </button>
-            </span>
-          )}
-        </div>
-        <div className="specGrid">
-          <div>
-            <span>Oil</span>
-            <strong>{[vvSpec.grade, vvSpec.qt ? `${vvSpec.qt} qt` : ""].filter(Boolean).join(" · ") || "—"}</strong>
-          </div>
-          <div>
-            <span>{vvSpec.oils.length === 1 ? "Valvoline oil" : "Valvoline oils"}</span>
-            <strong>{vvSpec.oils.length ? vvOilLabel(vvSpec.oils[0]) : "—"}</strong>
-            {vvSpec.oils.slice(1, 4).map((o) => (
-              <em key={o}>{vvOilLabel(o)}</em>
-            ))}
-            {vvSpec.oils.length > 4 ? <em className="muted">+{vvSpec.oils.length - 4} more</em> : null}
-          </div>
-        </div>
-        {vvSpec.fluids.length > 0 && (
-          <div className="fluidGrid" style={{ marginTop: 10 }}>
-            {vvSpec.fluids.map((f) => (
-              <div key={f.system} style={{ display: "contents" }}>
-                <div className="fSys">{f.system}</div>
-                <div className="fProd">{f.products.map(vvShort).join(" · ")}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        <p className="legalNote" style={{ marginTop: 10 }}>
-          Valvoline's spec for this {vehicle.year} {vehicle.make} {vehicle.model}
-          {vehicle.engine ? ` ${vehicle.engine}` : ""}. Capacity is a guide — confirm on the dipstick. Tap Edit to save your own.
-        </p>
-      </div>
-    );
   if (!sp)
     return (
       <div className="card specs" style={{ marginTop: 14 }}>
@@ -2457,7 +2379,7 @@ function SpecsCard({ vehicle, shop, cfg, locked, vvSpec, onEdit, onAdd, onMotor,
         </div>
         <p className="muted" style={{ margin: 0 }}>
           No oil grade or capacity on file yet for a {vehicle.year} {vehicle.make} {vehicle.model}
-          {vehicle.engine ? ` ${vehicle.engine}` : ""}. Enter it once from the oil cap or the Valvoline guide and it comes up for
+          {vehicle.engine ? ` ${vehicle.engine}` : ""}. Enter it once from the oil cap or the owner's manual and it comes up for
           every one of these from now on.
         </p>
       </div>
