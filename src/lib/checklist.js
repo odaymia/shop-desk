@@ -160,7 +160,7 @@ export function applyEquipment(items, cfgItems, motorNames) {
    the service's name). The first way that finds anything wins, so loose
    wording never widens an exact pairing ("engine filter" must not tie the
    air filter to "Engine oil & filter"). */
-const SERVICE_CHECKS = { oil: ["oil", "oilFilter"], diff: ["rearDiff", "frontDiff"], engineAir: ["airFilter"], cabinAir: ["cabinFilter"] };
+const SERVICE_CHECKS = { oil: ["oil", "oilFilter"], diff: ["rearDiff", "frontDiff"], diffFront: ["frontDiff"], diffRear: ["rearDiff"], engineAir: ["airFilter"], cabinAir: ["cabinFilter"] };
 
 /* Checklist item ids that go with these services ({ id, name, match }). */
 export function checklistIdsForServices(cfgItems, services) {

@@ -94,23 +94,63 @@ export function filterApplicable(intervals, motorNames) {
 export const vehicleSkips = (vehicle) =>
   vehicle && Array.isArray(vehicle.serviceSkip) ? [...new Set(vehicle.serviceSkip.filter(Boolean).map(String))] : [];
 
-/* The vehicle with one service checked off (`skip` true) or back on (false). */
+/* The vehicle with one service checked off (`skip` true) or back on (false).
+   A car that had "differential" checked off as a whole, before front and
+   rear were told apart, has both axles off: putting one back leaves the
+   other off. */
 export function withServiceSkip(vehicle, id, skip) {
-  const cur = vehicleSkips(vehicle).filter((x) => x !== String(id));
+  let cur = vehicleSkips(vehicle);
+  if (AXLE_IDS.includes(String(id)) && cur.includes("diff")) cur = [...cur.filter((x) => x !== "diff"), ...AXLE_IDS];
+  cur = [...new Set(cur)].filter((x) => x !== String(id));
   return { ...vehicle, serviceSkip: skip ? [...cur, String(id)] : cur };
 }
 
+/* ---- front and rear differential ----
+   The shop keeps one "Differential fluid service" (one price, one
+   interval). When the factory data says which differentials a car has, the
+   review lists them apart, "Front differential…" and "Rear differential…",
+   each with the shop's interval and price and its own history, due date and
+   factory interval. `axles` is { front, rear } (true, or "maybe" when it
+   depends on a drive that isn't known yet). With neither, nothing changes.
+   A past ticket that just says "differential" counts for the rear, or for
+   the front on a car with no rear one. Pure. */
+export const AXLE_IDS = ["diffFront", "diffRear"];
+export function splitDiffByAxle(intervals, axles) {
+  const ax = axles || {};
+  if (!ax.front && !ax.rear) return intervals || [];
+  const out = [];
+  for (const s of intervals || []) {
+    if (!s || s.id !== "diff") {
+      out.push(s);
+      continue;
+    }
+    const base = String(s.name || "").trim();
+    const named = (side) => (/differential/i.test(base) ? `${side} ${base.charAt(0).toLowerCase()}${base.slice(1)}` : `${side} differential fluid`);
+    const general = (other) => ` | differential -${other} | diff fluid -${other} | gear oil -${other}`;
+    if (ax.front)
+      out.push({ ...s, id: "diffFront", splitOf: "diff", name: named("Front"), match: `front diff | front differential | front axle fluid${ax.rear ? "" : general("rear")}`, motorKeys: ["front differential", "front axle"], ifEquipped: ax.front === "maybe" });
+    if (ax.rear)
+      out.push({ ...s, id: "diffRear", splitOf: "diff", name: named("Rear"), match: `rear diff | rear differential | rear axle fluid${general("front")}`, motorKeys: ["rear differential", "rear axle"], ifEquipped: ax.rear === "maybe" });
+  }
+  return out;
+}
+/* Skips as the split rows see them: "differential" off as a whole means
+   both axles off. */
+const withAxleSkips = (ids) => (ids.includes("diff") ? [...new Set([...ids, ...AXLE_IDS])] : ids);
+
 /* The service rows checked off for this vehicle (for the checklist, which
-   drops its matching items). */
+   drops its matching items). An axle checked off counts as its own service. */
 export function skippedServices(intervals, vehicle) {
   const skip = new Set(vehicleSkips(vehicle));
-  return skip.size ? (intervals || []).filter((s) => s && skip.has(String(s.id))) : [];
+  if (!skip.size) return [];
+  const axleRows = splitDiffByAxle((intervals || []).filter((s) => s && s.id === "diff"), { front: true, rear: true });
+  return [...(intervals || []), ...axleRows].filter((s) => s && skip.has(String(s.id)));
 }
 
 /* Split review rows into the ones this car has (`on`) and the ones checked off
    for it (`off`). Order within each group is kept. */
 export function splitBySkip(rows, skipIds) {
-  const skip = new Set((skipIds || []).map(String));
+  const skip = new Set(withAxleSkips((skipIds || []).map(String)));
   const on = [];
   const off = [];
   for (const r of rows || []) (skip.has(String(r.id)) ? off : on).push(r);
@@ -319,9 +359,10 @@ export function reviewCounts(rows) {
    (`serviceSched`): which services MOTOR says the car doesn't have, and the
    interval it settled on for the rest. No names or text, only our own service
    ids and numbers. */
-export function schedFromMerge(baseIntervals, mergedIntervals) {
+export function schedFromMerge(baseIntervals, mergedIntervals, axles) {
+  const ax = axles && (axles.front || axles.rear) ? { front: !!axles.front, rear: !!axles.rear } : null;
   const kept = new Set((mergedIntervals || []).map((x) => x.id));
-  const hidden = (baseIntervals || []).filter((x) => !kept.has(x.id)).map((x) => String(x.id)).sort();
+  const hidden = splitDiffByAxle(baseIntervals || [], ax).filter((x) => !kept.has(x.id)).map((x) => String(x.id)).sort();
   const items = {};
   for (const x of [...(mergedIntervals || [])].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
     if (x.source !== "MOTOR") continue;
@@ -329,9 +370,10 @@ export function schedFromMerge(baseIntervals, mergedIntervals) {
     if (num(x.repeatMiles) > 0) items[x.id].repeatMiles = num(x.repeatMiles);
     if (num(x.repeatMonths) > 0) items[x.id].repeatMonths = num(x.repeatMonths);
   }
-  return { hidden, items };
+  /* which differentials the car has, so the same front and rear rows come back */
+  return ax ? { hidden, items, axles: ax } : { hidden, items };
 }
-export const schedIsEmpty = (sched) => !sched || (!(sched.hidden || []).length && !Object.keys(sched.items || {}).length);
+export const schedIsEmpty = (sched) => !sched || (!(sched.hidden || []).length && !Object.keys(sched.items || {}).length && !(sched.axles && (sched.axles.front || sched.axles.rear)));
 export const sameSched = (a, b) => (schedIsEmpty(a) && schedIsEmpty(b)) || JSON.stringify(a || null) === JSON.stringify(b || null);
 
 /* Put that note back onto the shop's interval table. */
@@ -339,7 +381,7 @@ export function applySched(intervals, sched) {
   if (schedIsEmpty(sched)) return intervals || [];
   const hidden = new Set((sched.hidden || []).map(String));
   const items = sched.items || {};
-  return (intervals || [])
+  return splitDiffByAxle(intervals || [], sched.axles)
     .filter((x) => !hidden.has(String(x.id)))
     .map((x) =>
       items[x.id]

@@ -16,6 +16,8 @@ export const SERVICE_WHY = {
   coolant: "Coolant stops the engine from overheating or freezing and protects against rust inside the cooling system.",
   trans: "Fresh transmission fluid keeps shifting smooth and protects one of the most expensive parts on the car.",
   diff: "Differential fluid lubricates the gears that actually turn your wheels.",
+  diffFront: "The front differential's fluid lubricates the gears that turn your front wheels.",
+  diffRear: "The rear differential's fluid lubricates the gears that turn your rear wheels.",
   psFluid: "Clean power-steering fluid keeps the steering light, smooth, and quiet.",
   fuelFilter: "A clean fuel filter protects the fuel system and keeps the engine running smoothly.",
   sparkPlugs: "Worn spark plugs cause misfires, rough idle, hard starts, and wasted fuel.",

@@ -3,7 +3,7 @@ import { Modal, Field, Text, Num, fmtPhone } from "./ui.jsx";
 import { decodeVin, isVin } from "../lib/vin.js";
 import { lookupPlate } from "../lib/plate.js";
 import { buildYmme, modelYears } from "../lib/ymme.js";
-import { hasOemData, loadOemData, oemCoversYear, oemModels, oemEngineOptions, oemView, oemAsks } from "../lib/oemData.js";
+import { hasOemData, loadOemData, oemMakesFor, oemCoversYear, oemModels, oemEngineOptions, oemView, oemAsks } from "../lib/oemData.js";
 import { customerName, vehicleName, activeList, searchText } from "./useShop.js";
 import { realNameError } from "../lib/names.js";
 import { AddressField } from "./AddressField.jsx";
@@ -259,7 +259,7 @@ export function VehicleForm({ initial, customerId, onSave, onClose, onRelease, c
   const engineChoices = useMemo(() => (researched ? oemEngineOptions(research, d.year, d.model) : []), [researched, research, d.year, d.model]);
   /* makes: MOTOR's plus the ones this shop has serviced, A–Z. Anything not
      listed can be typed in. */
-  const makeOptions = useMemo(() => az(mergeOpts(mm.on ? mm.makes.map((m) => m.name) : [], ymme.makesFor(d.year))), [mm.on, mm.makes, ymme, d.year]);
+  const makeOptions = useMemo(() => az(mergeOpts(mergeOpts(mm.on ? mm.makes.map((m) => m.name) : [], ymme.makesFor(d.year)), d.year ? oemMakesFor(d.year) : [])), [mm.on, mm.makes, ymme, d.year]);
   const modelOptions = useMemo(
     () => (researched ? oemModels(research, d.year) : az(mergeOpts(motorMake ? mm.models.map((m) => m.name) : [], ymme.modelsFor(d.year, d.make)))),
     [researched, research, motorMake, mm.models, ymme, d.year, d.make]

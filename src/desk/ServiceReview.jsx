@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Modal, fmtDate } from "./ui.jsx";
 import { fmtMoney } from "../lib/invoice.js";
 import { ordersOf } from "./useShop.js";
-import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, schedFromMerge, sameSched, storeDecides, DEFAULT_SERVICE_INTERVALS } from "../lib/serviceReview.js";
+import { serviceReview, reviewCounts, mergeMotorIntervals, activeIntervals, filterApplicable, servicePart, vehicleSkips, withServiceSkip, splitBySkip, schedFromMerge, sameSched, storeDecides, DEFAULT_SERVICE_INTERVALS, splitDiffByAxle } from "../lib/serviceReview.js";
 import { motorVehicleFor, motorMaintenance, motorFluids, motorFilters } from "../lib/motor.js";
 import { specFromMotorFilters, pickEngine } from "../lib/motorFilters.js";
 import { hasOemData, loadOemData, oemView, oemSchedule } from "../lib/oemData.js";
@@ -74,8 +74,8 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
     const severity = cfg.serviceSeverity === "severe" ? "severe" : "normal";
     /* remember what the schedule said for this car, so the customer's My
        Garage page shows the same review. Only when it changed. */
-    const remember = (mm) => {
-      const sched = schedFromMerge(baseIntervals, mm.intervals);
+    const remember = (mm, axles) => {
+      const sched = schedFromMerge(baseIntervals, mm.intervals, axles);
       const veh = vehicleRef.current;
       if (veh && veh.id && !sameSched(veh.serviceSched, sched)) shop.saveVehicle({ ...veh, serviceSched: sched });
     };
@@ -85,18 +85,22 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
         const od = hasOemData(vehicle.make) ? await loadOemData(vehicle.make) : null;
         if (!live) return;
         const sch = od ? oemSchedule(oemView(od, vehicle)) : null;
-        if (sch && (sch.services.length || sch.notOnCar.length)) {
-          const applicable = baseIntervals.filter((x) => !sch.notOnCar.includes(x.id));
+        const split = sch && (sch.axles.front || sch.axles.rear);
+        if (sch && (sch.services.length || sch.notOnCar.length || split)) {
+          /* the manual treats this car's front and rear differentials apart:
+             so does the review, each with the shop's interval and price */
+          const mine = splitDiffByAxle(baseIntervals, sch.axles);
+          const applicable = mine.filter((x) => !sch.notOnCar.includes(x.id));
           const follow = !!cfg.serviceFactoryDecides;
           /* unless the owner chose to follow it, the factory interval is
              shown beside the shop's and the shop's still decides what's due.
              Services the manual says the car doesn't have are left off
              either way. */
           const mm = follow ? mergeMotorIntervals(applicable, sch.services, mode, severity) : storeDecides(mergeMotorIntervals(applicable, sch.services, "both", severity));
-          if (mm.intervals.some((x) => x.motorMiles > 0 || x.motorMonths > 0) || applicable.length !== baseIntervals.length) {
+          if (mm.intervals.some((x) => x.motorMiles > 0 || x.motorMonths > 0 || x.motorSpecialMiles > 0 || x.motorSpecialMonths > 0) || applicable.length !== baseIntervals.length || split) {
             setMerged(mm);
             setMotorState(follow ? "oem" : "oem-shown");
-            remember(mm);
+            remember(mm, sch.axles);
             fromManual = true;
           }
         }
@@ -358,6 +362,7 @@ export function ServiceReview({ order, cfg, shop, spec, onClose, onAdd, onShare,
                   )}
                   <td>
                     <strong>{r.name}</strong>
+                    {r.ifEquipped ? <span className="sub muted">4WD / AWD only. Set Drive on the car to confirm.</span> : null}
                     {r.part && r.part.number ? (
                       <span className="sub muted">Part #{r.part.number} · {Number(r.part.onHand) || 0} in stock</span>
                     ) : null}

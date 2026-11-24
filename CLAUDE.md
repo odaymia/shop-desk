@@ -55,8 +55,9 @@ it touches React, the DOM, or storage.
 `src/data/oem/` holds the shop's own research from owner's manuals and the
 manufacturer's maintenance guides (Toyota 2011-2026 so far). Rebuild a file
 from its workbook with `python3 tools/oemdata/build.py "<workbook.xlsx>"
-src/data/oem/<make>.json --make <Make>`; add the make to `LOADERS` in
-`src/lib/oemData.js`. The converter keeps every row as written.
+src/data/oem/<make>.json --make <Make>`; add the make to `LOADERS` and its
+model years to `COVERAGE` in `src/lib/oemData.js`. The converter keeps every
+row as written.
 
 The rules in `oemData.js` come from the research itself and must not be
 loosened:
@@ -72,6 +73,13 @@ loosened:
   use (towing, dust, short trips) stays separate from normal driving.
 - Rows marked unverified are shown as such and never used automatically.
 - The shop's own spec for an engine always comes before the factory one.
+- The service review lists replace intervals only, never inspections, and
+  shows a special-use interval labelled beside the normal one.
+- Front and rear differentials are separate services. The shop keeps one
+  "Differential fluid service" row in Settings (one price and interval);
+  when the manual gives a car a front and/or rear differential fluid or
+  replacement, the review splits that row into the axles the car has
+  (`oemAxles`, `splitDiffByAxle`; ids `diffFront`, `diffRear`).
 
 Do not add scraped third-party catalog data here. The Valvoline
 product-finder data was removed on purpose.

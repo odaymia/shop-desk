@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { hasOemData, parseScope, carTraits, applies, oemListings, pickListing, oemView, oemOilSpec, oemSchedule, oemNotOnCar, serviceIdOf, useOf, oemCoversYear, oemModels, oemEngineOptions, oemAsks } from "../src/lib/oemData.js";
-import { mergeMotorIntervals, serviceStatus, serviceReview, schedFromMerge, applySched, storeDecides, DEFAULT_SERVICE_INTERVALS } from "../src/lib/serviceReview.js";
+import { hasOemData, parseScope, carTraits, applies, oemListings, pickListing, oemView, oemOilSpec, oemSchedule, oemNotOnCar, oemAxles, oemMakesFor, serviceIdOf, useOf, oemCoversYear, oemModels, oemEngineOptions, oemAsks } from "../src/lib/oemData.js";
+import { mergeMotorIntervals, serviceStatus, serviceReview, schedFromMerge, applySched, storeDecides, splitDiffByAxle, withServiceSkip, vehicleSkips, skippedServices, splitBySkip, DEFAULT_SERVICE_INTERVALS } from "../src/lib/serviceReview.js";
+import { checklistIdsForServices } from "../src/lib/checklist.js";
 
 /* A small made-up data file in the shipped shape, so each rule is tested on
    rows written for it. The real file is checked at the end. */
@@ -147,15 +148,15 @@ test("what the card shows: rows that could apply, each with what it hinges on", 
   assert.equal(v.fluids.find((r) => r.component === "Engine coolant").basis, "Reference"); // shown as the manual gives it
   assert.equal(v.fluids.find((r) => r.id === "psFluid").na, true);
   const rav = oemView(data, { year: 2018, model: "RAV4", engine: "2.5L 4-cyl", ls: { aces: "4Cyl 2.5L 2AR-FE" } });
-  const diff = rav.fluids.find((r) => r.id === "diff");
+  const diff = rav.fluids.find((r) => r.id === "diffRear");
   assert.deepEqual([diff.fit, diff.open, diff.scope], ["maybe", ["drive"], "2.5L 2AR-FE gas AWD only"]);
   // told the car is front-drive, the differential rows go away
-  assert.equal(oemView(data, { year: 2018, model: "RAV4", engine: "2.5L 4-cyl", oem: { listing: "RAV4", drive: "2wd" } }).fluids.some((r) => r.id === "diff"), false);
+  assert.equal(oemView(data, { year: 2018, model: "RAV4", engine: "2.5L 4-cyl", oem: { listing: "RAV4", drive: "2wd" } }).fluids.some((r) => /^diff/.test(r.id)), false);
 });
 
 test("serviceIdOf and useOf sort rows the way the desk needs", () => {
-  assert.deepEqual(["Engine oil and filter", "Spark plugs", "Brake fluid", "Power steering fluid", "Engine coolant", "Inverter coolant", "Rear differential oil", "Rear electric drive unit fluid", "Transfer case fluid", "Automatic transmission fluid", "Hybrid e-transaxle fluid", "Manual transmission gear oil", "Clutch hydraulic fluid"].map(serviceIdOf),
-    ["oil", "sparkPlugs", "brakeFluid", "psFluid", "coolant", "otherCoolant", "diff", "diff", "transfer", "trans", "trans", "trans", "clutch"]);
+  assert.deepEqual(["Engine oil and filter", "Spark plugs", "Brake fluid", "Power steering fluid", "Engine coolant", "Inverter coolant", "Rear differential oil", "Rear electric drive unit fluid", "Front differential oil", "Separate front/rear differential", "Transfer case fluid", "Automatic transmission fluid", "Hybrid e-transaxle fluid", "Manual transmission gear oil", "Clutch hydraulic fluid"].map(serviceIdOf),
+    ["oil", "sparkPlugs", "brakeFluid", "psFluid", "coolant", "otherCoolant", "diffRear", "diffRear", "diffFront", "diff", "transfer", "trans", "trans", "trans", "clutch"]);
   assert.equal(useOf("Normal with recommended oil."), "normal");
   assert.equal(useOf("Normal chart. Daily inspection also applies when off-roading in deep sand."), "normal"); // starts as the normal chart
   assert.equal(useOf("Only if primarily towing, using a roof carrier, or carrying heavy loads."), "special");
@@ -182,12 +183,82 @@ test("schedule: replacements only, special use kept apart, inspections left out"
 
 test("schedule: an AWD-only service waits until the car's drive is known", () => {
   const rav = { year: 2018, model: "RAV4", engine: "2.5L 4-cyl", ls: { aces: "4Cyl 2.5L 2AR-FE" } };
-  assert.equal(oemSchedule(oemView(data, rav)).services.some((x) => x.forId === "diff"), false);
+  assert.equal(oemSchedule(oemView(data, rav)).services.some((x) => x.forId === "diffRear"), false);
   assert.equal(oemSchedule(oemView(data, rav)).services.some((x) => x.forId === "oil"), true);
   const awd = oemSchedule(oemView(data, { ...rav, oem: { drive: "awd" } })).services;
-  assert.equal(awd.find((x) => x.forId === "diff" && x.serviceType === "Replace").severeMiles, 15000);
+  assert.equal(awd.find((x) => x.forId === "diffRear" && x.serviceType === "Replace").severeMiles, 15000);
   assert.equal(awd.some((x) => x.serviceType !== "Replace"), false);
-  assert.equal(oemSchedule(oemView(data, { ...rav, oem: { drive: "2wd" } })).services.some((x) => x.forId === "diff"), false);
+  assert.equal(oemSchedule(oemView(data, { ...rav, oem: { drive: "2wd" } })).services.some((x) => /^diff/.test(x.forId)), false);
+});
+
+test("drive wording: \"2WD/4WD; 4WD only\" is a 4WD row, and a drive beside one engine belongs to that engine", () => {
+  const only = parseScope("5.7L 3UR-FE i-FORCE V8 6AT RWD/4WD; 4WD only");
+  assert.deepEqual([...only.drive], ["awd"]);
+  const t57 = { disp: "5.7", codes: new Set(), hybrid: false, drive: "", trans: "" };
+  assert.equal(applies(only, { ...t57, drive: "2wd" }).fit, "no");
+  // drive unknown: nothing but the drive settles it; drive known: the "only" is answered
+  assert.equal(applies(only, t57).hard, true);
+  assert.equal(applies(only, { ...t57, drive: "awd" }).hard, false);
+  // "if equipped" is never answered by the drive alone
+  assert.equal(applies(parseScope("5.7L V8 6AT; 4WD only, if equipped"), { ...t57, drive: "awd" }).hard, true);
+
+  const alt = parseScope("4.0L 1GR-FE RWD or 4.6L 1UR-FE; Regular Cab long bed");
+  assert.equal(alt.drive.size, 0);
+  const t = (disp, drive) => ({ disp, codes: new Set(), hybrid: false, drive, trans: "" });
+  assert.equal(applies(alt, t("4.6", "awd")).fit, "maybe"); // the 4.6L isn't tied to rear-drive
+  assert.equal(applies(alt, t("4.0", "awd")).fit, "no"); // the 4.0L is
+  assert.deepEqual(applies(alt, t("4.0", "")).open, ["drive"]);
+  // the same drive on every engine is still the row's drive
+  assert.deepEqual([...parseScope("2.7L 2TR-FE 4WD 5MT or 3.5L 2GR-FKS 4WD 6MT").drive], ["awd"]);
+});
+
+test("front and rear differentials are told apart, and the review lists the ones the car has", () => {
+  const rav = { year: 2018, model: "RAV4", engine: "2.5L 4-cyl", ls: { aces: "4Cyl 2.5L 2AR-FE" } };
+  // the manual has a rear differential for AWD only: unknown drive is a maybe, front-drive has none
+  assert.deepEqual(oemAxles(oemView(data, rav)), { front: false, rear: "maybe" });
+  assert.deepEqual(oemAxles(oemView(data, { ...rav, oem: { drive: "awd" } })), { front: false, rear: true });
+  assert.deepEqual(oemAxles(oemView(data, { ...rav, oem: { drive: "2wd" } })), { front: false, rear: false });
+  assert.deepEqual(oemAxles(oemView(data, camry)), { front: false, rear: false }); // nothing in the manual: the shop's one row stays
+
+  const base = DEFAULT_SERVICE_INTERVALS;
+  assert.equal(splitDiffByAxle(base, { front: false, rear: false }), base);
+  const both = splitDiffByAxle(base, { front: "maybe", rear: true });
+  assert.equal(both.some((x) => x.id === "diff"), false);
+  const [f, r] = [both.find((x) => x.id === "diffFront"), both.find((x) => x.id === "diffRear")];
+  assert.deepEqual([f.name, r.name, f.ifEquipped, r.ifEquipped], ["Front differential fluid service", "Rear differential fluid service", true, false]);
+  assert.deepEqual([f.miles, f.price, r.miles, r.price], [45000, 90, 45000, 90]); // the shop's one interval and price, for each
+  assert.equal(both.indexOf(r) - both.indexOf(f), 1); // where the one row was
+  // each has its own history; a ticket that just says "differential" counts for the rear
+  const order = (id, at, miles, text) => ({ id, vehicleId: "v", status: "invoiced", invoicedAt: at, mileageOut: miles, lines: [{ kind: "labor", description: text }] });
+  const now = Date.UTC(2026, 10, 23);
+  const hist = { a: order("a", now - 400 * 864e5, 60000, "Front differential fluid service"), b: order("b", now - 30 * 864e5, 88000, "Differential service") };
+  const rows = serviceReview(both, Object.values(hist), 90000, null, now);
+  assert.deepEqual([rows.find((x) => x.id === "diffFront").lastDone.mileage, rows.find((x) => x.id === "diffRear").lastDone.mileage], [60000, 88000]);
+  // a car with only a front one takes the general wording itself
+  const onlyFront = splitDiffByAxle(base, { front: true, rear: false });
+  assert.equal(serviceReview(onlyFront, [hist.b], 90000, null, now).find((x) => x.id === "diffFront").lastDone.mileage, 88000);
+
+  // the factory interval lands on its own axle
+  const awd = oemSchedule(oemView(data, { ...rav, oem: { drive: "awd" } }));
+  const mine = splitDiffByAxle(base, awd.axles);
+  const mm = mergeMotorIntervals(mine, awd.services, "both", "normal").intervals;
+  assert.deepEqual([mm.find((x) => x.id === "diffRear").motorSpecialMiles, mm.some((x) => x.id === "diffFront"), mm.some((x) => x.id === "diff")], [15000, false, false]);
+
+  // the note on the car brings the same rows back for My Garage
+  const sched = schedFromMerge(base, mm, awd.axles);
+  assert.deepEqual(sched.axles, { front: false, rear: true });
+  assert.deepEqual(sched.hidden, []);
+  assert.deepEqual(applySched(base, sched).filter((x) => /^diff/.test(x.id)).map((x) => x.id), ["diffRear"]);
+  assert.equal("axles" in schedFromMerge(base, mergeMotorIntervals(base, [], "store").intervals), false);
+
+  // checked off for one car: an axle on its own, and an old whole-differential skip covers both
+  const car = withServiceSkip({ id: "v" }, "diffFront", true);
+  assert.deepEqual(vehicleSkips(car), ["diffFront"]);
+  assert.deepEqual(skippedServices(base, car).map((x) => x.id), ["diffFront"]);
+  assert.deepEqual([...checklistIdsForServices(null, skippedServices(base, car))], ["frontDiff"]);
+  const old = { id: "v", serviceSkip: ["diff"] };
+  assert.deepEqual(splitBySkip(both, vehicleSkips(old)).on.some((x) => /^diff/.test(x.id)), false);
+  assert.deepEqual(vehicleSkips(withServiceSkip(old, "diffRear", false)), ["diffFront"]); // rear back on, front stays off
 });
 
 test("service review: the factory schedule goes to the right service, with its repeat interval", () => {
@@ -236,6 +307,9 @@ test("service review: the factory schedule goes to the right service, with its r
 test("the shipped Toyota file: every row reads, and known cars come out right", () => {
   const real = JSON.parse(fs.readFileSync(new URL("../src/data/oem/toyota.json", import.meta.url), "utf8"));
   assert.equal(real.make, "Toyota");
+  // the make is offered for exactly the years the file has
+  const ys = Object.keys(real.years).map(Number);
+  assert.deepEqual([oemMakesFor(Math.min(...ys)), oemMakesFor(Math.max(...ys)), oemMakesFor(Math.min(...ys) - 1), oemMakesFor(Math.max(...ys) + 1)], [["Toyota"], ["Toyota"], [], []]);
   const n = real.strings.length;
   let fluids = 0;
   let services = 0;

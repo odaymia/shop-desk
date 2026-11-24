@@ -27,6 +27,14 @@ const LOADERS = { toyota: () => import("../data/oem/toyota.json") };
 const cache = {};
 const key = (s) => String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, "");
 export const hasOemData = (make) => !!LOADERS[key(make)];
+/* The makes with research, and the model years each covers, known without
+   loading a file: a researched make is offered when adding a car of those
+   years whatever else the make list has. Keep in step with the files. */
+const COVERAGE = { toyota: { name: "Toyota", from: 2011, to: 2026 } };
+export const oemMakesFor = (year) => {
+  const y = Number(year);
+  return Object.values(COVERAGE).filter((c) => !y || (y >= c.from && y <= c.to)).map((c) => c.name);
+};
 export async function loadOemData(make) {
   const k = key(make);
   if (!LOADERS[k]) return null;
@@ -43,9 +51,32 @@ export function parseScope(text) {
   const t = String(text || "");
   const disp = new Set((t.match(/\d\.\d(?=\s?L\b)/g) || []).map(String));
   const codes = new Set((t.match(ENGINE_CODE) || []).filter((c) => /\d/.test(c)));
-  const drive = new Set();
-  if (/\b(FWD|RWD|2WD|4x2)\b/i.test(t)) drive.add("2wd");
-  if (/\b(AWD|4WD|4x4)\b/i.test(t) || /AWD-[ie]\b|e-AWD/i.test(t)) drive.add("awd");
+  const driveOf = (x) => {
+    const d = new Set();
+    if (/\b(FWD|RWD|2WD|4x2)\b/i.test(x)) d.add("2wd");
+    if (/\b(AWD|4WD|4x4)\b/i.test(x) || /AWD-[ie]\b|e-AWD/i.test(x)) d.add("awd");
+    return d;
+  };
+  /* "2WD/4WD; 4WD only" names both drives and then narrows to one: the
+     "only" is what the row is for */
+  const onlyAwd = /\b(AWD|4WD|4x4)\s+only\b/i.test(t);
+  const only2wd = /\b(FWD|RWD|2WD|4x2)\s+only\b/i.test(t);
+  let drive = onlyAwd !== only2wd ? new Set([onlyAwd ? "awd" : "2wd"]) : driveOf(t);
+  /* "4.0L RWD or 4.6L": a drive word inside one of several engines belongs
+     to that engine, not to the row. Kept per engine (`alts`) and read
+     against the car's own engine. */
+  let alts = null;
+  const cut = t.search(/[;,]/);
+  const head = cut < 0 ? t : t.slice(0, cut);
+  const parts = head.split(/\s+or\s+/i);
+  if (onlyAwd === only2wd && parts.length > 1 && parts.every((x) => /\d\.\d\s?L\b/.test(x))) {
+    const dv = parts.map(driveOf);
+    const key = (d) => [...d].sort().join("+");
+    if (dv.some((d) => key(d) !== key(dv[0]))) {
+      alts = parts.map((x, i) => ({ disp: new Set((x.match(/\d\.\d(?=\s?L\b)/g) || []).map(String)), drive: dv[i] }));
+      drive = cut < 0 ? new Set() : driveOf(t.slice(cut));
+    }
+  }
   const trans = new Set();
   if (/\b(\d{1,2}AT|automatic|e?CVT|ECT)\b/i.test(t)) trans.add("auto");
   if (/\b(\d{1,2}MT|manual)\b/i.test(t)) trans.add("manual");
@@ -53,7 +84,9 @@ export function parseScope(text) {
   /* "AWD only", "if equipped": for some cars of this model and not others,
      even when the rest of the research never names the other kind */
   const only = /\bonly\b|if equipped|equipped with/i.test(t);
-  return { text: t, disp, codes, drive, trans, fuel, only, qualified: QUALIFIER.test(t) };
+  /* an "only" that is just about the drive is answered once the drive is known */
+  const onlyIsDrive = (onlyAwd || only2wd) && !/if equipped|equipped with/i.test(t) && !/\bonly\b/i.test(t.replace(/\b(AWD|4WD|4x4|FWD|RWD|2WD|4x2)\s+only\b/gi, ""));
+  return { text: t, disp, codes, drive, alts, trans, fuel, only, onlyIsDrive, qualified: QUALIFIER.test(t) };
 }
 
 /* ---------- what is known about the car ----------
@@ -91,9 +124,15 @@ export function applies(scope, traits) {
     if (traits.hybrid === null) open.push("fuel");
     else if ((scope.fuel === "hybrid") !== traits.hybrid) return { fit: "no", open };
   }
-  if (scope.drive.size === 1) {
+  /* the row's drive, or the drive given beside this car's own engine */
+  let drv = scope.drive;
+  if (scope.alts && !drv.size) {
+    const mine = traits.disp ? scope.alts.filter((a) => a.disp.has(traits.disp)) : scope.alts;
+    drv = mine.some((a) => !a.drive.size) ? drv : new Set(mine.flatMap((a) => [...a.drive]));
+  }
+  if (drv.size === 1) {
     if (traits.drive) {
-      if (!scope.drive.has(traits.drive)) return { fit: "no", open };
+      if (!drv.has(traits.drive)) return { fit: "no", open };
     } else open.push("drive");
   }
   if (scope.trans.size === 1) {
@@ -102,7 +141,7 @@ export function applies(scope, traits) {
     } else open.push("trans");
   }
   /* `hard`: nothing but knowing the car settles it */
-  return { fit: open.length || scope.qualified ? "maybe" : "yes", open, hard: scope.only && open.length > 0 };
+  return { fit: open.length || scope.qualified ? "maybe" : "yes", open, hard: scope.only && (scope.onlyIsDrive ? open.includes("drive") : open.length > 0) };
 }
 
 /* ---------- which listing is this car ----------
@@ -170,12 +209,18 @@ export function serviceIdOf(name) {
   if (/clutch/.test(n)) return "clutch";
   if (/coolant/.test(n)) return /inverter|intercooler|power.?control|battery|fuel cell|traction|stack/.test(n) ? "otherCoolant" : "coolant";
   if (/transfer/.test(n)) return "transfer";
-  if (/differential|rear electric drive|rear drive unit/.test(n)) return "diff";
+  /* front and rear differentials are separate services with their own
+     fluid and interval; a row that names both, or neither, stays general */
+  if (/differential|rear electric drive|rear drive unit/.test(n)) {
+    const front = /front/.test(n);
+    const rear = /rear/.test(n);
+    return front === rear ? "diff" : front ? "diffFront" : "diffRear";
+  }
   if (/transmission|transaxle|cvt/.test(n)) return "trans";
   return "other";
 }
 /* Where a fluid sits on the card, top to bottom. */
-const FLUID_ORDER = ["oil", "trans", "diff", "transfer", "coolant", "otherCoolant", "brakeFluid", "psFluid", "clutch", "other"];
+const FLUID_ORDER = ["oil", "trans", "diff", "diffFront", "diffRear", "transfer", "coolant", "otherCoolant", "brakeFluid", "psFluid", "clutch", "other"];
 
 /* Is a schedule row for everyday driving or for special use? Toyota's
    charts say; the research carries that in the notes. */
@@ -213,13 +258,16 @@ export function oemView(data, vehicle, pick) {
      exist precisely because some of these cars aren't. */
   const naming = (dim) => all.filter((sc) => sc[dim].size === 1);
   if (L.sure && !traits.drive) {
-    const m = naming("drive");
+    /* only the rows that could be this car's: a four-cylinder sold front-
+       drive only is front-drive even when the V6 beside it comes as AWD */
+    const m = naming("drive").filter((sc) => applies(sc, traits).fit !== "no");
     if (m.length && m.every((sc) => sc.drive.has("2wd") && !sc.only)) traits.drive = "2wd";
   }
   if (L.sure && !traits.trans) {
     const m = naming("trans");
     const kinds = new Set(m.flatMap((sc) => [...sc.trans]));
-    if (m.length && kinds.size === 1 && !m.some((sc) => sc.only)) traits.trans = [...kinds][0];
+    /* an "only" that is about the drive ("4WD only") says nothing about the transmission */
+    if (m.length && kinds.size === 1 && !m.some((sc) => sc.only && !sc.onlyIsDrive)) traits.trans = [...kinds][0];
   }
   /* what the rows of this listing distinguish, for the choices on the card */
   const facet = (dim) => {
@@ -306,7 +354,7 @@ const REPLACE = /^replace$/i;
    against, so it never reaches the service review. Also the services the
    manual says this car doesn't have. */
 export function oemSchedule(view) {
-  if (!view) return { services: [], notOnCar: [], source: "" };
+  if (!view) return { services: [], notOnCar: [], axles: { front: false, rear: false }, source: "" };
   const out = [];
   const ids = [...new Set(view.services.map((r) => r.id))].filter((id) => id !== "other" && id !== "otherCoolant");
   const interval = (r) => [r.firstMiles || 0, r.firstMonths || 0, r.repeatMiles || 0, r.repeatMonths || 0];
@@ -322,7 +370,7 @@ export function oemSchedule(view) {
       out.push({ forId: id, name: `${name} Replace`, serviceType: "Replace", miles: n[0], months: n[1], repeatMiles: n[2], repeatMonths: n[3], severeMiles: sp[0], severeMonths: sp[1], severeRepeatMiles: sp[2], severeRepeatMonths: sp[3] });
     }
   }
-  return { services: out, notOnCar: oemNotOnCar(view), source: view.make };
+  return { services: out, notOnCar: oemNotOnCar(view), axles: oemAxles(view), source: view.make };
 }
 
 /* Services the manual says this car has no fluid for (electric power
@@ -332,13 +380,39 @@ export function oemSchedule(view) {
 export function oemNotOnCar(view) {
   if (!view || !view.sure) return [];
   const out = [];
-  for (const id of ["psFluid", "diff"]) {
-    const rows = [...view.fluids.filter((r) => r.id === id), ...view.services.filter((r) => r.id === id)];
+  const DIFFS = ["diff", "diffFront", "diffRear"];
+  for (const id of ["psFluid", ...DIFFS]) {
+    /* "no differential to service" needs every differential row to say so;
+       one axle is off when its own rows do */
+    const mine = (r) => (id === "diff" ? DIFFS.includes(r.id) : r.id === id);
+    const rows = [...view.fluids.filter(mine), ...view.services.filter(mine)];
     /* a row that says "none" is taken at its word whether or not its source
        is a mirror; a row that says there is one keeps the service on */
     if (rows.length && rows.every((r) => r.na) && settled(view, rows, () => "none")) out.push(id);
   }
   return out;
+}
+
+/* Which differentials the manual gives this car a fluid or a replacement
+   for: { front, rear }, each false, true, or "maybe" when it hangs on a
+   drive that isn't known yet (4WD only). Only verified rows that say
+   something to service count: a fluid with a spec or amount, or a scheduled
+   replacement. An inspection alone, or a row that only asks whether the
+   axle applies, doesn't put a service on the review. */
+export function oemAxles(view) {
+  const none = { front: false, rear: false };
+  if (!view || !view.sure) return none;
+  const gone = new Set(oemNotOnCar(view));
+  const has = (id) => {
+    if (gone.has(id) || gone.has("diff")) return false;
+    const rows = [
+      ...view.fluids.filter((r) => r.id === id && r.verified && !r.na && (r.qt > 0 || String(r.spec || "").trim())),
+      ...view.services.filter((r) => r.id === id && r.verified && !r.na && REPLACE.test(r.action)),
+    ];
+    if (!rows.length) return false;
+    return rows.some((r) => !r.hard && !(r.open || []).includes("drive")) ? true : "maybe";
+  };
+  return { front: has("diffFront"), rear: has("diffRear") };
 }
 
 /* "4.6 qt" */
