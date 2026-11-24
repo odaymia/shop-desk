@@ -1024,28 +1024,6 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
             </div>
           </div>
 
-          {vehicle && (
-            <SpecsCard
-              vehicle={vehicle}
-              shop={shop}
-              cfg={cfg}
-              locked={locked}
-              oemOil={oemOil}
-              onMotor={fillFromMotor}
-              motorBusy={motorBusy}
-              onEdit={() => setSpecEdit(true)}
-              onAdd={() => setPick("oil")}
-            />
-          )}
-          {vehicle && oemV && (
-            <OemSpecsCard
-              view={oemV}
-              vehicle={vehicle}
-              oil={shopSpec ? null : oemOil}
-              onPick={(patch) => shop.saveVehicle({ ...vehicle, oem: { ...(vehicle.oem || {}), ...patch } })}
-            />
-          )}
-
           <div className="card" style={{ marginTop: 14 }}>
             {!locked && (
               <div className="addBar">
@@ -1263,6 +1241,28 @@ export function OrderEditor({ orderId, shop, cfg, employees, nav, flash, autoPay
               </table>
             </div>
           </div>
+          {/* specs sit under the line builder, so the ticket itself comes first */}
+          {vehicle && (
+            <SpecsCard
+              vehicle={vehicle}
+              shop={shop}
+              cfg={cfg}
+              locked={locked}
+              oemOil={oemOil}
+              onMotor={fillFromMotor}
+              motorBusy={motorBusy}
+              onEdit={() => setSpecEdit(true)}
+              onAdd={() => setPick("oil")}
+            />
+          )}
+          {vehicle && oemV && (
+            <OemSpecsCard
+              view={oemV}
+              vehicle={vehicle}
+              oil={shopSpec ? null : oemOil}
+              onPick={(patch) => shop.saveVehicle({ ...vehicle, oem: { ...(vehicle.oem || {}), ...patch } })}
+            />
+          )}
           <VisitHistory shop={shop} order={o} vehicle={vehicle} customer={customer} nav={nav} />
         </div>
 
